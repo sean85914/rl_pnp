@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<robot name="deep_flip_system" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:property name="M_PI" value="3.1415926535"/>
+  <!-- UR3 -->
+  <xacro:include filename="$(find ur_description)/urdf/ur3.urdf.xacro"/>
+  <material name="black">
+    <color rgba="0.2 0.2 0.2 1.0"/>
+  </material>
+  <xacro:ur3_robot prefix="" joint_limited="false"/>
+  <link name="camera_link">
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="${M_PI/2} 0.0 ${M_PI/2}"/>
+      <geometry>
+        <mesh filename="package://realsense2_camera/meshes/RealSense 90deg.STL" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+  <joint name="arm2cam_joint" type="fixed">
+    <origin xyz="-0.0141949 0.45256924 0.84557343"
+            rpy="2.8739904737308226 1.3575028048452842 1.3385069136920331"/>
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+  </joint>
+</robot>
