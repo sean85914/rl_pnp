@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="robot_ip"/>
+  <arg name="tool_length" default="0.0"/>
+  <!-- Turn on real robot -->
+  <include file="$(find ur_modern_driver)/launch/ur3_bringup.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+  </include>
+  <node pkg="arm_operation" type="ur3_control_server" name="ur3_control_server" output="screen">
+    <param name="sim" value="false"/>
+    <param name="tool_length" value="$(arg tool_length)"/>
+    <param name="wrist1_upper_bound" value="3.14"/>
+    <param name="wrist1_lower_bound" value="-3.14"/>
+    <param name="wrist2_upper_bound" value="3.14"/>
+    <param name="wrist2_lower_bound" value="-3.14"/>
+    <param name="wrist3_upper_bound" value="3.14"/>
+    <param name="wrist3_lower_bound" value="-3.14"/>
+    <remap from="~joint_states" to="/joint_states"/>
+  </node>
+</launch>

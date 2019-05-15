@@ -1,0 +1,14 @@
+<launch>
+  <param name="use_sim_time" value="true"/>
+  <node pkg="arm_operation" type="ur5_control_server" name="ur5_control_server" output="screen">
+    <param name="sim" value="true"/>
+    <param name="tool_length" value="0.0"/>
+    <param name="wrist1_upper_bound" value="3.14"/>
+    <param name="wrist1_lower_bound" value="-3.14"/>
+    <param name="wrist2_upper_bound" value="3.14"/>
+    <param name="wrist2_lower_bound" value="-3.14"/>
+    <param name="wrist3_upper_bound" value="3.14"/>
+    <param name="wrist3_lower_bound" value="-3.14"/>
+    <remap from="~joint_states" to="/joint_states"/>
+  </node>
+</launch>
