@@ -1,12 +1,24 @@
 <?xml version="1.0"?>
 <robot name="deep_flip_system" xmlns:xacro="http://ros.org/wiki/xacro">
+  <gazebo>
+    <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so"> 
+      <robotNamespace>/</robotNamespace>
+    </plugin> 
+  </gazebo>
   <xacro:property name="M_PI" value="3.1415926535"/>
   <!-- UR3 -->
   <xacro:include filename="$(find ur_description)/urdf/ur3.urdf.xacro"/>
+  <!-- Gripper -->
+  <xacro:include filename="$(find robotiq_description)/urdf/robotiq_85_gripper.urdf.xacro" />
+  <!-- Color material -->
   <material name="black">
     <color rgba="0.2 0.2 0.2 1.0"/>
   </material>
+  <material name="green">
+    <color rgba="0.0 1.0 0.0 1.0"/>
+  </material>
   <xacro:ur3_robot prefix="" joint_limited="false"/>
+  <!-- SR300 -->
   <link name="camera_link">
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="${M_PI/2} 0.0 ${M_PI/2}"/>
@@ -22,4 +34,35 @@
     <parent link="base_link"/>
     <child link="camera_link"/>
   </joint>
-</robot>
+  <!-- Robotiq 2f 85 -->
+  <link name="gripper_root_link"/>
+  <joint name="ee2gripper_joint" type="fixed">
+    <parent link="ee_link"/>
+    <child link="gripper_root_link"/>
+    <origin xyz="0.011 0.0 0.0" rpy="${M_PI} 0.0 0.0"/>
+  </joint>
+  <xacro:robotiq_85_gripper prefix="" parent="gripper_root_link">
+    <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+  </xacro:robotiq_85_gripper>
+  <!-- Sketch for conveyor -->
+  <link name="convayor_link">
+    <visual>
+      <geometry>
+        <box size="1.0 0.6 0.06"/>
+      </geometry> 
+      <material name="green"/>
+    </visual>
+  </link>
+  <joint name="arm2convayor_joint" type="fixed">
+    <origin xyz="0.007 0.547 0.152" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="convayor_link"/>
+  </joint>
+  <!-- TCP -->
+  <link name="tcp_link"/>
+  <joint name="gripper_base2tcp" type="fixed">
+    <parent link="robotiq_85_base_link"/>
+    <child link="tcp_link"/>
+    <origin xyz="0.13 0.0 0.0" rpy="0.0 0.0 0.0"/>
+  </joint>
+</robot> 
