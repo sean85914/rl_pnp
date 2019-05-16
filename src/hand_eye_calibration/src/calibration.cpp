@@ -16,6 +16,8 @@
  *    file_name: output file name
  *  Service: /ur3_control_server/ur_control/goto_pose
  *  Frame: base_link, ee_link, tcp_link, tag_frame
+ *  Editor: Sean Lu
+ *  Last edited: 5/16, 2019
  */
 
 class calibration{
