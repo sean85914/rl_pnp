@@ -22,6 +22,7 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
 )
 find_package(Eigen REQUIRED)
 
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -81,7 +82,7 @@ generate_messages(
   DEPENDENCIES
   std_msgs
   geometry_msgs
-  actionlib_msgs  ##PETER
+  actionlib_msgs
 )
 
 ################################################
@@ -115,8 +116,8 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
  INCLUDE_DIRS include
- LIBRARIES arm_operation
- CATKIN_DEPENDS roscpp rospy std_msgs roslib
+ #LIBRARIES arm_operation
+ CATKIN_DEPENDS roscpp rospy std_msgs roslib message_runtime
  DEPENDS Eigen
 )
 
@@ -184,11 +185,13 @@ include_directories(
 # )
 
 ## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h"
+  PATTERN ".svn" EXCLUDE
+)
+
+
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES
