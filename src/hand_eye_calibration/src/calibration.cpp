@@ -8,6 +8,7 @@
 
 /*
  *  Hand-eye automatically calibration, collecting data process
+ *  Note: Remember to broadcast \tcp_link\ frame, this can be measured easily
  *  
  *  Parameters:
  *    dx: x difference in meter
@@ -37,9 +38,9 @@ class calibration{
   tf::TransformListener listener; 
   /*
    *  Write the data to file
-   *  format: x(hand coord.) y(hand coord.) z(hand coord.) x(eye_coord) y(eye_coord) z(eye_coord)
-   *  [param]in geometry_msgs::Pose p_tcp:
-   *  [param]in geometry_msgs::Pose p_tag:
+   *  format: x(hand coord.) y(hand coord.) z(hand coord.) x(eye_coord.) y(eye_coord.) z(eye_coord.)
+   *  [param]in geometry_msgs::Pose p_tcp: pose of tag in hand coordinate
+   *  [param]in geometry_msgs::Pose p_tag: pose of tag in eye coordinate
    */
   void write_data(geometry_msgs::Pose p_tcp, geometry_msgs::Pose p_tag){
     fs << p_tcp.position.x << " "
