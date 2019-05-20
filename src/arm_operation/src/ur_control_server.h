@@ -50,6 +50,11 @@ class RobotArm {
   double wrist1_upper_bound, wrist1_lower_bound;
   double wrist2_upper_bound, wrist2_lower_bound;
   double wrist3_upper_bound, wrist3_lower_bound;
+  const double parabola_a = -10.3;
+  const double parabola_b = 6.65;
+  const double parabola_c = -0.8;
+  const double move_y = 0.08;
+  const double parabola_time = 0.4;
   bool sim;
   bool wrist1_collision;
   bool wrist2_collision;
@@ -63,10 +68,11 @@ class RobotArm {
   // Services
   ros::ServiceServer goto_pose_srv;
   ros::ServiceServer go_straight_srv;
+  ros::ServiceServer go_parabolic_srv;
   ros::ServiceServer goto_joint_pose_srv;
   TrajClient *traj_client;
   control_msgs::FollowJointTrajectoryGoal goal; 
-  control_msgs::FollowJointTrajectoryGoal straight;
+  control_msgs::FollowJointTrajectoryGoal path;
   // Private Functions
   /* 
    *  Convert input joint angle to branch [-pi, pi]
@@ -150,6 +156,7 @@ class RobotArm {
    // Service server callback
    bool GotoPoseService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
    bool GoStraightLineService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
+   bool GoParabolicService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
    bool GotoJointPoseService(arm_operation::joint_pose::Request  &req, arm_operation::joint_pose::Response &res);
 };
 

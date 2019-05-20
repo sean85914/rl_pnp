@@ -7,6 +7,7 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   // Service server
   goto_pose_srv = pnh_.advertiseService("ur_control/goto_pose", &RobotArm::GotoPoseService, this);
   go_straight_srv = pnh_.advertiseService("ur_control/go_straight", &RobotArm::GoStraightLineService, this);
+  go_parabolic_srv = pnh_.advertiseService("ur_control/go_parabolic", &RobotArm::GoParabolicService, this);
   goto_joint_pose_srv = pnh_.advertiseService("ur_control/goto_joint_pose", &RobotArm::GotoJointPoseService, this);
   // Parameters
   if(!pnh.getParam("tool_length", tool_length)) tool_length = 0.18;
@@ -40,7 +41,7 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
     ROS_INFO("Waiting for the joint_trajectory_action server");
   ROS_INFO("[%s] Action server connected!", ros::this_node::getName().c_str());
   trajectory_msgs::JointTrajectory &t = goal.trajectory;
-  trajectory_msgs::JointTrajectory &l = straight.trajectory;
+  trajectory_msgs::JointTrajectory &l = path.trajectory;
   t.joint_names.resize(6);                   l.joint_names.resize(6);
   t.joint_names[0] = prefix+"shoulder_pan_joint";   l.joint_names[0] = prefix+"shoulder_pan_joint";
   t.joint_names[1] = prefix+"shoulder_lift_joint";  l.joint_names[1] = prefix+"shoulder_lift_joint";
@@ -88,7 +89,7 @@ bool RobotArm::GoStraightLineService(arm_operation::target_pose::Request &req, a
                                                                         req.target_pose.orientation.y,
                                                                         req.target_pose.orientation.z,
                                                                         req.target_pose.orientation.w);
-  trajectory_msgs::JointTrajectory &l = straight.trajectory;
+  trajectory_msgs::JointTrajectory &l = path.trajectory;
   geometry_msgs::Pose pose_now = getCurrentTCPPose();
   double waypoint_sol_[NUMBEROFPOINTS * 6] = {0}, temp[6] = {0};
   tf::Quaternion q(pose_now.orientation.x, 
@@ -150,7 +151,51 @@ bool RobotArm::GoStraightLineService(arm_operation::target_pose::Request &req, a
     l.points[NUMBEROFPOINTS].velocities[i] = 0; 
     l.points[0].time_from_start = ros::Duration(0);
   }
-  StartTrajectory(straight);
+  StartTrajectory(path);
+  res.plan_result = "find_one_feasible_solution";
+  return true;
+}
+
+bool RobotArm::GoParabolicService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res){
+  ROS_INFO("[%s] Receive new parabola path: %f %f %f", ros::this_node::getName().c_str(),
+                                                       req.target_pose.position.x, 
+                                                       req.target_pose.position.y,
+                                                       req.target_pose.position.z);
+  trajectory_msgs::JointTrajectory &l = path.trajectory;
+  double waypoint_sol_[NUMBEROFPOINTS * 6] = {0}, temp[6] = {0};
+  for(int i=0; i<NUMBEROFPOINTS; ++i) {
+    geometry_msgs::Pose waypoint;
+    // Interpolated points
+    waypoint.position.x = req.target_pose.position.x;
+    waypoint.position.y = req.target_pose.position.y - move_y * i / double(NUMBEROFPOINTS);
+    waypoint.position.z = (i!=0? parabola_a*pow(waypoint.position.y, 2)+parabola_b*waypoint.position.y+parabola_c : req.target_pose.position.z);
+    waypoint.orientation.x = 1/sqrt(2);
+    waypoint.orientation.y = 0.0;
+    waypoint.orientation.z = -1/sqrt(2);
+    waypoint.orientation.w = 0.0;
+    PerformIK(waypoint, temp);
+    if(num_sols == 0) {
+      ROS_ERROR("waypoint index: %d fail to find IK solution", i);
+      res.plan_result = "fail_to_find_solution";
+      return true;
+    }
+    for(int j=0; j<6; ++j) {waypoint_sol_[i*6 + j] = temp[j];}
+  }
+  for (int i=0; i<NUMBEROFPOINTS; ++i) {
+    double temp[6]={0};
+    for (int j=0; j<6; ++j){
+      l.points[i+1].positions[j] = waypoint_sol_[i*6 + j];
+      l.points[i+1].velocities[j] = 0.5; // XXX
+      l.points[i+1].time_from_start = ros::Duration(parabola_time * (i+1) / double(NUMBEROFPOINTS));
+    }
+  }
+  for (int i=0; i<6; ++i) {
+    l.points[0].positions[i] = joint[i];
+    l.points[0].velocities[i] = 0;
+    l.points[NUMBEROFPOINTS].velocities[i] = 0; 
+    l.points[0].time_from_start = ros::Duration(0);
+  }
+  StartTrajectory(path);
   res.plan_result = "find_one_feasible_solution";
   return true;
 }

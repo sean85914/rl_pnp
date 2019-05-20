@@ -1,8 +1,9 @@
 <launch>
   <param name="use_sim_time" value="true"/>
+  <arg name="tool_length" default="0.0"/>
   <node pkg="arm_operation" type="ur3_control_server" name="ur3_control_server" output="screen">
     <param name="sim" value="true"/>
-    <param name="tool_length" value="0.0"/>
+    <param name="tool_length" value="$(arg tool_length)"/>
     <param name="wrist1_upper_bound" value="3.14"/>
     <param name="wrist1_lower_bound" value="-3.14"/>
     <param name="wrist2_upper_bound" value="3.14"/>
