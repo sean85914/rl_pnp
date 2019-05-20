@@ -34,6 +34,20 @@
     <parent link="base_link"/>
     <child link="camera_link"/>
   </joint>
+  <!-- Gripper coupler -->
+  <link name="gripper_coupler_link">
+    <visual>
+      <origin xyz="0.004 0.0 0.0" rpy="0.0 ${-M_PI/2} 0.0"/>
+      <geometry>
+        <mesh filename="package://robotiq_description/meshes/robotiq_85_coupler.stl"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+  <joint name="ee_link2coupler_joint" type="fixed">
+    <parent link="ee_link"/>
+    <child link="gripper_coupler_link"/>
+  </joint>
   <!-- Robotiq 2f 85 -->
   <link name="gripper_root_link"/>
   <joint name="ee2gripper_joint" type="fixed">
@@ -61,7 +75,7 @@
   <!-- TCP -->
   <link name="tcp_link"/>
   <joint name="gripper_base2tcp" type="fixed">
-    <parent link="robotiq_85_base_link"/>
+    <parent link="ee_link"/>
     <child link="tcp_link"/>
     <origin xyz="0.13 0.0 0.0" rpy="0.0 0.0 0.0"/>
   </joint>
