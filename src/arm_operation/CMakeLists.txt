@@ -228,3 +228,9 @@ target_link_libraries(get_current_pose ${catkin_LIBRARIES})
 add_executable(set_pose src/set_pose.cpp)
 add_dependencies(set_pose ${catkin_EXPORTED_TARGETS} arm_operation_gencpp)
 target_link_libraries(set_pose ${catkin_LIBRARIES})
+
+add_executable(ur3_ik_solver script/ur_ik_solver.cpp)
+target_link_libraries(ur3_ik_solver ${catkin_LIBRARIES} ur3_kin)
+
+add_executable(ur5_ik_solver script/ur5_ik_solver.cpp)
+target_link_libraries(ur5_ik_solver ${catkin_LIBRARIES} ur5_kin)
