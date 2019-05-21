@@ -124,9 +124,10 @@ bool RobotArm::GoStraightLineService(arm_operation::target_pose::Request &req, a
   ROS_INFO("[%s] Execution time: %.f seconds", ros::this_node::getName().c_str(), total_time);
   // Least Square to solve joints angular velocities
   // Assume: q(t) = a*t^2 + b*t + c
+  // Then:   w(t) = 2a*t + b
   Eigen::MatrixXd A(NUMBEROFPOINTS+1, 3);
-  Eigen::MatrixXd x(3, 6);
   Eigen::MatrixXd b(NUMBEROFPOINTS+1, 6);
+  // Build matrix A and b
   for (int i = 0; i < NUMBEROFPOINTS; ++i) {
     double t = total_time * (i+1) / double(NUMBEROFPOINTS);
     A(i+1, 0) = t*t; A(i+1, 1) = t; A(i+1, 2) = 1;
@@ -136,7 +137,7 @@ bool RobotArm::GoStraightLineService(arm_operation::target_pose::Request &req, a
   }
   A(0, 0) = 0; A(0, 1) = 0; A(0, 2) = 1;
   for(int j = 0; j<6; ++j) {b(0, j)=joint[j];}
-  x = (A.transpose()*A).inverse()*A.transpose()*b;
+  Eigen::MatrixXd x(3, 6); x = (A.transpose()*A).inverse()*A.transpose()*b;
   for (int i=0; i<NUMBEROFPOINTS; ++i) {
     double temp[6]={0};
     for (int j=0; j<6; ++j){
@@ -168,11 +169,12 @@ bool RobotArm::GoParabolicService(arm_operation::target_pose::Request &req, arm_
     // Interpolated points
     waypoint.position.x = req.target_pose.position.x;
     waypoint.position.y = req.target_pose.position.y - move_y * i / double(NUMBEROFPOINTS);
-    waypoint.position.z = (i!=0? parabola_a*pow(waypoint.position.y, 2)+parabola_b*waypoint.position.y+parabola_c : req.target_pose.position.z);
-    waypoint.orientation.x = 1/sqrt(2);
-    waypoint.orientation.y = 0.0;
-    waypoint.orientation.z = -1/sqrt(2);
-    waypoint.orientation.w = 0.0;
+    waypoint.position.z = parabola_a*pow(waypoint.position.y, 2)+parabola_b*waypoint.position.y+parabola_c;
+    //ROS_INFO("%f %f %f", waypoint.position.x, waypoint.position.y, waypoint.position.z);
+    waypoint.orientation.x = 0.568; //-0.5;
+    waypoint.orientation.y = -0.524; //0.5;
+    waypoint.orientation.z = -0.428; //0.5;
+    waypoint.orientation.w = -0.469; //0.5;
     PerformIK(waypoint, temp);
     if(num_sols == 0) {
       ROS_ERROR("waypoint index: %d fail to find IK solution", i);
@@ -181,11 +183,27 @@ bool RobotArm::GoParabolicService(arm_operation::target_pose::Request &req, arm_
     }
     for(int j=0; j<6; ++j) {waypoint_sol_[i*6 + j] = temp[j];}
   }
+  // Least Square to solve joints angular velocities
+  // Assume: q(t) = a*t^2 + b*t + c
+  // Then:   w(t) = 2a*t + b
+  Eigen::MatrixXd A(NUMBEROFPOINTS+1, 3);
+  Eigen::MatrixXd b(NUMBEROFPOINTS+1, 6);
+  // Build matrix A and b
+  for (int i = 0; i < NUMBEROFPOINTS; ++i) {
+    double t = parabola_time * (i+1) / double(NUMBEROFPOINTS);
+    A(i+1, 0) = t*t; A(i+1, 1) = t; A(i+1, 2) = 1;
+    for (int j=0; j<6; ++j) {
+      b(i+1, j) = waypoint_sol_[i*6 + j];
+    }
+  }
+  A(0, 0) = 0; A(0, 1) = 0; A(0, 2) = 1;
+  for(int j = 0; j<6; ++j) {b(0, j)=joint[j];}
+  Eigen::MatrixXd x(3, 6); x = (A.transpose()*A).inverse()*A.transpose()*b;
   for (int i=0; i<NUMBEROFPOINTS; ++i) {
     double temp[6]={0};
     for (int j=0; j<6; ++j){
       l.points[i+1].positions[j] = waypoint_sol_[i*6 + j];
-      l.points[i+1].velocities[j] = 0.5; // XXX
+      l.points[i+1].velocities[j] = 2* x(0, j) * parabola_time * (i+1) / double(NUMBEROFPOINTS) + x(1, j);
       l.points[i+1].time_from_start = ros::Duration(parabola_time * (i+1) / double(NUMBEROFPOINTS));
     }
   }
@@ -195,6 +213,22 @@ bool RobotArm::GoParabolicService(arm_operation::target_pose::Request &req, arm_
     l.points[NUMBEROFPOINTS].velocities[i] = 0; 
     l.points[0].time_from_start = ros::Duration(0);
   }
+  /*
+  for (int i=0; i<NUMBEROFPOINTS; ++i) {
+    double temp[6]={0};
+    for (int j=0; j<6; ++j){
+      l.points[i+1].positions[j] = waypoint_sol_[i*6 + j];
+      l.points[i+1].velocities[j] = 0.1; // XXX
+      l.points[i+1].time_from_start = ros::Duration(parabola_time * (i+1) / double(NUMBEROFPOINTS));
+    }
+  }
+  for (int i=0; i<6; ++i) {
+    l.points[0].positions[i] = joint[i];
+    l.points[0].velocities[i] = 0;
+    l.points[NUMBEROFPOINTS].velocities[i] = 0; 
+    l.points[0].time_from_start = ros::Duration(0);
+  }
+  */
   StartTrajectory(path);
   res.plan_result = "find_one_feasible_solution";
   return true;
@@ -220,6 +254,7 @@ bool RobotArm::GotoJointPoseService(arm_operation::joint_pose::Request  &req, ar
 }
 
 // Private functions
+
 double RobotArm::validAngle(double angle){
   if(abs(angle) > 2*M_PI) angle = fmod(angle, 2*M_PI);
   if(angle > M_PI) angle -= 2*M_PI;
@@ -354,6 +389,7 @@ control_msgs::FollowJointTrajectoryGoal RobotArm::ArmToDesiredPoseTrajectory(geo
   double sol[6] = {0}; ROS_INFO("[%s] Joints to go solve from IK: ", ros::this_node::getName().c_str());
   // If not solutions, assign angle now to sol
   if(!PerformIK(pose, sol)) {
+    ROS_WARN("Cannot find IK solution!");
     for (int i = 0; i < 6; ++i) sol[i] = joint[i];
   } 
   for (int i = 0; i < 6; ++i) {
