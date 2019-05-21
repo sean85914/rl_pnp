@@ -51,10 +51,10 @@ class RobotArm {
   double wrist2_upper_bound, wrist2_lower_bound;
   double wrist3_upper_bound, wrist3_lower_bound;
   const double parabola_a = -10.3;
-  const double parabola_b = 6.65;
+  const double parabola_b = 6.8;
   const double parabola_c = -0.8;
-  const double move_y = 0.08;
-  const double parabola_time = 0.4;
+  const double move_y = 0.05;
+  const double parabola_time = 1.0;
   bool sim;
   bool wrist1_collision;
   bool wrist2_collision;
