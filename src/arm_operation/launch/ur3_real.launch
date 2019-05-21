@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="robot_ip"/>
-  <arg name="tool_length" default="0.0"/>
+  <arg name="tool_length" default="0.15"/>
   <!-- Turn on real robot -->
   <include file="$(find ur_modern_driver)/launch/ur3_bringup.launch">
     <arg name="robot_ip" value="$(arg robot_ip)"/>
