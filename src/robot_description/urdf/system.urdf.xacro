@@ -29,8 +29,8 @@
     </visual>
   </link>
   <joint name="arm2cam1_joint" type="fixed">
-    <origin xyz="-0.0141949 0.45256924 0.84557343"
-            rpy="2.8739904737308226 1.3575028048452842 1.3385069136920331"/>
+    <origin xyz="-0.00129317 0.440264 0.843718"
+            rpy="2.53724 1.54933 0.982746"/>
     <parent link="base_link"/>
     <child link="camera1_link"/>
   </joint>
@@ -45,7 +45,7 @@
     </visual>
   </link>
   <joint name="arm2cam2_joint" type="fixed">
-    <origin xyz="0 1.0 0.3" rpy="0.0 0.0 -${M_PI/2}"/> <!-- TBD -->
+    <origin xyz="-0.0368148 0.966091 0.409279" rpy="0.016628 0.132712 -1.55129"/> <!-- TBD -->
     <parent link="base_link"/>
     <child link="camera2_link"/>
   </joint>
