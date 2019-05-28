@@ -1,0 +1,21 @@
+<?xml version="1.0" ?>
+<launch>
+  <arg name="cam1_serial_no"  />
+  <arg name="cam2_serial_no"  />
+  <arg name="camera1" default="camera1"/>
+  <arg name="cam1_tf_prefix" default="camera1"/>
+  <arg name="camera2" default="camera2"/>
+  <arg name="cam2_tf_prefix" default="camera2"/>
+  <!-- Turn on camera 1 -->
+  <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
+    <arg name="camera" value="$(arg camera1)"/>
+    <arg name="tf_prefix" value="$(arg cam1_tf_prefix)"/>
+    <arg name="serial_no" value="$(arg cam1_serial_no)"/>
+  </include>
+  <!-- Turn on camera 2 -->
+    <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
+      <arg name="camera" value="$(arg camera2)"/>
+      <arg name="tf_prefix" value="$(arg cam2_tf_prefix)"/>
+      <arg name="serial_no" value="$(arg cam2_serial_no)"/>
+    </include> 
+</launch>
