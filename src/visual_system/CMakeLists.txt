@@ -30,3 +30,6 @@ target_link_libraries(get_click_position ${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
 
 add_executable(get_conveyor_plane src/get_conveyor_plane.cpp)
 target_link_libraries(get_conveyor_plane ${catkin_LIBRARIES})
+
+add_executable(get_target_pc src/get_target_pc.cpp)
+target_link_libraries(get_target_pc ${catkin_LIBRARIES})
