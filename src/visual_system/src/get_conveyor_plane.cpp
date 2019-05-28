@@ -26,7 +26,6 @@ class GetConveyorPlane{
   ros::NodeHandle nh_, pnh_;
   ros::Subscriber sub_pc;
   ros::Publisher pub_plane_pc;
-  PointCloudXYZRGB input;
   PointCloudXYZRGBPtr inputPtr;
   PointCloudXYZRGBPtr filteredPtr;
   PointCloudXYZRGBPtr planePtr;
@@ -44,10 +43,9 @@ GetConveyorPlane::GetConveyorPlane(ros::NodeHandle nh, ros::NodeHandle pnh): nh_
 }
 
 void GetConveyorPlane::cb_pc(const sensor_msgs::PointCloud2ConstPtr msgPtr){
-  pcl::fromROSMsg(*msgPtr, input);
+  pcl::fromROSMsg(*msgPtr, *inputPtr);
   std::vector<int> _;
-  pcl::removeNaNFromPointCloud(input, input, _);
-  inputPtr = input.makeShared();
+  pcl::removeNaNFromPointCloud(*inputPtr, *inputPtr, _);
   // Get plane
   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
@@ -64,8 +62,7 @@ void GetConveyorPlane::cb_pc(const sensor_msgs::PointCloud2ConstPtr msgPtr){
             coefficients->values[0], coefficients->values[1], 
             coefficients->values[2], coefficients->values[3]*-1);
   std::vector<double> norm_vec{coefficients->values[0], coefficients->values[1], coefficients->values[2]};
-  double distance_origin2plane = (coefficients->values[3])/norm(norm_vec);
-  if(distance_origin2plane<0) distance_origin2plane *= -1.0;
+  double distance_origin2plane = std::abs((coefficients->values[3])/norm(norm_vec));
   ROS_INFO("Distance from origin to plane: %f", distance_origin2plane);
   pcl::ExtractIndices<pcl::PointXYZRGB> indiceFilter(true);
   indiceFilter.setInputCloud(inputPtr);
