@@ -8,7 +8,8 @@
 
 /*
  *  Hand-eye automatically calibration, collecting data process
- *  Note: Remember to broadcast \tcp_link\ frame, this can be measured easily
+ *  Note: Remember to broadcast \fake_tcp\ frame, this can be measured easily
+ *        This frame represents the tag center in arm's coordinate
  *  
  *  Parameters:
  *    dx: x difference in meter
@@ -128,7 +129,7 @@ class calibration{
       tf::StampedTransform st;
       get_tag_data(st);
       geometry_msgs::Pose p_tag = transform2Pose(st);
-      get_arm_data(st, "tcp_link"); // Remember to broadcast tcp_link frame
+      get_arm_data(st, "fake_tcp"); // Remember to broadcast fake_tcp frame
       geometry_msgs::Pose p_tcp = transform2Pose(st);
       write_data(p_tcp, p_tag);
       ++count;
@@ -162,7 +163,7 @@ class calibration{
     client = nh_.serviceClient<arm_operation::target_pose>("/ur3_control_server/ur_control/goto_pose", true);
     ROS_INFO("Start process");
     tf::StampedTransform transform;
-    get_arm_data(transform, "ee_link");
+    get_arm_data(transform, "tcp_link");
     original_pose = transform2Pose(transform);
     calibration_process();
     ROS_INFO("End process");
