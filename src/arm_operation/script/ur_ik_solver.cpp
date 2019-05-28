@@ -60,8 +60,15 @@ int PerformIK(geometry_msgs::Pose target_pose){
   return sols;
 }
 
+void printHelp(void){
+  std::cout << "\033[1;31mNot enough arguments, please provides: tool length x y z qx qy qz qw\033[0m]\n";
+}
+
 int main(int argc, char** argv)
 {
+  if(argc!=9){
+    printHelp(); return -1;
+  }
   tool_length = atof(argv[1]);
   geometry_msgs::Pose p;
   p.position.x = atof(argv[2]);
