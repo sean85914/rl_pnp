@@ -312,12 +312,12 @@
 		<origin xyz="0 0 0.5" rpy="0 0 0" />
 	</joint-->
 
-    <link name="${prefix}tcp_link"/>
+    <!--link name="${prefix}tcp_link"/>
     <joint name="${prefix}tcp_fixed_joint" type="fixed">
       <origin xyz="0.225 0 0" rpy="0 0 0"/>
       <parent link="${prefix}ee_link"/>
       <child link="${prefix}tcp_link"/>
-    </joint>
+    </joint-->
 
     <xacro:ur_arm_transmission prefix="${prefix}" />
     <xacro:ur_arm_gazebo prefix="${prefix}" />
