@@ -70,6 +70,7 @@ class RobotArm {
   ros::ServiceServer go_straight_srv;
   ros::ServiceServer go_parabolic_srv;
   ros::ServiceServer goto_joint_pose_srv;
+  ros::ServiceServer fast_rotate_srv;
   TrajClient *traj_client;
   control_msgs::FollowJointTrajectoryGoal goal; 
   control_msgs::FollowJointTrajectoryGoal path;
@@ -157,7 +158,8 @@ class RobotArm {
    bool GotoPoseService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
    bool GoStraightLineService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
    bool GoParabolicService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
-   bool GotoJointPoseService(arm_operation::joint_pose::Request  &req, arm_operation::joint_pose::Response &res);
+   bool GotoJointPoseService(arm_operation::joint_pose::Request &req, arm_operation::joint_pose::Response &res);
+   bool FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 };
 
 #endif
