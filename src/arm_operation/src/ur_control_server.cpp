@@ -9,6 +9,7 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   go_straight_srv = pnh_.advertiseService("ur_control/go_straight", &RobotArm::GoStraightLineService, this);
   go_parabolic_srv = pnh_.advertiseService("ur_control/go_parabolic", &RobotArm::GoParabolicService, this);
   goto_joint_pose_srv = pnh_.advertiseService("ur_control/goto_joint_pose", &RobotArm::GotoJointPoseService, this);
+  fast_rotate_srv = pnh_.advertiseService("ur_control/fast_rotate", &RobotArm::FastRotateService, this);
   // Parameters
   if(!pnh.getParam("tool_length", tool_length)) tool_length = 0.18;
   if(!pnh.getParam("prefix", prefix)) prefix="";
@@ -253,6 +254,22 @@ bool RobotArm::GotoJointPoseService(arm_operation::joint_pose::Request  &req, ar
   return true;
 }
 
+bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
+  ROS_INFO("Receive fast rotate service call.");
+  trajectory_msgs::JointTrajectory &t = goal.trajectory;
+  for(int i=0; i<6; ++i){
+    t.points[0].positions[i] = joint[i];
+    t.points[1].positions[i] = joint[i];
+    t.points[0].velocities[i] = 0.0;
+    t.points[1].velocities[i] = 0.0;
+  }
+  t.points[1].positions[5] += M_PI/2; //if(t.points[1].positions[5] >= 2*M_PI) t.points[1].positions[5] -= 2*M_PI;
+  t.points[0].time_from_start = ros::Duration(0);
+  t.points[1].time_from_start = ros::Duration(0.6);
+  StartTrajectory(goal);
+  return true;
+}
+
 // Private functions
 
 double RobotArm::validAngle(double angle){
@@ -318,7 +335,10 @@ int RobotArm::PerformIK(geometry_msgs::Pose target_pose, double *sol){
     wrist1_collision = wrist_check_bound(q_sols[i*6+3], wrist1_upper_bound, wrist1_lower_bound); 
     wrist2_collision = wrist_check_bound(q_sols[i*6+4], wrist2_upper_bound, wrist2_lower_bound); 
     wrist3_collision = wrist_check_bound(q_sols[i*6+5], wrist3_upper_bound, wrist3_lower_bound);
-    for (int j = 0; j < 6; ++j) {dist += pow(q_sols[i*6 + j] - joint[j], 2);}
+    for (int j = 0; j < 6; ++j) {
+      if(j<3) dist += pow((q_sols[i*6 + j] - joint[j])*1.5, 2); // For joint 1, 2, and 3, multiply by 1.5
+      else dist += pow((q_sols[i*6 + j] - joint[j])*0.5, 2); // For joint 4, 5 and 6, multiply by 0.5
+    }
     // Find solution with minimum joint angle difference
     if(min>dist && !wrist1_collision && !wrist2_collision && !wrist3_collision){
       min = dist;
