@@ -7,9 +7,11 @@
   </gazebo>
   <xacro:property name="M_PI" value="3.1415926535"/>
   <!-- UR3 -->
-  <xacro:include filename="$(find ur_description)/urdf/ur3.urdf.xacro"/>
+  <!--xacro:include filename="$(find ur_description)/urdf/ur3.urdf.xacro"/-->
+  <!-- UR3 with suction -->
+  <xacro:include filename="$(find robot_description)/urdf/ur3_with_suction.urdf.xacro"/>
   <!-- Gripper -->
-  <xacro:include filename="$(find robotiq_description)/urdf/robotiq_85_gripper.urdf.xacro" />
+  <!--xacro:include filename="$(find robotiq_description)/urdf/robotiq_85_gripper.urdf.xacro" /-->
   <!-- Color material -->
   <material name="black">
     <color rgba="0.2 0.2 0.2 1.0"/>
@@ -50,6 +52,7 @@
     <child link="camera2_link"/>
   </joint>
   <!-- Gripper coupler -->
+  <!--
   <link name="gripper_coupler_link">
     <visual>
       <origin xyz="0.004 0.0 0.0" rpy="0.0 ${-M_PI/2} 0.0"/>
@@ -63,7 +66,6 @@
     <parent link="ee_link"/>
     <child link="gripper_coupler_link"/>
   </joint>
-  <!-- Robotiq 2f 85 -->
   <link name="gripper_root_link"/>
   <joint name="ee2gripper_joint" type="fixed">
     <parent link="ee_link"/>
@@ -73,6 +75,7 @@
   <xacro:robotiq_85_gripper prefix="" parent="gripper_root_link">
     <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
   </xacro:robotiq_85_gripper>
+  -->
   <!-- Sketch for conveyor -->
   <link name="convayor_link">
     <visual>
@@ -88,10 +91,10 @@
     <child link="convayor_link"/>
   </joint>
   <!-- TCP -->
-  <link name="tcp_link"/>
+  <!--link name="tcp_link"/>
   <joint name="gripper_base2tcp" type="fixed">
     <parent link="ee_link"/>
     <child link="tcp_link"/>
     <origin xyz="0.15 0.0 0.0" rpy="0.0 0.0 0.0"/>
-  </joint>
+  </joint-->
 </robot> 

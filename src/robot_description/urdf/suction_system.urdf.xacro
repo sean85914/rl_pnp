@@ -1,0 +1,180 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:macro name="suction" params="prefix">
+    <link name="${prefix}base_link">
+      <inertial>
+      <origin
+        xyz="-1.11022302462516E-16 -1.11022302462516E-16 -0.0708077771271759"
+        rpy="0 0 0" />
+        <mass value="0.0269529639966238" />
+        <inertia
+          ixx="0"
+          ixy="0"
+          ixz="0"
+          iyy="0"
+          iyz="0"
+          izz="0" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://robot_description/meshes/suction_base_link.STL" />
+        </geometry>
+        <material name="">
+          <color rgba="0.2 0.2 0.2 1" />
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://robot_description/meshes/suction_base_link.STL" />
+        </geometry>
+      </collision>
+    </link>
+
+    <!--joint name="suction_base_to_ur3" type="fixed">
+      <parent link="${parent_link}"/>
+      <child link="${prefix}base_link"/>
+	  <origin xyz="0 0 0" rpy="1.5 0 0" />
+    </joint-->
+
+    <link name="${prefix}suction_link">
+      <inertial>
+      <origin
+        xyz="-0.000891723556123436 1.18917720115519E-09 -0.187652557857505"
+        rpy="0 0 0" />
+      <mass
+        value="0.00562488501690316" />
+        <inertia
+          ixx="0"
+          ixy="0"
+          ixz="0"
+          iyy="0"
+          iyz="0"
+          izz="0" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://robot_description/meshes/suction_link.STL" />
+        </geometry>
+        <material name="">
+          <color
+            rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://robot_description/meshes/suction_link.STL" />
+        </geometry>
+      </collision>
+    </link>
+
+  <joint
+    name="suction_joint"
+    type="fixed">
+    <origin
+      xyz="0 0 0"
+      rpy="3.94430452610506E-31 0 5.20457404555301E-30" />
+    <parent
+      link="${prefix}base_link" />
+    <child
+      link="${prefix}suction_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+
+    <link name="${prefix}screw_link">
+      <inertial>
+        <origin
+          xyz="-2.0456557559001E-09 3.26791349536393E-09 -0.125360550526689"
+          rpy="0 0 0" />
+        <mass value="0.00277753847717754" />
+        <inertia
+          ixx="3.20726624747084E-06"
+          ixy="9.74087880487962E-21"
+          ixz="-1.24079137918588E-13"
+          iyy="3.17901486715071E-06"
+          iyz="1.9821519955184E-13"
+          izz="6.65160883528896E-08" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://robot_description/meshes/screw_link.STL" />
+        </geometry>
+        <material name="">
+          <color rgba="0.776470588235294 0.756862745098039 0.737254901960784 1" />
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://robot_description/meshes/screw_link.STL" />
+        </geometry>
+      </collision>
+    </link>
+
+  <joint
+    name="screw_joint"
+    type="fixed">
+    <origin
+      xyz="0 0 0"
+      rpy="3.94430452610506E-31 0 5.20457404555301E-30" />
+    <parent
+      link="${prefix}base_link" />
+    <child
+      link="${prefix}screw_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+
+    <link name="${prefix}crop_link">
+      <inertial>
+        <origin
+          xyz="-4.44089209850063E-16 -2.22044604925031E-16 -0.083"
+          rpy="0 0 0" />
+        <mass value="0.000502857293029461" />
+        <inertia
+          ixx="3.14285808143414E-07"
+          ixy="-2.64697796016949E-23"
+          ixz="3.66741778925289E-22"
+          iyy="3.2446866832726E-07"
+          iyz="-6.14937738419781E-22"
+          izz="1.01828601838463E-08" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://robot_description/meshes/crop_link.STL" />
+        </geometry>
+        <material name="">
+          <color rgba="0.831372549019608 0.670588235294118 0.129411764705882 1" />
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh
+            filename="package://robot_description/meshes/crop_link.STL" />
+        </geometry>
+      </collision>
+    </link>
+
+  <joint
+    name="crop_joint"
+    type="fixed">
+    <origin
+      xyz="0 0 0"
+      rpy="3.94430452610506E-31 0 5.20457404555301E-30" />
+    <parent
+      link="${prefix}base_link" />
+    <child
+      link="${prefix}crop_link" />
+    <axis
+      xyz="0 -1 0" />
+    </joint>
+  </xacro:macro>
+</robot>
