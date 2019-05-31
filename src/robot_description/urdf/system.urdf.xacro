@@ -31,8 +31,8 @@
     </visual>
   </link>
   <joint name="arm2cam1_joint" type="fixed">
-    <origin xyz="-0.00129317 0.440264 0.843718"
-            rpy="2.53724 1.54933 0.982746"/>
+    <origin xyz="-0.00847729 0.45376 0.846709"
+            rpy="2.21937 1.55742 0.659318"/>
     <parent link="base_link"/>
     <child link="camera1_link"/>
   </joint>
@@ -91,10 +91,10 @@
     <child link="convayor_link"/>
   </joint>
   <!-- TCP -->
-  <!--link name="tcp_link"/>
+  <link name="tcp_link"/>
   <joint name="gripper_base2tcp" type="fixed">
     <parent link="ee_link"/>
     <child link="tcp_link"/>
-    <origin xyz="0.15 0.0 0.0" rpy="0.0 0.0 0.0"/>
-  </joint-->
+    <origin xyz="0.225 0.0 0.0" rpy="0.0 0.0 0.0"/>
+  </joint>
 </robot> 
