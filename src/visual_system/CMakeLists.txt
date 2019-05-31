@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(visual_system)
 add_compile_options(-std=c++11)
 
-find_package(catkin REQUIRED COMPONENTS 
+find_package(catkin REQUIRED COMPONENTS cmake_modules
   roscpp
   roslib
   std_msgs
@@ -30,12 +30,18 @@ generate_messages(
 
 catkin_package(
   LIBRARIES visual_system
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs tf
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs tf message_runtime
 )
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
+)
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h"
+  PATTERN ".svn" EXCLUDE
 )
 
 add_executable(get_click_position src/get_click_position.cpp)
@@ -45,4 +51,5 @@ add_executable(get_conveyor_plane src/get_conveyor_plane.cpp)
 target_link_libraries(get_conveyor_plane ${catkin_LIBRARIES})
 
 add_executable(get_target_pc src/get_target_pc.cpp)
+add_dependencies(get_target_pc visual_system_gencpp)
 target_link_libraries(get_target_pc ${catkin_LIBRARIES})
