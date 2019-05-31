@@ -12,12 +12,25 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   pcl_conversions
   pcl_ros
+  message_generation
 )
 
 find_package(OpenCV REQUIRED)
 
+add_service_files(
+  FILES
+  target_pose.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+)
+
 catkin_package(
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs cv_bridge tf
+  LIBRARIES visual_system
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs tf
 )
 
 include_directories(

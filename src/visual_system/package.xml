@@ -11,9 +11,11 @@
   <build_depend>geometry_msgs</build_depend>
   <build_depend>cv_bridge</build_depend>
   <build_depend>tf</build_depend>
+  <build_depend>message_generation</build_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>tf</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
 </package>
