@@ -22,40 +22,37 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   if(Serial.available()){
-    if(Serial.read() == 'v'){ // Vacuum
-      int value = Serial.readString().toInt();
-      switch(value){
-        case 0:
+    String command_string = Serial.readString();
+    if(command_string[0] == 'v'){
+      switch(command_string[1]){
+        case '0':
           digitalWrite(VACUUM_GENERATOR, LOW);
           digitalWrite(VACUUM_BREAKER, LOW);
-          //Serial.println("v: 0");
+          Serial.println("v: 0");
           break;
-        case 1:
+        case '1':
           digitalWrite(VACUUM_GENERATOR, LOW);
           digitalWrite(VACUUM_BREAKER, HIGH);
-          //Serial.println("v: 1");
+          Serial.println("v: 1");
           break;
-        case 2:
+        case '2':
           digitalWrite(VACUUM_GENERATOR, HIGH);
           digitalWrite(VACUUM_BREAKER, LOW);
-          //Serial.println("v: 2");
+          Serial.println("v: 2");
           break;
-        case 3:
+        case '3':
           digitalWrite(VACUUM_GENERATOR, HIGH);
           digitalWrite(VACUUM_BREAKER, HIGH);
-          //Serial.println("v: 3");
+          Serial.println("v: 3");
           break;
       }
     }
-    else { // Conveyor
-      int value = Serial.readString().toInt();
-      if(value==1){
-        //Serial.println("c: 1");
-        digitalWrite(CONVRYOR_CONTROL, HIGH);
-        delay(100);
-        digitalWrite(CONVRYOR_CONTROL, LOW);
-      }
+    else{
+      digitalWrite(CONVRYOR_CONTROL, HIGH);
+      delay(100);
+      digitalWrite(CONVRYOR_CONTROL, LOW);
+      Serial.println("c: 1");
     }
   }
-  //delay(1);
+  delay(1);
 }

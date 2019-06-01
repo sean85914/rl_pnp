@@ -75,6 +75,8 @@ bool RobotArm::GotoPoseService(arm_operation::target_pose::Request &req, arm_ope
                                                                req.target_pose.orientation.y, 
                                                                req.target_pose.orientation.z, 
                                                                req.target_pose.orientation.w);
+  ROS_INFO("[%s] Joint state now: %f %f %f %f %f %f", ros::this_node::getName().c_str(),
+                                                      joint[0], joint[1], joint[2], joint[3], joint[4], joint[5]);
   StartTrajectory(ArmToDesiredPoseTrajectory(req.target_pose, req.factor));
   if(num_sols == 0) res.plan_result = "fail_to_find_solution";
   res.plan_result = "find_one_feasible_solution";
@@ -263,9 +265,11 @@ bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty:
     t.points[0].velocities[i] = 0.0;
     t.points[1].velocities[i] = 0.0;
   }
+  ROS_INFO("Now: %f", t.points[1].positions[5]);
   t.points[1].positions[5] += M_PI/2; //if(t.points[1].positions[5] >= 2*M_PI) t.points[1].positions[5] -= 2*M_PI;
+  ROS_INFO("To go: %f", t.points[1].positions[5]);
   t.points[0].time_from_start = ros::Duration(0);
-  t.points[1].time_from_start = ros::Duration(0.5);
+  t.points[1].time_from_start = ros::Duration(1.8);
   StartTrajectory(goal);
   return true;
 }
