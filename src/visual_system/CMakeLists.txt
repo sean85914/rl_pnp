@@ -9,12 +9,14 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
   sensor_msgs
   geometry_msgs
   tf
+  image_transport
   cv_bridge
   pcl_conversions
   pcl_ros
   message_generation
 )
 
+find_package(Boost REQUIRED)
 find_package(OpenCV REQUIRED)
 
 add_service_files(
@@ -53,3 +55,6 @@ target_link_libraries(get_conveyor_plane ${catkin_LIBRARIES})
 add_executable(get_target_pc src/get_target_pc.cpp)
 add_dependencies(get_target_pc visual_system_gencpp)
 target_link_libraries(get_target_pc ${catkin_LIBRARIES})
+
+add_executable(take_picture src/take_picture.cpp)
+target_link_libraries(take_picture ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
