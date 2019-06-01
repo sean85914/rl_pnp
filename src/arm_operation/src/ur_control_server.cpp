@@ -265,7 +265,7 @@ bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty:
   }
   t.points[1].positions[5] += M_PI/2; //if(t.points[1].positions[5] >= 2*M_PI) t.points[1].positions[5] -= 2*M_PI;
   t.points[0].time_from_start = ros::Duration(0);
-  t.points[1].time_from_start = ros::Duration(0.6);
+  t.points[1].time_from_start = ros::Duration(0.5);
   StartTrajectory(goal);
   return true;
 }
