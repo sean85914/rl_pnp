@@ -60,22 +60,22 @@ void loop() {
         case 0:
           digitalWrite(VACUUM_GENERATOR, LOW);
           digitalWrite(VACUUM_BREAKER, LOW);
-          Serial.println("v: 0");
+          //Serial.println("v: 0");
           break;
         case 1:
           digitalWrite(VACUUM_GENERATOR, LOW);
           digitalWrite(VACUUM_BREAKER, HIGH);
-          Serial.println("v: 1");
+          //Serial.println("v: 1");
           break;
         case 2:
           digitalWrite(VACUUM_GENERATOR, HIGH);
           digitalWrite(VACUUM_BREAKER, LOW);
-          Serial.println("v: 2");
+          //Serial.println("v: 2");
           break;
         case 3:
           digitalWrite(VACUUM_GENERATOR, HIGH);
           digitalWrite(VACUUM_BREAKER, HIGH);
-          Serial.println("v: 3");
+          //Serial.println("v: 3");
           break;
       }
     }
@@ -83,7 +83,7 @@ void loop() {
       digitalWrite(CONVRYOR_CONTROL, HIGH);
       delay(100);
       digitalWrite(CONVRYOR_CONTROL, LOW);
-      Serial.println("c: 1");
+      //Serial.println("c: 1");
     }
   }
   delay(1);
