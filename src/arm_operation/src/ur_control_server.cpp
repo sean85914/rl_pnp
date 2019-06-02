@@ -259,7 +259,7 @@ bool RobotArm::GotoJointPoseService(arm_operation::joint_pose::Request  &req, ar
 bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   ROS_INFO("Receive fast rotate service call.");
   trajectory_msgs::JointTrajectory &t = goal.trajectory;
-  for(int i=0; i<6; ++i){
+  /*for(int i=0; i<6; ++i){
     t.points[0].positions[i] = joint[i];
     t.points[1].positions[i] = joint[i];
     t.points[0].velocities[i] = 0.0;
@@ -271,7 +271,32 @@ bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty:
   t.points[0].time_from_start = ros::Duration(0);
   t.points[1].time_from_start = ros::Duration(1.8);
   StartTrajectory(goal);
-  return true;
+  return true;*/
+  geometry_msgs::Pose pose_now = getCurrentTCPPose();
+  tf::Quaternion q_now(pose_now.orientation.x,
+                       pose_now.orientation.y,
+                       pose_now.orientation.z,
+                       pose_now.orientation.w),
+                 q_rotate(0.707f, 0.0f, 0.0f, 0.707f), // Rotate X-axis about 90 degree
+                 q_final = q_now * q_rotate;
+  geometry_msgs::Pose pose_after_rotate = pose_now;
+  pose_after_rotate.orientation.x = q_final.getX();
+  pose_after_rotate.orientation.y = q_final.getY();
+  pose_after_rotate.orientation.z = q_final.getZ();
+  pose_after_rotate.orientation.w = q_final.getW();
+  double joint_after_rotate[6];
+  if(PerformIK(pose_after_rotate, joint_after_rotate)){
+    for(int i=0; i<6; ++i){
+      t.points[0].positions[i] = joint[i];
+      t.points[1].positions[i] = joint_after_rotate[i];
+      t.points[0].velocities[i] = 
+      t.points[1].velocities[i] = 0.0;
+    }
+    t.points[0].time_from_start = ros::Duration(0.0);
+    t.points[1].time_from_start = ros::Duration(0.8);
+    StartTrajectory(goal);
+    return true;
+  }else return false;
 }
 
 // Private functions
