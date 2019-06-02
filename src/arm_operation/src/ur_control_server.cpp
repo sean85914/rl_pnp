@@ -284,6 +284,22 @@ bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty:
   pose_after_rotate.orientation.y = q_final.getY();
   pose_after_rotate.orientation.z = q_final.getZ();
   pose_after_rotate.orientation.w = q_final.getW();
+  ROS_INFO("Pose now:\n\tTranslation: [%f, %f, %f]\n\tQuaternion: [%f, %f, %f, %f]", 
+           pose_now.position.x,
+           pose_now.position.y,
+           pose_now.position.z,
+           pose_now.orientation.x,
+           pose_now.orientation.y,
+           pose_now.orientation.z,
+           pose_now.orientation.w);
+  ROS_INFO("Pose to go:\n\tTranslation: [%f, %f, %f]\n\tQuaternion: [%f, %f, %f, %f]", 
+           pose_after_rotate.position.x,
+           pose_after_rotate.position.y,
+           pose_after_rotate.position.z,
+           pose_after_rotate.orientation.x,
+           pose_after_rotate.orientation.y,
+           pose_after_rotate.orientation.z,
+           pose_after_rotate.orientation.w);
   double joint_after_rotate[6];
   if(PerformIK(pose_after_rotate, joint_after_rotate)){
     for(int i=0; i<6; ++i){
@@ -292,11 +308,22 @@ bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty:
       t.points[0].velocities[i] = 
       t.points[1].velocities[i] = 0.0;
     }
+    ROS_INFO("Joint 1\t Joint 2\t Joint 3\t Joint 4\t Joint 5\t Joint 6");
+    ROS_INFO("%.5f\t%.5f\t%.5f\t%.5f\t%.5f\t%.5f\t", joint[0], joint[1], joint[2], joint[3], joint[4], joint[5]);
+    ROS_INFO("%.5f\t%.5f\t%.5f\t%.5f\t%.5f\t%.5f\t", joint_after_rotate[0], 
+                                                     joint_after_rotate[1],
+                                                     joint_after_rotate[2],
+                                                     joint_after_rotate[3],
+                                                     joint_after_rotate[4],
+                                                     joint_after_rotate[5]);
     t.points[0].time_from_start = ros::Duration(0.0);
-    t.points[1].time_from_start = ros::Duration(0.8);
+    t.points[1].time_from_start = ros::Duration(1.5);
     StartTrajectory(goal);
     return true;
-  }else return false;
+  }else {
+    ROS_WARN("Cannot find IK solution!");
+    return false;
+  }
 }
 
 // Private functions
