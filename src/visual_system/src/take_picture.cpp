@@ -1,3 +1,10 @@
+/*
+ *  Service to collect dataset
+ *  Subscribe topic: /image_raw (sensor_msgs::Image)
+ *  Advertise service: ~save_image (std_srvs::Empty)
+ *    After you call this service, it will save the image in package:visual_system/images
+ */
+
 // C++ STL
 #include <iomanip>
 #include <sstream>
