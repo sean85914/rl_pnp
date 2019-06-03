@@ -4,6 +4,7 @@
 // SRV
 #include <arm_operation/target_pose.h>
 #include <visual_system/target_pose.h>
+#include <vacuum_conveyor_control/vacuum_control.h>
 // MSG
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Point.h>
@@ -15,8 +16,10 @@ class SuckObj{
   // Service client
   ros::ServiceClient visual_system_client;
   ros::ServiceClient arm_operation_client;
+  ros::ServiceClient vacuum_client;
   arm_operation::target_pose pose_req;
   visual_system::target_pose get_pose_req;
+  vacuum_conveyor_control::vacuum_control vacuum_req;
   void start(void);
  public:
   SuckObj(ros::NodeHandle, ros::NodeHandle);
@@ -27,7 +30,9 @@ SuckObj::SuckObj(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
   arm_operation_client = pnh_.serviceClient<arm_operation::target_pose>("/ur3_control_server/ur_control/goto_pose");
   ros::service::waitForService("/get_target_pc_node/get_target_info");
   visual_system_client = pnh_.serviceClient<visual_system::target_pose>("/get_target_pc_node/get_target_info");
-  ROS_INFO("Service conneted!");
+  ros::service::waitForService("/arduino_control/vacuum_control");
+  vacuum_client = pnh_.serviceClient<vacuum_conveyor_control::vacuum_control>("/arduino_control/vacuum_control");
+  ROS_INFO("Services conneted!");
   if(!pnh_.getParam("motion", motion)) motion = false; ROS_INFO("motion: %s", (motion==true?"true":"false"));
   pose_req.request.factor = 0.5f;
   start();
@@ -67,7 +72,11 @@ void SuckObj::start(void){
            pose_req.request.target_pose.orientation.y,
            pose_req.request.target_pose.orientation.z,
            pose_req.request.target_pose.orientation.w);
-  if(motion) arm_operation_client.call(pose_req);
+  if(motion) {
+    arm_operation_client.call(pose_req);
+    vacuum_req.request.command = 2;
+    vacuum_client.call(vacuum_req);
+  }
   //  Broadcast transform to debug
   /*
   tf::Vector3 target_pose(pose_req.request.target_pose.position.x,
