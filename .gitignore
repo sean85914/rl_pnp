@@ -3,3 +3,4 @@ devel/
 .catkin_workspace
 *.pyc
 *.pth
+*.tar.gz
