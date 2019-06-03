@@ -68,6 +68,7 @@ add_service_files(
   FILES
   target_pose.srv
   joint_pose.srv
+  rotate_to_flip.srv
 )
 
 ## Generate actions in the 'action' folder
