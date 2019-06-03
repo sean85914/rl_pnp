@@ -4,6 +4,7 @@ add_compile_options(-std=c++11)
 
 find_package(catkin REQUIRED COMPONENTS cmake_modules
   roscpp
+  rospy
   roslib
   std_msgs
   sensor_msgs
@@ -22,6 +23,7 @@ find_package(OpenCV REQUIRED)
 add_service_files(
   FILES
   target_pose.srv
+  barcode_detect.srv
 )
 
 generate_messages(
@@ -32,7 +34,7 @@ generate_messages(
 
 catkin_package(
   LIBRARIES visual_system
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs tf message_runtime
+  CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs tf message_runtime
 )
 
 include_directories(
