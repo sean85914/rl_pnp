@@ -24,13 +24,16 @@
 
 #include <ros/ros.h>
 #include <actionlib/client/simple_action_client.h>
-#include <std_srvs/Empty.h>
+// MSG
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Quaternion.h>
 #include <sensor_msgs/JointState.h>
+// SRV
+#include <std_srvs/Empty.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <arm_operation/target_pose.h>
 #include <arm_operation/joint_pose.h>
+#include <arm_operation/rotate_to_flip.h>
 #include <tf/transform_datatypes.h>
 #include <cmath>
 #include <Eigen/Dense>
@@ -38,6 +41,8 @@
 
 #define deg2rad(x) (x*M_PI/180.0)
 #define NUMBEROFPOINTS 10
+
+inline double makeMinorRotate(const double joint_now, const double joint_togo);
 
 typedef actionlib::SimpleActionClient< control_msgs::FollowJointTrajectoryAction > TrajClient;
 
@@ -71,6 +76,7 @@ class RobotArm {
   ros::ServiceServer go_parabolic_srv;
   ros::ServiceServer goto_joint_pose_srv;
   ros::ServiceServer fast_rotate_srv;
+  ros::ServiceServer flip_srv;
   TrajClient *traj_client;
   control_msgs::FollowJointTrajectoryGoal goal; 
   control_msgs::FollowJointTrajectoryGoal path;
@@ -104,6 +110,16 @@ class RobotArm {
    *    int: number of IK solutions
    */
   int PerformIK(geometry_msgs::Pose target_pose, double *sol);
+  /*
+   *  Perform inverse kinematic and return the optimized joints solution
+   *  Will consider best wrist motion
+   *  Input:
+   *    geometry_msgs::Pose target_pose: target pose
+   *    double *sol: output placeholder of size-6 double array
+   *  Output:
+   *    int: number of IK solutions
+   */
+  int PerformIKWristMotion(geometry_msgs::Pose target_pose, double *sol);
   /*
    *  Check if input wrist angle will self-collision
    *  Input:
@@ -160,6 +176,8 @@ class RobotArm {
    bool GoParabolicService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
    bool GotoJointPoseService(arm_operation::joint_pose::Request &req, arm_operation::joint_pose::Response &res);
    bool FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+   bool FlipService(arm_operation::rotate_to_flip::Request &req,
+                    arm_operation::rotate_to_flip::Response &res);
 };
 
 #endif

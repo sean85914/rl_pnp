@@ -1,5 +1,14 @@
 #include "ur_control_server.h"
 
+inline double makeMinorRotate(const double joint_now, const double joint_togo){
+  bool sign = (joint_togo>0.0f);
+  double dis_1 = std::abs(joint_now-joint_togo);
+  double dis_2 = std::abs(joint_now-(joint_togo-(sign?2*M_PI:-2*M_PI)));
+  // Choose small one
+  if(dis_1<dis_2) return joint_togo;
+  else return (joint_togo-(sign?2*M_PI:-2*M_PI));
+}
+
 // Public functions
 RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), num_sols(1){
   // Subscriber
@@ -10,6 +19,7 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   go_parabolic_srv = pnh_.advertiseService("ur_control/go_parabolic", &RobotArm::GoParabolicService, this);
   goto_joint_pose_srv = pnh_.advertiseService("ur_control/goto_joint_pose", &RobotArm::GotoJointPoseService, this);
   fast_rotate_srv = pnh_.advertiseService("ur_control/fast_rotate", &RobotArm::FastRotateService, this);
+  flip_srv = pnh_.advertiseService("ur_control/flip_service", &RobotArm::FlipService, this);
   // Parameters
   if(!pnh.getParam("tool_length", tool_length)) tool_length = 0.18;
   if(!pnh.getParam("prefix", prefix)) prefix="";
@@ -256,6 +266,73 @@ bool RobotArm::GotoJointPoseService(arm_operation::joint_pose::Request  &req, ar
   return true;
 }
 
+bool RobotArm::FlipService(arm_operation::rotate_to_flip::Request &req,
+                 arm_operation::rotate_to_flip::Response &res){
+  ROS_INFO("Flip service: rotate_times: %d", req.rotate_times);
+  double rotate_angle = -30.0f;
+  trajectory_msgs::JointTrajectory &t = goal.trajectory;
+  geometry_msgs::Pose pose_now = getCurrentTCPPose();
+  tf::Vector3 rotate_axis;
+  switch(req.rotate_times){
+    case 0: rotate_axis = tf::Vector3(0.0f, 0.0f,  1.0f); break;
+    case 1: rotate_axis = tf::Vector3(0.0f, 1.0f,  0.0f); break;
+    case 2: rotate_axis = tf::Vector3(0.0f, 0.0f, -1.0f); break;
+    case 3: rotate_axis = tf::Vector3(0.0f, -1.0f, 0.0f); break;
+  }
+  tf::Quaternion q_now(pose_now.orientation.x,
+                       pose_now.orientation.y,
+                       pose_now.orientation.z,
+                       pose_now.orientation.w),
+                 //q_rotate(0.0f, 0.0f, sin(deg2rad(theta/2)), cos(deg2rad(theta/2))), // Rotate Z-axis about -30 degree
+                 q_rotate(rotate_axis, deg2rad(rotate_angle)),
+                 q_final = q_now * q_rotate;
+  geometry_msgs::Pose pose_after_rotate = pose_now;
+  pose_after_rotate.orientation.x = q_final.getX();
+  pose_after_rotate.orientation.y = q_final.getY();
+  pose_after_rotate.orientation.z = q_final.getZ();
+  pose_after_rotate.orientation.w = q_final.getW();
+  ROS_INFO("Pose now:\n\tTranslation: [%f, %f, %f]\n\tQuaternion: [%f, %f, %f, %f]", 
+           pose_now.position.x,
+           pose_now.position.y,
+           pose_now.position.z,
+           pose_now.orientation.x,
+           pose_now.orientation.y,
+           pose_now.orientation.z,
+           pose_now.orientation.w);
+  ROS_INFO("Pose to go:\n\tTranslation: [%f, %f, %f]\n\tQuaternion: [%f, %f, %f, %f]", 
+           pose_after_rotate.position.x,
+           pose_after_rotate.position.y,
+           pose_after_rotate.position.z,
+           pose_after_rotate.orientation.x,
+           pose_after_rotate.orientation.y,
+           pose_after_rotate.orientation.z,
+           pose_after_rotate.orientation.w);
+  double joint_after_rotate[6];
+  if(PerformIKWristMotion(pose_after_rotate, joint_after_rotate)){
+    for(int i=0; i<6; ++i){
+      t.points[0].positions[i] = joint[i];
+      t.points[1].positions[i] = joint_after_rotate[i];
+      t.points[0].velocities[i] = 
+      t.points[1].velocities[i] = 0.0;
+    }
+    ROS_INFO("Joint Information");
+    ROS_INFO("%.5f     %.5f     %.5f     %.5f     %.5f     %.5f", joint[0], joint[1], joint[2], joint[3], joint[4], joint[5]);
+    ROS_INFO("%.5f     %.5f     %.5f     %.5f     %.5f     %.5f", joint_after_rotate[0], 
+                                                                  joint_after_rotate[1],
+                                                                  joint_after_rotate[2],
+                                                                  joint_after_rotate[3],
+                                                                  joint_after_rotate[4],
+                                                                  joint_after_rotate[5]);
+    t.points[0].time_from_start = ros::Duration(0.0);
+    t.points[1].time_from_start = ros::Duration(calculate_time(joint, joint_after_rotate)/2.0f);
+    StartTrajectory(goal);
+    return true;
+  }else {
+    ROS_WARN("Cannot find IK solution!");
+    return false;
+  }
+}
+
 bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   ROS_INFO("Receive fast rotate service call.");
   trajectory_msgs::JointTrajectory &t = goal.trajectory;
@@ -308,7 +385,7 @@ bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty:
       t.points[0].velocities[i] = 
       t.points[1].velocities[i] = 0.0;
     }
-    ROS_INFO("Joint 1\t Joint 2\t Joint 3\t Joint 4\t Joint 5\t Joint 6");
+    ROS_INFO("   Joint 1   Joint 2   Joint 3   Joint 4   Joint 5   Joint 6");
     ROS_INFO("%.5f\t%.5f\t%.5f\t%.5f\t%.5f\t%.5f\t", joint[0], joint[1], joint[2], joint[3], joint[4], joint[5]);
     ROS_INFO("%.5f\t%.5f\t%.5f\t%.5f\t%.5f\t%.5f\t", joint_after_rotate[0], 
                                                      joint_after_rotate[1],
@@ -401,6 +478,32 @@ int RobotArm::PerformIK(geometry_msgs::Pose target_pose, double *sol){
       index = i;
     } dist = 0; 
   } if(index == -1) return 0; // All solutions will self-collision
+  for(int i=0; i<6; ++i) sol[i] = q_sols[index*6+i];
+  return (num_sols = sols);
+}
+
+int RobotArm::PerformIKWristMotion(geometry_msgs::Pose target_pose, double *sol){
+  double T[16] = {0};
+  PoseToDH(target_pose, T);
+  // tcp_link to ee_link since what we interested is tcp_link
+  for(int i=0; i<3; ++i)
+    T[i*4+3] -= tool_length*T[i*4];
+  double q_sols[8*6], min = 1e6, dist = 0;
+  int sols = ur_kinematics::inverse(T, q_sols), index = -1;
+  for(int i=0; i<sols; ++i){
+    // Preprocess joint anglr to -pi ~ pi
+    for(int j=0; j<6; ++j){
+      q_sols[i*6+j] = validAngle(q_sols[i*6+j]);
+    }
+    // Consider only the same sign of joint 1
+    if(joint[0]*q_sols[i*6]<0.0f) continue;
+    for(int j=3; j<6; ++j) {
+      q_sols[i*6+j] = makeMinorRotate(joint[j], q_sols[i*6+j]);
+      dist += pow(q_sols[i*6+j] - joint[j], 2);
+    }if(min>dist){
+      min = dist; index = i; 
+    } dist = 0;
+  } if(index == -1) return 0;
   for(int i=0; i<6; ++i) sol[i] = q_sols[index*6+i];
   return (num_sols = sols);
 }
