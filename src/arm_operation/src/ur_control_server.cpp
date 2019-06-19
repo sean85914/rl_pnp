@@ -478,7 +478,9 @@ int RobotArm::PerformIK(geometry_msgs::Pose target_pose, double *sol){
       index = i;
     } dist = 0; 
   } if(index == -1) return 0; // All solutions will self-collision
-  for(int i=0; i<6; ++i) sol[i] = q_sols[index*6+i];
+  // See if Co-located angle for wrist
+  for(int i=3; i<6; ++i) sol[i] = makeMinorRotate(joint[i], q_sols[index*6+i]);
+  for(int i=0; i<3; ++i) sol[i] = q_sols[index*6+i];
   return (num_sols = sols);
 }
 
@@ -497,6 +499,7 @@ int RobotArm::PerformIKWristMotion(geometry_msgs::Pose target_pose, double *sol)
     }
     // Consider only the same sign of joint 1
     if(joint[0]*q_sols[i*6]<0.0f) continue;
+    // See if Co-located angle for wrist
     for(int j=3; j<6; ++j) {
       q_sols[i*6+j] = makeMinorRotate(joint[j], q_sols[i*6+j]);
       dist += pow(q_sols[i*6+j] - joint[j], 2);
