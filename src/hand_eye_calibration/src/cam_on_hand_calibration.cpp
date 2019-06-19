@@ -57,8 +57,8 @@ class calibration{
    */
   bool get_tag_data(tf::StampedTransform &t){
     try{
-      listener.waitForTransform("camera_link", tag_frame, ros::Time(0), ros::Duration(2.0));
-      listener.lookupTransform("camera_link", tag_frame, ros::Time(0), t);
+      listener.waitForTransform("camera2_link", tag_frame, ros::Time(0), ros::Duration(2.0));
+      listener.lookupTransform("camera2_link", tag_frame, ros::Time(0), t);
     } catch(tf::TransformException ex){
       ROS_ERROR("%s", ex.what());
       return 0;
@@ -111,26 +111,26 @@ class calibration{
   /*
    *  Calibration process, the robot arm will follow the predefined path and receive data
    *  Predefined path:
-   *    0  3  4  7  8
-   *     --         |
-   *     dx      dz |
-   *                |
-   *    1  2  5  6  9
+   *    0  3  4    
+   *     --   |     
+   *     dx   |  dz 
+   *          |     
+   *    1  2  5    
    */
   void calibration_process(void){
-    while(count<10){
+    while(count<6){
       ROS_INFO("----------- %d -----------", count);
       switch(count){
         case 0:
           req.request.target_pose = original_pose;
           break;
-        case 1: case 5: case 9:
+        case 1: case 5:
           req.request.target_pose.position.z -= dz;
           break;
-        case 2: case 4: case 6: case 8:
+        case 2: case 4:
           req.request.target_pose.position.x += dx;
           break;
-        case 3: case 7:
+        case 3:
           req.request.target_pose.position.z += dz;
           break;
       }
