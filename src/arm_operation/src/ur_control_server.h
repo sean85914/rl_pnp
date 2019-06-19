@@ -41,10 +41,10 @@
 
 #define deg2rad(x) (x*M_PI/180.0)
 #define NUMBEROFPOINTS 10
-
+// Make rotation more efficent
 inline double makeMinorRotate(const double joint_now, const double joint_togo);
 
-typedef actionlib::SimpleActionClient< control_msgs::FollowJointTrajectoryAction > TrajClient;
+typedef actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> TrajClient;
 
 class RobotArm {
  private:
@@ -55,11 +55,6 @@ class RobotArm {
   double wrist1_upper_bound, wrist1_lower_bound;
   double wrist2_upper_bound, wrist2_lower_bound;
   double wrist3_upper_bound, wrist3_lower_bound;
-  const double parabola_a = -10.3;
-  const double parabola_b = 6.8;
-  const double parabola_c = -0.8;
-  const double move_y = 0.05;
-  const double parabola_time = 1.0;
   bool sim;
   bool wrist1_collision;
   bool wrist2_collision;
@@ -73,7 +68,6 @@ class RobotArm {
   // Services
   ros::ServiceServer goto_pose_srv;
   ros::ServiceServer go_straight_srv;
-  ros::ServiceServer go_parabolic_srv;
   ros::ServiceServer goto_joint_pose_srv;
   ros::ServiceServer fast_rotate_srv;
   ros::ServiceServer flip_srv;
@@ -88,7 +82,7 @@ class RobotArm {
    *  Output:
    *    double: convert angle to branch [-pi, pi]
    */
-  double validAngle(double angle);
+  inline double validAngle(double angle);
   /*
    *  Subscriber callback, update joint values
    */
@@ -129,7 +123,7 @@ class RobotArm {
    *  Output:
    *    bool: true if collision happened, false otherwise
    */
-  bool wrist_check_bound(double &joint, double upper, double lower);
+  inline bool wrist_check_bound(double &joint, double upper, double lower);
   /*
    *  Get current TCP pose
    *  Input: None
@@ -150,19 +144,19 @@ class RobotArm {
   /*
    * Get traejctory execution state
    */
-  actionlib::SimpleClientGoalState getState();
+  inline actionlib::SimpleClientGoalState getState();
   /*
    *  Start trajectory with given goal
    *  Input:
    *    control_msgs::FollowJointTrajectoryGoal goal: target trajectory goal
    *  Output: None
    */
-  void StartTrajectory(control_msgs::FollowJointTrajectoryGoal goal);
+  inline void StartTrajectory(control_msgs::FollowJointTrajectoryGoal goal);
   /*
    *  Make robot arm go to target pose
    *  Input:
    *    geometry_msgs::Pose pose: target pose
-   *    double factor: execution speed factor (the larget the faster)
+   *    double factor: execution speed factor (the larger the faster)
    *  Output:
    *    control_msgs::FollowJointTrajectoryGoal
    */
@@ -173,7 +167,6 @@ class RobotArm {
    // Service server callback
    bool GotoPoseService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
    bool GoStraightLineService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
-   bool GoParabolicService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
    bool GotoJointPoseService(arm_operation::joint_pose::Request &req, arm_operation::joint_pose::Response &res);
    bool FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
    bool FlipService(arm_operation::rotate_to_flip::Request &req,
