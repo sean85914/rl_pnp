@@ -31,13 +31,13 @@
     </visual>
   </link>
   <joint name="arm2cam1_joint" type="fixed">
-    <origin xyz="-0.00847729 0.45376 0.846709"
-            rpy="2.21937 1.55742 0.659318"/>
+    <origin xyz="-0.0247218 0.452686 0.852129"
+            rpy="2.70374 1.55653 1.12336"/>
     <parent link="base_link"/>
     <child link="camera1_link"/>
   </joint>
   <!-- SR300 toward UR3 -->
-  <link name="camera2_link">
+  <!--link name="camera2_link">
     <visual>
       <origin xyz="0.0 0.0 0.0" rpy="${M_PI/2} 0.0 ${M_PI/2}"/>
       <geometry>
@@ -47,10 +47,10 @@
     </visual>
   </link>
   <joint name="arm2cam2_joint" type="fixed">
-    <origin xyz="-0.0368148 0.966091 0.409279" rpy="0.016628 0.132712 -1.55129"/> <!-- TBD -->
+    <origin xyz="-0.0368148 0.966091 0.409279" rpy="0.016628 0.132712 -1.55129"/>
     <parent link="base_link"/>
     <child link="camera2_link"/>
-  </joint>
+  </joint-->
   <!-- Gripper coupler -->
   <!--
   <link name="gripper_coupler_link">
@@ -95,6 +95,6 @@
   <joint name="gripper_base2tcp" type="fixed">
     <parent link="ee_link"/>
     <child link="tcp_link"/>
-    <origin xyz="0.225 0.0 0.0" rpy="0.0 0.0 0.0"/>
+    <origin xyz="0.0 0.0 0.19" rpy="0.0 0.0 0.0"/>
   </joint>
 </robot> 
