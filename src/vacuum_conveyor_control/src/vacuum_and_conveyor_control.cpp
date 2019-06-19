@@ -2,6 +2,7 @@
 #include <serial/serial.h>
 // SRV
 #include <std_srvs/Empty.h>
+#include <std_srvs/SetBool.h>
 #include <vacuum_conveyor_control/vacuum_control.h>
 
 class ArduinoControl{
@@ -13,8 +14,10 @@ class ArduinoControl{
   ros::NodeHandle nh_, pnh_;
   ros::ServiceServer vacuum_srv;
   ros::ServiceServer conveyor_srv;
+  ros::ServiceServer pheumatic_srv;
   bool vacuum_control_cb(vacuum_conveyor_control::vacuum_control::Request&, vacuum_conveyor_control::vacuum_control::Response&);
   bool conveyor_control_cb(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  bool pheumatic_control_cb(std_srvs::SetBool::Request&, std_srvs::SetBool::Response&);
  public:
   ArduinoControl(ros::NodeHandle, ros::NodeHandle);
   ~ArduinoControl(){mySerial.close();}
@@ -36,6 +39,7 @@ ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh)
   // Advertise services
   vacuum_srv = pnh_.advertiseService("vacuum_control", &ArduinoControl::vacuum_control_cb, this);
   conveyor_srv = pnh_.advertiseService("conveyor_control", &ArduinoControl::conveyor_control_cb, this);
+  pheumatic_srv = pnh_.advertiseService("pheumatic_control", &ArduinoControl::pheumatic_control_cb, this);
 }
 
 bool ArduinoControl::vacuum_control_cb(vacuum_conveyor_control::vacuum_control::Request &req, 
@@ -48,7 +52,22 @@ bool ArduinoControl::vacuum_control_cb(vacuum_conveyor_control::vacuum_control::
 
 bool ArduinoControl::conveyor_control_cb(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   std::string command = "c1";
-  ROS_INFO("Receive conveyot command");
+  ROS_INFO("Receive conveyor command");
+  mySerial.write(command);
+  return true;
+}
+
+bool ArduinoControl::pheumatic_control_cb(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res){
+  std::string command;
+  if(req.data) {
+    command = "p1";
+    pnh_.setParam("pheumatic", true);
+  }
+  else {
+    command = "p0";
+    pnh_.setParam("pheumatic", false);
+  }
+  ROS_INFO("Receive pheumatic command");
   mySerial.write(command);
   return true;
 }
