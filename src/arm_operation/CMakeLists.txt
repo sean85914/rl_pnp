@@ -235,3 +235,6 @@ target_link_libraries(ur3_ik_solver ${catkin_LIBRARIES} ur3_kin)
 
 add_executable(ur5_ik_solver script/ur_ik_solver.cpp)
 target_link_libraries(ur5_ik_solver ${catkin_LIBRARIES} ur5_kin)
+
+add_executable(tcp_transform_publisher src/tcp_transform_publisher.cpp)
+target_link_libraries(tcp_transform_publisher ${catkin_LIBRARIES})
