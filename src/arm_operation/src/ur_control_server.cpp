@@ -20,18 +20,18 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   fast_rotate_srv = pnh_.advertiseService("ur_control/fast_rotate", &RobotArm::FastRotateService, this);
   flip_srv = pnh_.advertiseService("ur_control/flip_service", &RobotArm::FlipService, this);
   // Parameters
-  if(!pnh.getParam("tool_length", tool_length)) tool_length = 0.18;
-  if(!pnh.getParam("prefix", prefix)) prefix="";
-  if(!pnh.getParam("sim", sim)) sim = false;
+  if(!pnh_.getParam("tool_length", tool_length)) tool_length = 0.18;
+  if(!pnh_.getParam("prefix", prefix)) prefix="";
+  if(!pnh_.getParam("sim", sim)) sim = false;
   // Wrist1 default bound [-240, -30]
-  if(!pnh.getParam("wrist1_upper_bound", wrist1_upper_bound)) wrist1_upper_bound = deg2rad(-30);
-  if(!pnh.getParam("wrist1_lower_bound", wrist1_lower_bound)) wrist1_lower_bound = deg2rad(-240);
+  if(!pnh_.getParam("wrist1_upper_bound", wrist1_upper_bound)) wrist1_upper_bound = deg2rad(-30);
+  if(!pnh_.getParam("wrist1_lower_bound", wrist1_lower_bound)) wrist1_lower_bound = deg2rad(-240);
   // Wrist2 default bound [-pi, 0]
-  if(!pnh.getParam("wrist2_upper_bound", wrist2_upper_bound)) wrist2_upper_bound = 0;
-  if(!pnh.getParam("wrist2_lower_bound", wrist2_lower_bound)) wrist2_lower_bound = -M_PI;
+  if(!pnh_.getParam("wrist2_upper_bound", wrist2_upper_bound)) wrist2_upper_bound = 0;
+  if(!pnh_.getParam("wrist2_lower_bound", wrist2_lower_bound)) wrist2_lower_bound = -M_PI;
   // Wrist3 default bound [-220, 5]
-  if(!pnh.getParam("wrist3_upper_bound", wrist3_upper_bound)) wrist3_upper_bound = deg2rad(5);
-  if(!pnh.getParam("wrist3_lower_bound", wrist3_lower_bound)) wrist3_lower_bound = deg2rad(-220);
+  if(!pnh_.getParam("wrist3_upper_bound", wrist3_upper_bound)) wrist3_upper_bound = deg2rad(5);
+  if(!pnh_.getParam("wrist3_lower_bound", wrist3_lower_bound)) wrist3_lower_bound = deg2rad(-220);
   // Show parameter information
   ROS_INFO("*********************************************************************************");
   ROS_INFO("[%s] Tool length: %f", ros::this_node::getName().c_str(), tool_length);
@@ -369,6 +369,7 @@ int RobotArm::PerformIK(geometry_msgs::Pose target_pose, double *sol){
   for (int i = 0; i < sols; ++i) {
     // Preprocess joint angle to -pi ~ pi
     for (int j = 0; j < 6; ++j) q_sols[i*6 + j] = validAngle(q_sols[i*6 + j]); 
+    q_sols[i*6] = makeMinorRotate(joint[0], q_sols[i*6]);
     // Convert wrist joints to available range, or set wristX_collision to true if collision happen
     wrist1_collision = wrist_check_bound(q_sols[i*6+3], wrist1_upper_bound, wrist1_lower_bound); 
     wrist2_collision = wrist_check_bound(q_sols[i*6+4], wrist2_upper_bound, wrist2_lower_bound); 
