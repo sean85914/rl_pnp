@@ -31,8 +31,8 @@
     </visual>
   </link>
   <joint name="arm2cam1_joint" type="fixed">
-    <origin xyz="-0.0247218 0.452686 0.852129"
-            rpy="2.70374 1.55653 1.12336"/>
+    <origin xyz="-0.438475 -0.00906225 0.649185"
+            rpy="-2.65823 1.51606 -2.62462"/>
     <parent link="base_link"/>
     <child link="camera1_link"/>
   </joint>
@@ -76,25 +76,4 @@
     <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
   </xacro:robotiq_85_gripper>
   -->
-  <!-- Sketch for conveyor -->
-  <link name="convayor_link">
-    <visual>
-      <geometry>
-        <box size="1.0 0.6 0.06"/>
-      </geometry> 
-      <material name="green"/>
-    </visual>
-  </link>
-  <joint name="arm2convayor_joint" type="fixed">
-    <origin xyz="0.007 0.547 0.152" rpy="0 0 0"/>
-    <parent link="base_link"/>
-    <child link="convayor_link"/>
-  </joint>
-  <!-- TCP -->
-  <link name="tcp_link"/>
-  <joint name="gripper_base2tcp" type="fixed">
-    <parent link="ee_link"/>
-    <child link="tcp_link"/>
-    <origin xyz="0.19 0.0 0.0" rpy="0.0 0.0 0.0"/>
-  </joint>
 </robot> 
