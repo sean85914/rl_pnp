@@ -1,0 +1,6 @@
+<launch>
+  <arg name="config_file" default="tcp_config.yaml"/>
+  <node pkg="arm_operation" type="tcp_transform_publisher" name="tcp_transform_publisher" clear_params="true" output="screen">
+    <rosparam command="load" file="$(find arm_operation)/config/$(arg config_file)"/>
+  </node>
+</launch>
