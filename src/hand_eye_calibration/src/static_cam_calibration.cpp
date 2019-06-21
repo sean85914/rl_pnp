@@ -12,7 +12,7 @@
  *        This frame represents the tag center in arm's coordinate
  *  
  *  Parameters:
- *    dx: x difference in meter
+ *    dy: y difference in meter
  *    dz: z difference in meter
  *    tag_frame: target tag frame
  *    file_name: output file name
@@ -25,7 +25,7 @@
 class calibration{
  private:
   int count; // Counter for process
-  double dx, dz; // Predefined path distance
+  double dy, dz; // Predefined path distance
   std::fstream fs; // file stream
   std::string tag_frame; // frame id for tag, from parameter server
   std::string package_path; // package path
@@ -103,7 +103,7 @@ class calibration{
    *  Predefined path:
    *    0  3  4  7  8
    *     --         |
-   *     dx      dz |
+   *     dy      dz |
    *                |
    *    1  2  5  6  9
    */
@@ -118,7 +118,7 @@ class calibration{
           req.request.target_pose.position.z -= dz;
           break;
         case 2: case 4: case 6: case 8:
-          req.request.target_pose.position.x += dx;
+          req.request.target_pose.position.y += dy;
           break;
         case 3: case 7:
           req.request.target_pose.position.z += dz;
@@ -145,8 +145,8 @@ class calibration{
   calibration(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), count(0){
     req.request.factor = 0.5; 
     // Get parameters
-    if(!pnh_.getParam("dx", dx)) dx = 0.03; ROS_INFO("dx: %f", dx);
-    if(!pnh_.getParam("dz", dz)) dz = 0.05; ROS_INFO("dz: %f", dz);
+    if(!pnh_.getParam("dy", dy)) dy = 0.03; ROS_INFO("dy: %f", dy);
+    if(!pnh_.getParam("dz", dz)) dz = 0.03; ROS_INFO("dz: %f", dz);
     if(!pnh_.getParam("tag_frame", tag_frame)) tag_frame = "tag_0"; ROS_INFO("tag frame is: %s", tag_frame.c_str());
     if(!pnh_.getParam("file_name", file_name)) file_name = "calibration"; ROS_INFO("file_name: %s", file_name.c_str());
     package_path = ros::package::getPath("hand_eye_calibration");
