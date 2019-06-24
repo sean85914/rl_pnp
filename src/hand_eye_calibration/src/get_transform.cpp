@@ -1,5 +1,6 @@
 #include <cstdio> // printf
 #include <iostream> // std::cout
+#include <iomanip>
 #include <fstream> // std::ifstream
 #include <Eigen/Dense> // Eigen core, SVD
 #include <tf/tf.h> // Transformation
@@ -8,7 +9,7 @@
  *  Get transformation from two point sets in given file using ICP for hand-eye calibration
  *  
  *  Editor: Sean Lu
- *  Last edited: 5/16, 2019
+ *  Last edited: 6/24, 2019
  */
 
 /*
@@ -67,7 +68,7 @@ bool parse_file(char *file, Eigen::MatrixXf &target, Eigen::MatrixXf &source){
   int count = 0;
   f.open(file, std::ifstream::in);
   if(!f){
-    printf("Cannot open file! Abort...\n");
+    printf("\033[1;31mCannot open file! Abort...\n\033[0m");
     return 0;
   }
   while(std::getline(f, line)) ++count;
@@ -132,6 +133,28 @@ void compute(Eigen::MatrixXf &target, Eigen::MatrixXf &source, tf::Transform &t)
   Eigen::Matrix4f homo = Eigen::Matrix4f::Zero();
   homo.block<3, 3>(0, 0) = R; homo.block<3, 1>(0, 3) = trans; homo(3, 3) = 1.0;
   std::cout << "Homogeneous transformation matrix: \n" << homo << "\n";
+  double err_square = 0.0f;
+  Eigen::MatrixXf source_transformed(target.rows(), 3);
+  std::cout << "Registration error: \n";
+  for(int i=0; i<target.rows(); ++i){
+    for(int j=0; j<3; ++j){
+      source_transformed(i, j) = R(j, 0)*source(i, j) + R(j, 1)*source(i, j) + R(j, 2)*source(i, j) + trans(j);
+    }
+  }
+  for(int i=0; i<target.rows(); ++i){
+    std::cout.setf(std::ios::showpoint); std::cout.setf(std::ios::fixed, std::ios::floatfield);
+    std::cout << std::setprecision(3) 
+              << "[" << source(i, 0) << ", " << source(i, 1) << ", " << source(i, 2) << "] -> " 
+              << "[" << source_transformed(i, 0) << ", " << source_transformed(i, 1) << ", " << source_transformed(i, 2) << "]: "
+              << "[" << target(i, 0) << ", " << target(i, 1) << ", " << target(i, 2) << "]" << "  Error: ";
+    double err_x = target(i, 0) - source_transformed(i, 0);
+    double err_y = target(i, 1) - source_transformed(i, 1);
+    double err_z = target(i, 2) - source_transformed(i, 2);
+    double term_err = err_x*err_x + err_y*err_y + err_z*err_z;
+    std::cout << term_err << "\n";
+    err_square += term_err;
+  }
+  std::cout << "Overall error: " << err_square << "\n";
 }
 
 bool get_best_transformation(char* file, tf::Transform& t){
