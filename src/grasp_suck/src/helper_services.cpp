@@ -170,7 +170,7 @@ bool service_place_cb(std_srvs::Empty::Request &req, std_srvs::Empty::Response &
       ros::Duration(0.3).sleep();
     }while(tmp_counter<=1);
     // Retract the pheumatic
-    
+    tmp_counter = 0;
     do{ // Call twice to make sure the suction work properly
       ++tmp_counter; 
       std_srvs::SetBool retract; 
