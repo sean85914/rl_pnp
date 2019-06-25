@@ -40,6 +40,10 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(get_pose_service src/get_pose_service.cpp)
-add_dependencies(get_pose_service ${catkin_EXPORTED_TARGETS} grasp_suck_gencpp)
-target_link_libraries(get_pose_service ${catkin_LIBRARIES})
+add_executable(helper_services src/helper_services.cpp)
+add_dependencies(helper_services ${catkin_EXPORTED_TARGETS} grasp_suck_gencpp)
+target_link_libraries(helper_services ${catkin_LIBRARIES})
+
+add_executable(robotiq_gripper_control src/robotiq_gripper_control.cpp)
+add_dependencies(robotiq_gripper_control ${catkin_EXPORTED_TARGETS})
+target_link_libraries(robotiq_gripper_control ${catkin_LIBRARIES})
