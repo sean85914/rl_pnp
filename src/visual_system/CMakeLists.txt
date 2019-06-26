@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
   pcl_conversions
   pcl_ros
   message_generation
+  message_filters
 )
 
 find_package(Boost REQUIRED)
@@ -60,3 +61,9 @@ target_link_libraries(get_target_pc ${catkin_LIBRARIES})
 
 add_executable(take_picture src/take_picture.cpp)
 target_link_libraries(take_picture ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_executable(save_all src/save_all.cpp)
+target_link_libraries(save_all ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_executable(pixel_to_xyz src/pixel_to_xyz.cpp)
+target_link_libraries(pixel_to_xyz ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})

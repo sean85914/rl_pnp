@@ -51,7 +51,8 @@ ImageSaver::ImageSaver(ros::NodeHandle nh, ros::NodeHandle pnh):
   // Check if images directory exist, if not, then create one
   color_file_path = package_path + "/images/color/";
   depth_file_path = package_path + "/images/depth/";
-  boost::filesystem::path p_color(color_file_path), p_depth(depth_file_path);
+  boost::filesystem::path p(package_path+"/images"), p_color(color_file_path), p_depth(depth_file_path);
+  if(!boost::filesystem::exists(p)){ROS_WARN("images directory doesn't exist, create one."); boost::filesystem::create_directory(p);}
   if(!boost::filesystem::exists(p_color)){
     ROS_WARN("Color images directory doesn't exist, create one.");
     boost::filesystem::create_directory(p_color);
@@ -110,7 +111,7 @@ bool ImageSaver::cb_service_depth(std_srvs::Empty::Request &req, std_srvs::Empty
     file_name = depth_file_path + file_name + ".png"; // JPG support only 8-bit, use PNG for 16-bit
     if(cv::imwrite(file_name, cv_depth_ptr->image)){
       ROS_INFO("%s saved!", file_name.c_str());
-      ++color_num;
+      ++depth_num;
       return true;
     }else {
       ROS_ERROR("Image save failed!");
