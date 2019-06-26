@@ -1,39 +1,131 @@
-#include <ros/ros.h>
-#include <tf/transform_listener.h>
-#include <geometry_msgs/Pose.h>
-// SRV
-#include <std_srvs/Empty.h>
-#include <std_srvs/Trigger.h>
-#include <std_srvs/SetBool.h>
-// Get target pose in robot arm frame
-#include <grasp_suck/get_pose.h>
-// Robot arm high level control
-#include <arm_operation/joint_pose.h>
-#include <arm_operation/target_pose.h>
-// Suction
-#include <vacuum_conveyor_control/vacuum_control.h>
+#include "helper_services.h"
 
-#define GRASP false
-#define SUCK  true
+Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh): 
+ nh_(nh), pnh_(pnh), define_home(true), define_place(true)
+{
+  // Initialize vector size
+  suction_tcp.resize(3); gripper_tcp.resize(3); home_joint.resize(6); place_joint.resize(6);
+  // Get parameters
+  if(!pnh.getParam("cam_prefix", cam_prefix)) cam_prefix = "camera1";
+  if(!pnh.getParam("arn_prefix", arm_prefix)) arm_prefix = "";
+  if(!pnh.getParam("/tcp_transformation_publisher/suction", suction_tcp)) {suction_tcp[0] = suction_tcp[1] = suction_tcp[2] = 0.0f;}
+  if(!pnh.getParam("/tcp_transformation_publisher/gripper", gripper_tcp)) {gripper_tcp[0] = gripper_tcp[1] = gripper_tcp[2] = 0.0f;}
+  if(!pnh.getParam("ur3_home_joint", home_joint)) {define_home = false; ROS_WARN("No predefined home joint received!");}
+  if(!pnh.getParam("ur3_place_joint", place_joint)) {define_place = false; ROS_WARN("No predefined place joint received!");}
+  // Show parameters
+  ROS_INFO("--------------------------------------");
+  ROS_INFO("Camera prefix: %s", cam_prefix.c_str());
+  ROS_INFO("Arm prefix: %s", arm_prefix.c_str());
+  ROS_INFO("Suction translation: %f %f %f", suction_tcp[0], suction_tcp[1], suction_tcp[2]);
+  ROS_INFO("Gripper translation: %f %f %f", gripper_tcp[0], gripper_tcp[1], gripper_tcp[2]);
+  if(define_home) ROS_INFO("UR3 home joints: %f %f %f %f %f %f", home_joint[0], home_joint[1], home_joint[2], home_joint[3], home_joint[4], home_joint[5]);
+  if(define_place) ROS_INFO("UR3 place joints: %f %f %f %f %f %f", place_joint[0], place_joint[1], place_joint[2], place_joint[3], place_joint[4], place_joint[5]);
+  ROS_INFO("--------------------------------------");
+  // Connect to service server
+  // goto_joint_pose
+  while(!ros::service::waitForService("/ur3_control_server/ur_control/goto_joint_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_joint_pose service...");}
+  robot_arm_goto_joint = pnh.serviceClient<arm_operation::joint_pose>("/ur3_control_server/ur_control/goto_joint_pose");
+  // goto_pose
+  while(!ros::service::waitForService("/ur3_control_server/ur_control/goto_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_pose service...");}
+  robot_arm_goto_pose = pnh.serviceClient<arm_operation::target_pose>("/ur3_control_server/ur_control/goto_pose");
+  // Vacuum control
+  while(!ros::service::waitForService("/arduino_control/vacuum_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to vacuum_control service...");}
+  vacuum_control = pnh.serviceClient<vacuum_conveyor_control::vacuum_control>("/arduino_control/vacuum_control");
+  // Pheumatic control
+  while(!ros::service::waitForService("/arduino_control/pheumatic_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to pheumatic_control service...");}
+  pheumatic_control = pnh.serviceClient<std_srvs::SetBool>("/arduino_control/pheumatic_control");
+  // Close gripper
+  while(!ros::service::waitForService("/robotiq_finger_control_node/close_gripper", ros::Duration(3.0))) {ROS_WARN("Try to connect to close_gripper service...");}
+  close_gripper = pnh.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/close_gripper");
+  // Open gripper
+  while(!ros::service::waitForService("/robotiq_finger_control_node/open_gripper", ros::Duration(3.0))) {ROS_WARN("Try to connect to open_gripper service...");}
+  open_gripper = pnh.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/open_gripper");
+  // Get state
+  while(!ros::service::waitForService("/robotiq_finger_control_node/get_grasp_state", ros::Duration(3.0))) {ROS_WARN("Try to connect to get_grasp_state service...");}
+  get_grasp_state = pnh.serviceClient<std_srvs::Trigger>("/robotiq_finger_control_node/get_grasp_state");
+  // Advertise service server
+  // go home
+  if(define_home) service_home = pnh.advertiseService("robot_go_home", 
+                                                      &Helper_Services::go_home_service_callback, 
+                                                      this);
+  // go to placing
+  if(define_place) service_place = pnh.advertiseService("robot_goto_place", 
+                                                        &Helper_Services::go_place_service_callback, 
+                                                        this);
+  service_goto_target = pnh.advertiseService("goto_target", 
+                                             &Helper_Services::go_target_service_callback, 
+                                             this);
+  // TODO: add a service to check if suck succeed
+}
 
-bool define_home = true; 
-bool define_place = true;
-bool last_motion; // Last motion primmitive, 0 for grasp and 1 for suck
-const double OFFSET = -0.008f; // Lower 0.8 centimeter to make sure have contact with object
-const double X_OFFSET = 0.02f; // Seems error from calibration
-std::string cam_prefix;
-std::string ur_prefix;
-std::vector<double> suction_tcp;
-std::vector<double> gripper_tcp;
-std::vector<double> ur3_home_joint;
-std::vector<double> ur3_place_joint;
-ros::ServiceClient robot_arm_goto_joint;
-ros::ServiceClient robot_arm_goto_pose;
-ros::ServiceClient vacuum_control;
-ros::ServiceClient pheumatic_control;
-ros::ServiceClient close_gripper;
-ros::ServiceClient open_gripper;
-ros::ServiceClient get_grasp_state;
+/*
+  _    _  ____  __  __ ______ 
+ | |  | |/ __ \|  \/  |  ____|
+ | |__| | |  | | \  / | |__   
+ |  __  | |  | | |\/| |  __|  
+ | |  | | |__| | |  | | |____ 
+ |_|  |_|\____/|_|  |_|______|
+                              
+ */
+
+bool Helper_Services::go_home_service_callback(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
+  arm_operation::joint_pose myJointReq;
+  for(int i=0; i<6; ++i) myJointReq.request.joint[i] = home_joint[i];
+  ROS_INFO("UR3 goto home");
+  robot_arm_goto_joint.call(myJointReq);
+  if(last_motion==GRASP){
+    std_srvs::Trigger req;
+    get_grasp_state.call(req);
+    ROS_INFO("Grasp: %s", req.response.success==true?"Success":"Fail");
+  }else{ // Suck
+    // TODO
+  }
+  return true;
+}
+
+/*
+  _____  _               _____ ______ 
+ |  __ \| |        /\   / ____|  ____|
+ | |__) | |       /  \ | |    | |__   
+ |  ___/| |      / /\ \| |    |  __|  
+ | |    | |____ / ____ \ |____| |____ 
+ |_|    |______/_/    \_\_____|______|
+                                      
+ */
+
+bool Helper_Services::go_place_service_callback(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
+  arm_operation::joint_pose myJointReq;
+  for(int i=0; i<6; ++i) myJointReq.request.joint[i] = place_joint[i];
+  ROS_INFO("UR3 goto place");
+  robot_arm_goto_joint.call(myJointReq); ros::Duration(0.3).sleep();
+  if(last_motion==false){ // Grasp
+    std_srvs::Empty empty;
+    open_gripper.call(empty);
+  } else{ // Suck
+    int tmp_counter = 0;
+    do{ // Call twice to make sure the suction work properly
+      ++tmp_counter; 
+      vacuum_conveyor_control::vacuum_control vacuum_cmd;
+      vacuum_cmd.request.command = 0; // Exhale
+      vacuum_control.call(vacuum_cmd); 
+      ros::Duration(0.3).sleep();
+    }while(tmp_counter<=1);
+    // Retract the pheumatic
+    tmp_counter = 0;
+    do{ // Call twice to make sure the suction work properly
+      ++tmp_counter; 
+      std_srvs::SetBool retract; 
+      retract.request.data = false;
+      pheumatic_control.call(retract);
+      ros::Duration(0.3).sleep();
+    }while(tmp_counter<=1);
+  }
+  // Then go home
+  for(int i=0; i<6; ++i) myJointReq.request.joint[i] = home_joint[i];
+  ROS_INFO("UR3 goto home"); 
+  robot_arm_goto_joint.call(myJointReq);
+  return true;
+}
 
 /*
    _____  ____    _______ ____    _______       _____   _____ ______ _______ 
@@ -43,9 +135,12 @@ ros::ServiceClient get_grasp_state;
  | |__| | |__| |    | | | |__| |    | |/ ____ \| | \ \| |__| | |____   | |   
   \_____|\____/     |_|  \____/     |_/_/    \_\_|  \_\\_____|______|  |_|   
                                                                              
-*/                                                                             
+*/
 
-bool service_callback(grasp_suck::get_pose::Request &req, grasp_suck::get_pose::Response &res){
+bool Helper_Services::go_target_service_callback(
+    grasp_suck::get_pose::Request &req, 
+    grasp_suck::get_pose::Response &res)
+{
   tf::TransformListener listener;
   ROS_INFO("\nReceive new request: ");
   if(req.primmitive==GRASP){ // Grasp
@@ -61,7 +156,7 @@ bool service_callback(grasp_suck::get_pose::Request &req, grasp_suck::get_pose::
     printf("Motion primmitive: \033[1;32msuck\033[0m\n");
     printf("Position in camera frame: (%f, %f, %f)\n", req.point_in_cam.x, req.point_in_cam.y, req.point_in_cam.z);
   }
-  std::string des_frame = (ur_prefix==""?"base_link":ur_prefix+"_base_link");
+  std::string des_frame = (arm_prefix==""?"base_link":arm_prefix+"_base_link");
   std::string ori_frame = cam_prefix+"_color_optical_frame";
   tf::StampedTransform st;
   try{
@@ -117,131 +212,11 @@ bool service_callback(grasp_suck::get_pose::Request &req, grasp_suck::get_pose::
   return true;
 }
 
-/*
-  _    _  ____  __  __ ______ 
- | |  | |/ __ \|  \/  |  ____|
- | |__| | |  | | \  / | |__   
- |  __  | |  | | |\/| |  __|  
- | |  | | |__| | |  | | |____ 
- |_|  |_|\____/|_|  |_|______|
-                              
- */
-
-bool service_home_cb(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
-  arm_operation::joint_pose myJointReq;
-  for(int i=0; i<6; ++i) myJointReq.request.joint[i] = ur3_home_joint[i];
-  ROS_INFO("UR3 goto home");
-  robot_arm_goto_joint.call(myJointReq);
-  if(last_motion==GRASP){
-    std_srvs::Trigger req;
-    get_grasp_state.call(req);
-    ROS_INFO("Grasp: %s", req.response.success==true?"Success":"Fail");
-  }else{ // Suck
-    // TODO
-  }
-  return true;
-}
-
-/*
-  _____  _               _____ ______ 
- |  __ \| |        /\   / ____|  ____|
- | |__) | |       /  \ | |    | |__   
- |  ___/| |      / /\ \| |    |  __|  
- | |    | |____ / ____ \ |____| |____ 
- |_|    |______/_/    \_\_____|______|
-                                      
- */
-
-bool service_place_cb(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
-  arm_operation::joint_pose myJointReq;
-  for(int i=0; i<6; ++i) myJointReq.request.joint[i] = ur3_place_joint[i];
-  ROS_INFO("UR3 goto place");
-  robot_arm_goto_joint.call(myJointReq); ros::Duration(0.3).sleep();
-  if(last_motion==false){ // Grasp
-    std_srvs::Empty empty;
-    open_gripper.call(empty);
-  } else{ // Suck
-    int tmp_counter = 0;
-    do{ // Call twice to make sure the suction work properly
-      ++tmp_counter; 
-      vacuum_conveyor_control::vacuum_control vacuum_cmd;
-      vacuum_cmd.request.command = 0; // Exhale
-      vacuum_control.call(vacuum_cmd); 
-      ros::Duration(0.3).sleep();
-    }while(tmp_counter<=1);
-    // Retract the pheumatic
-    tmp_counter = 0;
-    do{ // Call twice to make sure the suction work properly
-      ++tmp_counter; 
-      std_srvs::SetBool retract; 
-      retract.request.data = false;
-      pheumatic_control.call(retract);
-      ros::Duration(0.3).sleep();
-    }while(tmp_counter<=1);
-  }
-  // Then go home
-  for(int i=0; i<6; ++i) myJointReq.request.joint[i] = ur3_home_joint[i];
-  ROS_INFO("UR3 goto home"); 
-  robot_arm_goto_joint.call(myJointReq);
-  return true;
-}
-
 int main(int argc, char** argv)
 {
-  
   ros::init(argc, argv, "helper_service_node");
   ros::NodeHandle nh, pnh("~");
-  // Initialize vector size
-  suction_tcp.resize(3); gripper_tcp.resize(3); ur3_home_joint.resize(6); ur3_place_joint.resize(6);
-  // Get parameters
-  if(!pnh.getParam("cam_prefix", cam_prefix)) cam_prefix = "camera1";
-  if(!pnh.getParam("ur_prefix", ur_prefix)) ur_prefix = "";
-  if(!pnh.getParam("/tcp_transformation_publisher/suction", suction_tcp)) {suction_tcp[0] = suction_tcp[1] = suction_tcp[2] = 0.0f;}
-  if(!pnh.getParam("/tcp_transformation_publisher/gripper", gripper_tcp)) {gripper_tcp[0] = gripper_tcp[1] = gripper_tcp[2] = 0.0f;}
-  if(!pnh.getParam("ur3_home_joint", ur3_home_joint)) {define_home = false; ROS_WARN("No predefined home joint received!");}
-  if(!pnh.getParam("ur3_place_joint", ur3_place_joint)) {define_place = false; ROS_WARN("No predefined place joint received!");}
-  // Show parameters
-  ROS_INFO("--------------------------------------");
-  ROS_INFO("Camera prefix: %s", cam_prefix.c_str());
-  ROS_INFO("Arm prefix: %s", ur_prefix.c_str());
-  ROS_INFO("Suction translation: %f %f %f", suction_tcp[0], suction_tcp[1], suction_tcp[2]);
-  ROS_INFO("Gripper translation: %f %f %f", gripper_tcp[0], gripper_tcp[1], gripper_tcp[2]);
-  if(define_home) ROS_INFO("UR3 home joints: %f %f %f %f %f %f", ur3_home_joint[0], ur3_home_joint[1], ur3_home_joint[2], ur3_home_joint[3], ur3_home_joint[4], ur3_home_joint[5]);
-  if(define_place) ROS_INFO("UR3 place joints: %f %f %f %f %f %f", ur3_place_joint[0], ur3_place_joint[1], ur3_place_joint[2], ur3_place_joint[3], ur3_place_joint[4], ur3_place_joint[5]);
-  ROS_INFO("--------------------------------------");
-  // Advertise services
-  ros::ServiceServer service_home;
-  ros::ServiceServer service_place;
-  ros::ServiceServer service_goto_target;
-  // go home
-  if(define_home){
-    while(!ros::service::waitForService("/ur3_control_server/ur_control/goto_joint_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_joint_pose service...");}
-    robot_arm_goto_joint = pnh.serviceClient<arm_operation::joint_pose>("/ur3_control_server/ur_control/goto_joint_pose");
-    service_home = pnh.advertiseService("robot_go_home", service_home_cb);
-  }
-  // go to placing
-  if(define_place){
-    service_place = pnh.advertiseService("robot_goto_place", service_place_cb);
-    while(!ros::service::waitForService("/arduino_control/vacuum_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to vacuum_control service...");}
-    vacuum_control = pnh.serviceClient<vacuum_conveyor_control::vacuum_control>("/arduino_control/vacuum_control");
-    while(!ros::service::waitForService("/arduino_control/pheumatic_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to pheumatic_control service...");}
-    pheumatic_control = pnh.serviceClient<std_srvs::SetBool>("/arduino_control/pheumatic_control");
-  }
-  // go to target
-  while(!ros::service::waitForService("/ur3_control_server/ur_control/goto_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_pose service...");}
-  robot_arm_goto_pose = pnh.serviceClient<arm_operation::target_pose>("/ur3_control_server/ur_control/goto_pose");
-  service_goto_target = pnh.advertiseService("goto_target", service_callback);
-  // Gripper related service client
-  // Close
-  while(!ros::service::waitForService("/robotiq_finger_control_node/close_gripper", ros::Duration(3.0))) {ROS_WARN("Try to connect to close_gripper service...");}
-  close_gripper = pnh.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/close_gripper");
-  // Open
-  while(!ros::service::waitForService("/robotiq_finger_control_node/open_gripper", ros::Duration(3.0))) {ROS_WARN("Try to connect to open_gripper service...");}
-  open_gripper = pnh.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/open_gripper");
-  // Get state
-  while(!ros::service::waitForService("/robotiq_finger_control_node/get_grasp_state", ros::Duration(3.0))) {ROS_WARN("Try to connect to get_grasp_state service...");}
-  get_grasp_state = pnh.serviceClient<std_srvs::Trigger>("/robotiq_finger_control_node/get_grasp_state");
-  // Spin node until ROS shutdown
-  ros::spin();
+  Helper_Services foo(nh, pnh);
+  while(ros::ok()) ros::spinOnce();
   return 0;
 }
