@@ -10,24 +10,24 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   if(!pnh.getParam("arn_prefix", arm_prefix)) arm_prefix = "";
   if(!pnh.getParam("/tcp_transformation_publisher/suction", suction_tcp)) {suction_tcp[0] = suction_tcp[1] = suction_tcp[2] = 0.0f;}
   if(!pnh.getParam("/tcp_transformation_publisher/gripper", gripper_tcp)) {gripper_tcp[0] = gripper_tcp[1] = gripper_tcp[2] = 0.0f;}
-  if(!pnh.getParam("ur3_home_joint", home_joint)) {define_home = false; ROS_WARN("No predefined home joint received!");}
-  if(!pnh.getParam("ur3_place_joint", place_joint)) {define_place = false; ROS_WARN("No predefined place joint received!");}
+  if(!pnh.getParam("home_joint", home_joint)) {define_home = false; ROS_WARN("No predefined home joint received!");}
+  if(!pnh.getParam("place_joint", place_joint)) {define_place = false; ROS_WARN("No predefined place joint received!");}
   // Show parameters
   ROS_INFO("--------------------------------------");
   ROS_INFO("Camera prefix: %s", cam_prefix.c_str());
   ROS_INFO("Arm prefix: %s", arm_prefix.c_str());
   ROS_INFO("Suction translation: %f %f %f", suction_tcp[0], suction_tcp[1], suction_tcp[2]);
   ROS_INFO("Gripper translation: %f %f %f", gripper_tcp[0], gripper_tcp[1], gripper_tcp[2]);
-  if(define_home) ROS_INFO("UR3 home joints: %f %f %f %f %f %f", home_joint[0], home_joint[1], home_joint[2], home_joint[3], home_joint[4], home_joint[5]);
-  if(define_place) ROS_INFO("UR3 place joints: %f %f %f %f %f %f", place_joint[0], place_joint[1], place_joint[2], place_joint[3], place_joint[4], place_joint[5]);
+  if(define_home) ROS_INFO("UR5 home joints: %f %f %f %f %f %f", home_joint[0], home_joint[1], home_joint[2], home_joint[3], home_joint[4], home_joint[5]);
+  if(define_place) ROS_INFO("UR5 place joints: %f %f %f %f %f %f", place_joint[0], place_joint[1], place_joint[2], place_joint[3], place_joint[4], place_joint[5]);
   ROS_INFO("--------------------------------------");
   // Connect to service server
   // goto_joint_pose
-  while(!ros::service::waitForService("/ur3_control_server/ur_control/goto_joint_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_joint_pose service...");}
-  robot_arm_goto_joint = pnh.serviceClient<arm_operation::joint_pose>("/ur3_control_server/ur_control/goto_joint_pose");
+  while(!ros::service::waitForService("/ur5_control_server/ur_control/goto_joint_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_joint_pose service...");}
+  robot_arm_goto_joint = pnh.serviceClient<arm_operation::joint_pose>("/ur5_control_server/ur_control/goto_joint_pose");
   // goto_pose
-  while(!ros::service::waitForService("/ur3_control_server/ur_control/goto_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_pose service...");}
-  robot_arm_goto_pose = pnh.serviceClient<arm_operation::target_pose>("/ur3_control_server/ur_control/goto_pose");
+  while(!ros::service::waitForService("/ur5_control_server/ur_control/goto_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_pose service...");}
+  robot_arm_goto_pose = pnh.serviceClient<arm_operation::target_pose>("/ur5_control_server/ur_control/goto_pose");
   // Vacuum control
   while(!ros::service::waitForService("/arduino_control/vacuum_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to vacuum_control service...");}
   vacuum_control = pnh.serviceClient<vacuum_conveyor_control::vacuum_control>("/arduino_control/vacuum_control");
@@ -55,6 +55,7 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   service_goto_target = pnh.advertiseService("goto_target", 
                                              &Helper_Services::go_target_service_callback, 
                                              this);
+  ROS_INFO("\033[1;37mNode ready\033[0m");
   // TODO: add a service to check if suck succeed
 }
 
@@ -71,7 +72,7 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
 bool Helper_Services::go_home_service_callback(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   arm_operation::joint_pose myJointReq;
   for(int i=0; i<6; ++i) myJointReq.request.joint[i] = home_joint[i];
-  ROS_INFO("UR3 goto home");
+  ROS_INFO("UR5 goto home");
   robot_arm_goto_joint.call(myJointReq);
   if(last_motion==GRASP){
     std_srvs::Trigger req;
@@ -96,7 +97,7 @@ bool Helper_Services::go_home_service_callback(std_srvs::Empty::Request &req, st
 bool Helper_Services::go_place_service_callback(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   arm_operation::joint_pose myJointReq;
   for(int i=0; i<6; ++i) myJointReq.request.joint[i] = place_joint[i];
-  ROS_INFO("UR3 goto place");
+  ROS_INFO("UR5 goto place");
   robot_arm_goto_joint.call(myJointReq); ros::Duration(0.3).sleep();
   if(last_motion==false){ // Grasp
     std_srvs::Empty empty;
@@ -122,7 +123,7 @@ bool Helper_Services::go_place_service_callback(std_srvs::Empty::Request &req, s
   }
   // Then go home
   for(int i=0; i<6; ++i) myJointReq.request.joint[i] = home_joint[i];
-  ROS_INFO("UR3 goto home"); 
+  ROS_INFO("UR5 goto home"); 
   robot_arm_goto_joint.call(myJointReq);
   return true;
 }
@@ -192,7 +193,7 @@ bool Helper_Services::go_target_service_callback(
   arm_operation::target_pose myPoseReq;
   myPoseReq.request.target_pose = res.result_pose;
   myPoseReq.request.factor = 0.5f;
-  ROS_INFO("\nUR3 goto target: \nPosition: [%f, %f, %f]\nOrientation: [%f, %f, %f, %f]",
+  ROS_INFO("\nUR5 goto target: \nPosition: [%f, %f, %f]\nOrientation: [%f, %f, %f, %f]",
             res.result_pose.position.x, res.result_pose.position.y, res.result_pose.position.z,
             res.result_pose.orientation.x, res.result_pose.orientation.y, res.result_pose.orientation.z, res.result_pose.orientation.w);
   robot_arm_goto_pose.call(myPoseReq);
