@@ -6,10 +6,10 @@
     </plugin> 
   </gazebo>
   <xacro:property name="M_PI" value="3.1415926535"/>
-  <!-- UR3 -->
-  <!--xacro:include filename="$(find ur_description)/urdf/ur3.urdf.xacro"/-->
+  <!-- UR5 -->
+  <xacro:include filename="$(find ur_description)/urdf/ur5.urdf.xacro"/>
   <!-- UR3 with suction -->
-  <xacro:include filename="$(find robot_description)/urdf/ur3_with_suction.urdf.xacro"/>
+  <!--xacro:include filename="$(find robot_description)/urdf/ur5_with_suction.urdf.xacro"/-->
   <!-- Gripper -->
   <!--xacro:include filename="$(find robotiq_description)/urdf/robotiq_85_gripper.urdf.xacro" /-->
   <!-- Color material -->
@@ -19,7 +19,7 @@
   <material name="green">
     <color rgba="0.0 1.0 0.0 1.0"/>
   </material>
-  <xacro:ur3_robot prefix="" joint_limited="false"/>
+  <xacro:ur5_robot prefix="" joint_limited="false"/>
   <!-- SR300 above conveyor -->
   <link name="camera1_link">
     <visual>
