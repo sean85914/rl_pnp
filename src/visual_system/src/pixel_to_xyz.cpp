@@ -37,8 +37,12 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "pixel_to_xyz");
   ros::NodeHandle nh, pnh("~");
   #ifdef PUB_PC
-  ROA_WARN("Publish pointcloud for debug");
-  pub_pc = pnh.advertise<sensor_msgs::PointCloud2>("point_cloud", 1);
+  if(PUB_PC){
+    ROS_WARN("Publish pointcloud for debug");
+    pub_pc = pnh.advertise<sensor_msgs::PointCloud2>("point_cloud", 1);
+  }
+  else
+    ROS_WARN("Not publish pointcloud");
   #endif
   #ifndef PUB_PC
   ROS_WARN("Not publish poibtcloud");
@@ -77,8 +81,8 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_ms
  
   pcl::PointCloud<pcl::PointXYZRGB> pc;
   int idx_cnt = 0;
-  for(int x=208; /*row<depth_img_ptr->image.rows;*/x<=452; ++x){
-    for(int y=21; /*col<depth_img_ptr->image.cols;*/ y<=245; ++y){
+  for(int x=208; /*row<depth_img_ptr->image.rows;*/x<=431; ++x){
+    for(int y=21; /*col<depth_img_ptr->image.cols;*/ y<=244; ++y){
       // More readable
       auto depth = depth_img_ptr->image.at<unsigned short>(cv::Point(x, y));
       geometry_msgs::Point p;
@@ -115,7 +119,7 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_ms
       #ifdef PUB_PC
       sensor_msgs::PointCloud2 pc_out;
       pcl::toROSMsg(pc, pc_out);
-      pc_out.header.frmae_id = color_image->header.frame_id;
+      pc_out.header.frame_id = color_image->header.frame_id;
       pub_pc.publish(pc_out);
       #endif
     }
