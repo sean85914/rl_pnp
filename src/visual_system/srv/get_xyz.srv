@@ -1,0 +1,3 @@
+int16[2] point # pixel, in x y
+---
+geometry_msgs/Point result

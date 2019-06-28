@@ -25,6 +25,7 @@ add_service_files(
   FILES
   target_pose.srv
   barcode_detect.srv
+  get_xyz.srv
 )
 
 generate_messages(
