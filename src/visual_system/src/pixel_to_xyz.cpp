@@ -136,5 +136,6 @@ bool callback_service(visual_system::get_xyz::Request &req,
   ROS_INFO("\nRequest: pixel(%d, %d)\n\
 Response: point(%f, %f, %f)", 
               req.point[0], req.point[1], p.x, p.y, p.z);
+  isReady = false; // Change to false 
   return true;
 }
