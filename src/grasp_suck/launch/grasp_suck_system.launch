@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<launch>
+  <?ignore
+  <!-- SR300 -->
+  <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
+    <arg name="camera" value="camera1"/>
+  </include>
+  <!-- UR5 -->
+  <include file="$(find arm_operation)/launch/ur5_real.launch">
+    <arg name="robot_ip" value="192.168.50.11"/>
+    <arg name="tool_length" value="0.0"/>
+  </include>
+  ?>
+  <!-- TCP information -->
+  <include file="$(find arm_operation)/launch/tcp_publisher.launch"/>
+  <!-- Vacuum -->
+  <node pkg="vacuum_conveyor_control" type="arduino_control" name="arduino_control" output="screen" clear_params="true" required="true">
+    <param name="port" value="/dev/ttyUSB1"/>
+  </node>
+  <!-- robotiq 2-finger gripper -->
+  <node pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" name="robotiq2FGripper" args="/dev/ttyUSB0" required="true"/>
+  <!-- robotiq gripper control -->
+  <node pkg="grasp_suck" type="robotiq_gripper_control" name="robotiq_finger_control_node" output="screen" required="true"/>
+  <!-- Visual System -->
+  <!-- Convert pixel to xyz coord. w.r.t. camera_color_optical_frame -->
+  <node pkg="visual_system" type="pixel_to_xyz" name="pixel_to_xyz" output="screen" required="true">
+    <param name="debug" value="false"/>
+    <remap from="camera/color/image_raw" to="/camera1/color/image_raw"/>
+    <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
+    <remap from="camera/color/camera_info" to="/camera1/color/camera_info"/>
+  </node>
+  <!-- Get reward based on consecutive depth images -->
+  <node pkg="grasp_suck" type="get_reward" name="get_reward" output="screen" required="true">
+    <param name="thres" value="200"/>
+    <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
+  </node> 
+  <!-- High-level Control -->
+  <include file="$(find grasp_suck)/launch/helper_services.launch"/> 
+</launch>
