@@ -10,7 +10,7 @@ ros::Subscriber sub_gripper_in;
 robotiq_2f_gripper_control::Robotiq2FGripper_robot_input now_state;
 
 // Initial robotiq 2-finger gripper, refer to: package:robotiq_2f_gripper_control/nodes/Robotiq2FGripperSimpleController.py
-void initial_gripepr(void){
+void initial_gripper(void){
   robotiq_2f_gripper_control::Robotiq2FGripper_robot_output msg;
   pub_gripper_out.publish(msg);// Reset
   ros::Duration(0.5).sleep();
@@ -49,6 +49,12 @@ bool get_grasp_state_cb(std_srvs::Trigger::Request &req, std_srvs::Trigger::Resp
     res.message = "Successfully grasp object";
   }
 }
+// Initial gripper
+bool initial_gripper_cb(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+{
+  initial_gripper();
+  return true;
+}
 
 int main(int argc, char** argv)
 {
@@ -58,11 +64,12 @@ int main(int argc, char** argv)
   pub_gripper_out = nh.advertise<robotiq_2f_gripper_control::Robotiq2FGripper_robot_output>("Robotiq2FGripperRobotOutput", 1);
   sub_gripper_in  = nh.subscribe("Robotiq2FGripperRobotInput", 1, cb_update_state);
   // Initialize gripper
-  initial_gripepr();
+  initial_gripper();
   // Advertise services
-  ros::ServiceServer close_gripper_service = pnh.advertiseService("close_gripper", close_gripper_cb);
-  ros::ServiceServer open_gripepr_service  = pnh.advertiseService("open_gripper", open_gripper_cb);
-  ros::ServiceServer check_grasp_succeed   = pnh.advertiseService("get_grasp_state", get_grasp_state_cb);
+  ros::ServiceServer close_gripper_service     = pnh.advertiseService("close_gripper", close_gripper_cb);
+  ros::ServiceServer open_gripepr_service      = pnh.advertiseService("open_gripper", open_gripper_cb);
+  ros::ServiceServer check_grasp_succeed       = pnh.advertiseService("get_grasp_state", get_grasp_state_cb);
+  ros::ServiceServer initial_gripper_service   = pnh.advertiseService("initial_gripper", initial_gripper_cb);
   // Spin until ROS shutdown  
   ros::spin();
   return 0;
