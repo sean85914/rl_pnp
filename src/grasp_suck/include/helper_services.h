@@ -46,10 +46,14 @@ class Helper_Services{
   // Vacuum control
   ros::ServiceClient vacuum_control;
   ros::ServiceClient pheumatic_control;
-  // 2 finger gripper control
+  // 2-finger gripper control
   ros::ServiceClient close_gripper;
   ros::ServiceClient open_gripper;
-  ros::ServiceClient get_grasp_state;
+  //ros::ServiceClient get_grasp_state;
+  // Get reward
+  ros::ServiceClient set_prior;
+  ros::ServiceClient set_posterior;
+  ros::ServiceClient get_result;
   // Advertise services
   ros::ServiceServer service_home;
   ros::ServiceServer service_place;

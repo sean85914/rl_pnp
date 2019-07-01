@@ -28,21 +28,30 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   // goto_pose
   while(!ros::service::waitForService("/ur5_control_server/ur_control/goto_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_pose service...");}
   robot_arm_goto_pose = pnh.serviceClient<arm_operation::target_pose>("/ur5_control_server/ur_control/goto_pose");
-  // Vacuum control
+  // vacuum_control
   while(!ros::service::waitForService("/arduino_control/vacuum_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to vacuum_control service...");}
   vacuum_control = pnh.serviceClient<vacuum_conveyor_control::vacuum_control>("/arduino_control/vacuum_control");
-  // Pheumatic control
+  // pheumatic_control
   while(!ros::service::waitForService("/arduino_control/pheumatic_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to pheumatic_control service...");}
   pheumatic_control = pnh.serviceClient<std_srvs::SetBool>("/arduino_control/pheumatic_control");
-  // Close gripper
+  // close_gripper
   while(!ros::service::waitForService("/robotiq_finger_control_node/close_gripper", ros::Duration(3.0))) {ROS_WARN("Try to connect to close_gripper service...");}
   close_gripper = pnh.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/close_gripper");
-  // Open gripper
+  // open_gripper
   while(!ros::service::waitForService("/robotiq_finger_control_node/open_gripper", ros::Duration(3.0))) {ROS_WARN("Try to connect to open_gripper service...");}
   open_gripper = pnh.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/open_gripper");
-  // Get state
-  while(!ros::service::waitForService("/robotiq_finger_control_node/get_grasp_state", ros::Duration(3.0))) {ROS_WARN("Try to connect to get_grasp_state service...");}
-  get_grasp_state = pnh.serviceClient<std_srvs::Trigger>("/robotiq_finger_control_node/get_grasp_state");
+  // get_grasp_state
+  /*while(!ros::service::waitForService("/robotiq_finger_control_node/get_grasp_state", ros::Duration(3.0))) {ROS_WARN("Try to connect to get_grasp_state service...");}
+  get_grasp_state = pnh.serviceClient<std_srvs::Trigger>("/robotiq_finger_control_node/get_grasp_state");*/
+  // set_prior
+  while(!ros::service::waitForService("/get_reward/set_prior", ros::Duration(3.0))) {ROS_WARN("Try to connect to set_prior service...");}
+  set_prior = pnh.serviceClient<std_srvs::Empty>("/get_reward/set_prior");
+  // set_posterior
+  while(!ros::service::waitForService("/get_reward/set_posterior", ros::Duration(3.0))) {ROS_WARN("Try to connect to set_posterior service...");}
+  set_posterior = pnh.serviceClient<std_srvs::Empty>("/get_reward/set_posterior");
+  // get_result
+  while(!ros::service::waitForService("/get_reward/get_result", ros::Duration(3.0))) {ROS_WARN("Try to connect to get_result service...");}
+  get_result = pnh.serviceClient<std_srvs::SetBool>("/get_reward/get_result");
   // Advertise service server
   // go home
   if(define_home) service_home = pnh.advertiseService("robot_go_home", 
@@ -74,13 +83,15 @@ bool Helper_Services::go_home_service_callback(std_srvs::Empty::Request &req, st
   for(int i=0; i<6; ++i) myJointReq.request.joint[i] = home_joint[i];
   ROS_INFO("UR5 goto home");
   robot_arm_goto_joint.call(myJointReq);
-  if(last_motion==GRASP){
+  std_srvs::Empty empty_req;
+  set_posterior.call(empty_req);
+  /*if(last_motion==GRASP){
     std_srvs::Trigger req;
     get_grasp_state.call(req);
     ROS_INFO("Grasp: %s", req.response.success==true?"Success":"Fail");
   }else{ // Suck
     // TODO
-  }
+  }*/
   return true;
 }
 
@@ -142,6 +153,9 @@ bool Helper_Services::go_target_service_callback(
     grasp_suck::get_pose::Request &req, 
     grasp_suck::get_pose::Response &res)
 {
+  std_srvs::Empty empty_req;
+  // Set prior depth image
+  set_prior.call(empty_req);
   tf::TransformListener listener;
   ROS_INFO("\nReceive new request: ");
   if(req.primmitive==GRASP){ // Grasp
