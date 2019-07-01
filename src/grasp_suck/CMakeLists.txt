@@ -15,7 +15,10 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
   actionlib
   actionlib_msgs
   message_generation
+  cv_bridge
 )
+
+find_package(OpenCV REQUIRED)
 
 add_service_files(
   FILES
@@ -38,6 +41,7 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 add_executable(helper_services src/helper_services.cpp)
@@ -47,3 +51,6 @@ target_link_libraries(helper_services ${catkin_LIBRARIES})
 add_executable(robotiq_gripper_control src/robotiq_gripper_control.cpp)
 add_dependencies(robotiq_gripper_control ${catkin_EXPORTED_TARGETS})
 target_link_libraries(robotiq_gripper_control ${catkin_LIBRARIES})
+
+add_executable(get_reward src/get_reward.cpp)
+target_link_libraries(get_reward ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
