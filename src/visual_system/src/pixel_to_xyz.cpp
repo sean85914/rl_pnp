@@ -18,13 +18,15 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <opencv2/opencv.hpp> // cv
 
+bool verbose;
 bool isReady = false;
+const int LENGTH = 224;
+const int X_MIN = 208;
+const int Y_MIN = 21;
 std::vector<double> intrinsic; // [fx, fy, cx, cy]
 std::vector<geometry_msgs::Point> pixel_to_xyz; // Column-major ((0, 0), (0, 1), ..., (1, 0), (1, 1), ...(223, 223))
 cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
-#ifdef PUB_PC
 ros::Publisher pub_pc;
-#endif
 
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, \
                   const sensor_msgs::CameraInfoConstPtr& cam_info);
@@ -33,20 +35,16 @@ bool callback_service(visual_system::get_xyz::Request &req,
 
 int main(int argc, char** argv)
 {
-  intrinsic.resize(4); pixel_to_xyz.resize(224*224);
+  intrinsic.resize(4); pixel_to_xyz.resize(LENGTH*LENGTH);
   ros::init(argc, argv, "pixel_to_xyz");
   ros::NodeHandle nh, pnh("~");
-  #ifdef PUB_PC
-  if(PUB_PC){
+  if(!pnh.getParam("verbose", verbose)) verbose = false;
+  if(verbose){
     ROS_WARN("Publish pointcloud for debug");
     pub_pc = pnh.advertise<sensor_msgs::PointCloud2>("point_cloud", 1);
   }
   else
     ROS_WARN("Not publish pointcloud");
-  #endif
-  #ifndef PUB_PC
-  ROS_WARN("Not publish poibtcloud");
-  #endif
   // Message filter: color image, depth image, color camera info
   message_filters::Subscriber<sensor_msgs::Image> color_image_sub(nh, "camera/color/image_raw", 1);
   message_filters::Subscriber<sensor_msgs::Image> depth_image_sub(nh, "camera/aligned_depth_to_color/image_raw", 1);
@@ -81,13 +79,13 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_ms
  
   pcl::PointCloud<pcl::PointXYZRGB> pc;
   int idx_cnt = 0;
-  for(int x=208; /*row<depth_img_ptr->image.rows;*/x<=431; ++x){
-    for(int y=21; /*col<depth_img_ptr->image.cols;*/ y<=244; ++y){
+  for(int x=X_MIN; x<=X_MIN+LENGTH-1; ++x){ // 208~431
+    for(int y=Y_MIN; y<=Y_MIN+LENGTH-1; ++y){ // 21~244
       // More readable
       auto depth = depth_img_ptr->image.at<unsigned short>(cv::Point(x, y));
       geometry_msgs::Point p;
       // Equivalent
-      /*unsigned short int depth = depth_img_ptr->image.at<unsigned short>(y, x);
+      /*
       if(depth!=0){
         pcl::PointXYZRGB p;
         p.z = depth * 0.001f;
@@ -99,31 +97,32 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_ms
         pc.points.push_back(p);
       }*/
       if(depth!=0){
-        p.z = depth * 0.001f; // Represent in 1mm
+        p.z = depth * 0.001f; // Represent in 1 mm
         p.x = (x-intrinsic[2])/intrinsic[0]*p.z; // x = (u-cx)/fx*z
         p.y = (y-intrinsic[3])/intrinsic[1]*p.z; // y = (v-cy)/fy*z
-        #ifdef PUB_PC
-        pcl::PointXYZRGB pc_p;
-        pc_p.x = p.x; pc_p.y = p.y; pc_p.z = p.z;
-        pc_p.r = color_img_ptr->image.at<cv::Vec3b>(cv::Point(x, y))[2];
-        pc_p.g = color_img_ptr->image.at<cv::Vec3b>(cv::Point(x, y))[1];
-        pc_p.b = color_img_ptr->image.at<cv::Vec3b>(cv::Point(x, y))[0];
-        pc.push_back(pc_p);
-        #endif
+        if(verbose){
+          pcl::PointXYZRGB pc_p;
+          pc_p.x = p.x; pc_p.y = p.y; pc_p.z = p.z;
+          pc_p.r = color_img_ptr->image.at<cv::Vec3b>(cv::Point(x, y))[2];
+          pc_p.g = color_img_ptr->image.at<cv::Vec3b>(cv::Point(x, y))[1];
+          pc_p.b = color_img_ptr->image.at<cv::Vec3b>(cv::Point(x, y))[0];
+          pc.push_back(pc_p);
+        }
       } else{
         geometry_msgs::Point p;
         p.x = p.y = p.z = std::numeric_limits<double>::quiet_NaN();
       }
       pixel_to_xyz[idx_cnt] = p; ++idx_cnt;
       pc.height = 1; pc.width = pc.points.size();
-      #ifdef PUB_PC
-      sensor_msgs::PointCloud2 pc_out;
-      pcl::toROSMsg(pc, pc_out);
-      pc_out.header.frame_id = color_image->header.frame_id;
-      pub_pc.publish(pc_out);
-      #endif
-    }
-  } isReady = true;
+    } // End for(y)
+  } // End for(x) 
+  isReady = true;
+  if(verbose){
+    sensor_msgs::PointCloud2 pc_out;
+    pcl::toROSMsg(pc, pc_out);
+    pc_out.header.frame_id = color_image->header.frame_id;
+    pub_pc.publish(pc_out);
+  }
 }
 
 bool callback_service(visual_system::get_xyz::Request &req,
@@ -135,11 +134,16 @@ bool callback_service(visual_system::get_xyz::Request &req,
     res.result.z = std::numeric_limits<double>::quiet_NaN();
     return true;
   }
-  geometry_msgs::Point p = pixel_to_xyz[req.point[0]*224+req.point[1]+1];
+  int idx = req.point[0]*LENGTH+req.point[1];
+  if(idx>=pixel_to_xyz.size()){
+    ROS_WARN("Invalid request index, please remember to subtract 208 for x and 21 for y index");
+    return false;
+  }
+  geometry_msgs::Point p = pixel_to_xyz[idx];
   res.result = p;
   ROS_INFO("\nRequest: pixel(%d, %d)\n\
 Response: point(%f, %f, %f)", 
-              req.point[0], req.point[1], p.x, p.y, p.z);
+            req.point[0], req.point[1], p.x, p.y, p.z);
   isReady = false; // Change to false 
   return true;
 }

@@ -68,4 +68,3 @@ target_link_libraries(save_all ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(pixel_to_xyz src/pixel_to_xyz.cpp)
 target_link_libraries(pixel_to_xyz ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-#target_compile_definitions(pixel_to_xyz PRIVATE PUB_PC true)
