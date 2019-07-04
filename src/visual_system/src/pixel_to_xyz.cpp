@@ -11,6 +11,7 @@
 // SRV
 #include <std_srvs/Empty.h>
 #include <visual_system/get_xyz.h>
+#include <visual_system/get_image.h>
 // MSG
 #include <geometry_msgs/Point.h>
 #include <sensor_msgs/Image.h>
@@ -25,13 +26,16 @@ const int X_MIN = 208;
 const int Y_MIN = 21;
 std::vector<double> intrinsic; // [fx, fy, cx, cy]
 std::vector<geometry_msgs::Point> pixel_to_xyz; // Column-major ((0, 0), (0, 1), ..., (1, 0), (1, 1), ...(223, 223))
+cv::Rect myROI(X_MIN, Y_MIN, LENGTH, LENGTH);
 cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
-ros::Publisher pub_pc;
+ros::Publisher pub_pc, pub_color, pub_depth;
 
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, \
                   const sensor_msgs::CameraInfoConstPtr& cam_info);
 bool callback_service(visual_system::get_xyz::Request &req,
                       visual_system::get_xyz::Response &res);
+bool callback_get_image(visual_system::get_image::Request &req,
+                        visual_system::get_image::Response &res);
 
 int main(int argc, char** argv)
 {
@@ -40,8 +44,10 @@ int main(int argc, char** argv)
   ros::NodeHandle nh, pnh("~");
   if(!pnh.getParam("verbose", verbose)) verbose = false;
   if(verbose){
-    ROS_WARN("Publish pointcloud for debug");
+    ROS_WARN("Publish data for debug");
     pub_pc = pnh.advertise<sensor_msgs::PointCloud2>("point_cloud", 1);
+    pub_color = pnh.advertise<sensor_msgs::Image>("crop_color", 1);
+    pub_depth = pnh.advertise<sensor_msgs::Image>("crop_depth", 1);
   }
   else
     ROS_WARN("Not publish pointcloud");
@@ -54,6 +60,7 @@ int main(int argc, char** argv)
   message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), color_image_sub, depth_image_sub, info_sub);
   sync.registerCallback(boost::bind(&callback_sub, _1, _2, _3));
   ros::ServiceServer service = pnh.advertiseService("pixel_to_xyz", callback_service);
+  ros::ServiceServer image_service = pnh.advertiseService("get_image", callback_get_image);
   ros::spin();
   return 0;
 }
@@ -122,6 +129,12 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_ms
     pcl::toROSMsg(pc, pc_out);
     pc_out.header.frame_id = color_image->header.frame_id;
     pub_pc.publish(pc_out);
+    cv::Mat crop_color = color_img_ptr->image(myROI), 
+            crop_depth = depth_img_ptr->image(myROI);
+    cv_bridge::CvImage crop_color_cv_bridge(color_img_ptr->header, color_img_ptr->encoding, crop_color),
+                       crop_depth_cv_bridge(depth_img_ptr->header, depth_img_ptr->encoding, crop_depth);
+    pub_color.publish(crop_color_cv_bridge.toImageMsg());
+    pub_depth.publish(crop_depth_cv_bridge.toImageMsg());
   }
 }
 
@@ -145,5 +158,17 @@ bool callback_service(visual_system::get_xyz::Request &req,
 Response: point(%f, %f, %f)", 
             req.point[0], req.point[1], p.x, p.y, p.z);
   isReady = false; // Change to false 
+  return true;
+}
+
+bool callback_get_image(visual_system::get_image::Request &req,
+                        visual_system::get_image::Response &res){
+  if(!isReady) {ROS_ERROR("Not ready, abort..."); return false;}
+  cv::Mat crop_color = color_img_ptr->image(myROI), 
+          crop_depth = depth_img_ptr->image(myROI);
+  cv_bridge::CvImage crop_color_cv_bridge(color_img_ptr->header, color_img_ptr->encoding, crop_color),
+                     crop_depth_cv_bridge(depth_img_ptr->header, depth_img_ptr->encoding, crop_depth);
+  res.crop_color_img = *crop_color_cv_bridge.toImageMsg();
+  res.crop_depth_img = *crop_depth_cv_bridge.toImageMsg();
   return true;
 }

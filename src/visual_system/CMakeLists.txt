@@ -26,12 +26,14 @@ add_service_files(
   target_pose.srv
   barcode_detect.srv
   get_xyz.srv
+  get_image.srv
 )
 
 generate_messages(
   DEPENDENCIES
   std_msgs
   geometry_msgs
+  sensor_msgs
 )
 
 catkin_package(
