@@ -24,7 +24,7 @@
   <!-- Visual System -->
   <!-- Convert pixel to xyz coord. w.r.t. camera_color_optical_frame -->
   <node pkg="visual_system" type="pixel_to_xyz" name="pixel_to_xyz" output="screen" required="true">
-    <param name="debug" value="false"/>
+    <param name="debug" value="true"/>
     <remap from="camera/color/image_raw" to="/camera1/color/image_raw"/>
     <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
     <remap from="camera/color/camera_info" to="/camera1/color/camera_info"/>
