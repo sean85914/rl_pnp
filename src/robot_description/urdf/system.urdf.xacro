@@ -7,7 +7,7 @@
   </gazebo>
   <xacro:property name="M_PI" value="3.1415926535"/>
   <!-- UR5 -->
-  <xacro:include filename="$(find ur_description)/urdf/ur5.urdf.xacro"/>
+  <xacro:include filename="$(find robot_description)/urdf/ur5_suction_finger.urdf.xacro"/>
   <!-- UR3 with suction -->
   <!--xacro:include filename="$(find robot_description)/urdf/ur5_with_suction.urdf.xacro"/-->
   <!-- Gripper -->
