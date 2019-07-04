@@ -100,12 +100,7 @@ class Trainer(object):
             else:
                 grasp_predictions = np.concatenate((grasp_predictions, output_prob[rotate_idx+1].cpu().detach().numpy()[:, 0, int(padding_width/2):int(color_img_2x.shape[0]/2 - padding_width/2),
                                                                                                                               int(padding_width/2):int(color_img_2x.shape[0]/2 - padding_width/2)]))
-        suck_max_Q = np.max(suck_predictions)
-        suck_max_index = np.where(suck_predictions == suck_max_Q)
-        print "MAX SUCK: {}: ({}, {})".format(suck_max_Q, suck_max_index[2], suck_max_index[1])
-        grasp_max_Q = np.max(grasp_predictions)
-        grasp_max_index = np.where(grasp_predictions == grasp_max_Q)
-        print "MAX GRASP: {}: ({}, {}) with rotation_idx: {}".format(grasp_max_Q, grasp_max_index[2], grasp_max_index[1], grasp_max_index[0])
+        
         return suck_predictions, grasp_predictions, state_feat
         
     def get_label_value(self, primitive, action_success, next_color, next_depth):
@@ -187,7 +182,7 @@ class Trainer(object):
             else:
                 loss = self.criterion(self.model.output_prob[1].view(1, 320, 320), Variable(torch.from_numpy(label).float())) * \
                                                                                    Variable(torch.from_numpy(label_weights).float(), requires_grad=False)
-            loss = loss_sum()
+            loss = loss.sum()
             loss.backward()
             loss_value = loss.cpu().data.numpy()
             
