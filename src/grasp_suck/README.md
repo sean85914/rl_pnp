@@ -1,11 +1,18 @@
-# How to start
+# Table of Contents
+1. [How to Start](#Start)
+2. [Launch](#Launch)
+3. [Services](#Services)
+
+## How to start <a name="Start"></a>
 ```
-$ roslaunch arm_operation ur5_real.launch robot_ip:=192.168.50.11 tool_length:=0.0
-$ roslaunch realsense2_camera rs_rgbd.launch camera:=caemra1
-$ roslaunch grasp_suck grasp_suck_system.launch
-$ cd src/grasp_suck/src && python main.py [--force_cpu] [--last_model] PATH_TO_YOUR_MODEL
+$ cd && git clone https://github.com/sean85914/flip_object.git && cd flip_object && catkin_make
+$ source devel/setup.bash # DO THIS IN EACH NEW TERMINAL
+[Terminal 1] $ roslaunch arm_operation ur5_real.launch robot_ip:=192.168.50.11 tool_length:=0.0
+[Terminal 2] $ roslaunch realsense2_camera rs_rgbd.launch camera:=caemra1
+[Terminal 3] $ roslaunch grasp_suck grasp_suck_system.launch
+[Terminal 4] $ cd src/grasp_suck/src && python main.py [--force_cpu] [--last_model] PATH_TO_YOUR_MODEL
 ```
-## grasp_suck_system.launch
+## grasp_suck_system.launch <a name="Launch"></a>
 
 | Type   | Path    | Description |
 | :---:  | :---:   | :---:       |
@@ -17,7 +24,7 @@ $ cd src/grasp_suck/src && python main.py [--force_cpu] [--last_model] PATH_TO_Y
 | node   | grasp_suck/get_reward                                 | Using consecutive depth images to judge if action succeed |
 | launch | grasp_suck/helper_services.launch                     | High-level services, including homing, picking and placing | 
 
-## Services List
+## Services List <a name="Services"></a>
 
 | Service name                              | Service type | Description |
 | :---:                                     | :---: | :---: |
