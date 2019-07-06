@@ -2,6 +2,7 @@
 1. [How to Start](#Start)
 2. [Launch](#Launch)
 3. [Services](#Services)
+4. [Network](#Network)
 
 ## How to start <a name="Start"></a>
 ```
@@ -49,5 +50,7 @@ $ source devel/setup.bash # DO THIS IN EACH NEW TERMINAL
 | /helper_services_node/robot_go_home | std_srvs/Empty | Return arm to home and set posterior |
 | /helper_services_node/robot_go_place | std_srvs/Empty | Place the object with predifined pose |
 
-
-
+## Network <a name="Network"></a>
+### TODO
+1. [models.py](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/src/models.py)
+2. [trainer.py](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/src/trainer.py)
