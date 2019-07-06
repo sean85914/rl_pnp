@@ -72,7 +72,8 @@ class reinforcement_net(nn.Module):
 
             # Apply rotations to images
             for rotate_idx in range(self.num_rotations):
-                rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
+                #rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
+                rotate_theta = np.radians(-90.0+(180.0/self.num_rotations-1)*rotate_idx)
                 
                 # Compute sample grid for rotation BEFORE neural network
                 affine_mat_before = np.asarray([[np.cos(-rotate_theta), np.sin(-rotate_theta), 0],[-np.sin(-rotate_theta), np.cos(-rotate_theta), 0]])
