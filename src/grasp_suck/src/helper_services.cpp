@@ -85,13 +85,6 @@ bool Helper_Services::go_home_service_callback(std_srvs::Empty::Request &req, st
   robot_arm_goto_joint.call(myJointReq);
   std_srvs::Empty empty_req;
   set_posterior.call(empty_req);
-  /*if(last_motion==GRASP){
-    std_srvs::Trigger req;
-    get_grasp_state.call(req);
-    ROS_INFO("Grasp: %s", req.response.success==true?"Success":"Fail");
-  }else{ // Suck
-    // TODO
-  }*/
   return true;
 }
 
@@ -115,22 +108,29 @@ bool Helper_Services::go_place_service_callback(std_srvs::Empty::Request &req, s
     open_gripper.call(empty);
   } else{ // Suck
     int tmp_counter = 0;
-    do{ // Call twice to make sure the suction work properly
+    do{ // Call serveral times to make sure the suction work properly
       ++tmp_counter; 
       vacuum_conveyor_control::vacuum_control vacuum_cmd;
-      vacuum_cmd.request.command = 0; // Exhale
+      vacuum_cmd.request.command = 1; // Exhale
       vacuum_control.call(vacuum_cmd); 
-      ros::Duration(0.3).sleep();
-    }while(tmp_counter<=1);
+      ros::Duration(0.2).sleep();
+    }while(tmp_counter<=REPEAT_TIME);
+    do{ // Call serveral times to make sure the suction work properly
+      ++tmp_counter; 
+      vacuum_conveyor_control::vacuum_control vacuum_cmd;
+      vacuum_cmd.request.command = 0; // Normal
+      vacuum_control.call(vacuum_cmd); 
+      ros::Duration(0.2).sleep();
+    }while(tmp_counter<=REPEAT_TIME);
     // Retract the pheumatic
     tmp_counter = 0;
-    do{ // Call twice to make sure the suction work properly
+    do{ // Call serveral times to make sure the suction work properly
       ++tmp_counter; 
       std_srvs::SetBool retract; 
       retract.request.data = false;
       pheumatic_control.call(retract);
-      ros::Duration(0.3).sleep();
-    }while(tmp_counter<=1);
+      ros::Duration(0.2).sleep();
+    }while(tmp_counter<=REPEAT_TIME);
   }
   // Then go home
   for(int i=0; i<6; ++i) myJointReq.request.joint[i] = home_joint[i];
@@ -221,8 +221,8 @@ bool Helper_Services::go_target_service_callback(
       vacuum_conveyor_control::vacuum_control vacuum_cmd;
       vacuum_cmd.request.command = 2; // Inhale
       vacuum_control.call(vacuum_cmd);
-      ros::Duration(0.3).sleep();
-    }while(tmp_counter<=1);
+      ros::Duration(0.2).sleep();
+    }while(tmp_counter<=REPEAT_TIME);
   }
   return true;
 }
