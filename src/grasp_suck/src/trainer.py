@@ -84,9 +84,9 @@ class Trainer(object):
         input_depth_img.shape = (input_depth_img.shape[0], input_depth_img.shape[1], input_depth_img.shape[2], 1)
         input_color_data = torch.from_numpy(input_color_img.astype(np.float32)).permute(3, 2, 0, 1)
         input_depth_data = torch.from_numpy(input_depth_img.astype(np.float32)).permute(3, 2, 0, 1)
-        if self.use_cuda:
+        '''if self.use_cuda:
             input_color_data = input_color_data.cuda()
-            input_depth_data = input_depth_data.cuda()
+            input_depth_data = input_depth_data.cuda()'''
         # Pass input data to model
         output_prob, state_feat = self.model.forward(input_color_data, input_depth_data, is_volatile, specific_rotation)
         

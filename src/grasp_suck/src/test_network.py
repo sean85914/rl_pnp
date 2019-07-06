@@ -35,10 +35,12 @@ next_color = cv2.imread("test_img/color_000001.jpg")
 depth = cv2.imread("test_img/depth_000000.png", -1)
 next_depth = cv2.imread("test_img/depth_000001.png", -1)
 
+total = 0
 ts = time.time()
 suck_predictions, grasp_predictions, state_feat = \
                           trainer.forward(color, depth, is_volatile=True)
 print "Forward: {}".format(time.time()-ts)
+total += time.time()-ts
 
 action_str = "grasp"
 action_success = False
@@ -47,8 +49,11 @@ ts = time.time()
 label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
 		                                                         next_color, next_depth)
 print "Get label: {}".format(time.time()-ts)
-
+total += time.time()-ts
+pixel_index = [1, 112, 112]
 ts = time.time()
 trainer.backprop(color, depth, action_str, pixel_index, label_value)
 print "Backpropagation: {}".format(time.time()-ts)
+total += time.time()-ts
 
+print "Total time: {}".format(total)

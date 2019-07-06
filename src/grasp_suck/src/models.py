@@ -59,17 +59,23 @@ class reinforcement_net(nn.Module):
 
 
     def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1):
-
         if is_volatile:
             output_prob = []
             interm_feat = []
+            if self.use_cuda:
+                input_color_data = input_color_data.cuda()
+                input_depth_data = input_depth_data.cuda()
             # suck is undirectional, so don't have to rotate
             interm_suck_color_feat = self.suck_color_trunk.features(input_color_data)
             interm_suck_depth_feat = self.suck_depth_trunk.features(input_depth_data)
+            interm_suck_color_feat = interm_suck_color_feat.detach()
+            interm_suck_depth_feat = interm_suck_depth_feat.detach()
             interm_suck_feat = torch.cat((interm_suck_color_feat, interm_suck_depth_feat), dim=1)
-            interm_feat.append(interm_suck_feat)
-            output_prob.append(nn.Upsample(scale_factor=16, mode='bilinear').forward(self.sucknet(interm_suck_feat)))
-
+            interm_feat.append(interm_suck_feat.cpu())
+            output_prob.append(nn.Upsample(scale_factor=16, mode='bilinear').forward(self.sucknet(interm_suck_feat)).cpu())
+            if self.use_cuda:
+                input_color_data = input_color_data.cpu()
+                input_depth_data = input_depth_data.cpu()
             # Apply rotations to images
             for rotate_idx in range(self.num_rotations):
                 #rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
@@ -83,7 +89,6 @@ class reinforcement_net(nn.Module):
                     flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False).cuda(), input_color_data.size())
                 else:
                     flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False), input_color_data.size())
-                
                 # Rotate images 'clockwise'
                 if self.use_cuda:
                     with torch.no_grad():
@@ -93,12 +98,16 @@ class reinforcement_net(nn.Module):
                     with torch.no_grad():
                         rotate_color = F.grid_sample(Variable(input_color_data), flow_grid_before, mode='nearest')
                         rotate_depth = F.grid_sample(Variable(input_depth_data), flow_grid_before, mode='nearest')
-                        
+                
                 # Compute intermediate features
                 interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
+                self.grasp_color_trunk.zero_grad()
+                interm_grasp_color_feat = interm_grasp_color_feat.detach()
                 interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+                self.grasp_depth_trunk.zero_grad()
+                interm_grasp_depth_feat = interm_grasp_depth_feat.detach()
                 interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
-                interm_feat.append(interm_grasp_feat)
+                interm_feat.append(interm_grasp_feat.cpu())
 
                 # Compute sample grid for rotation AFTER branches
                 affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
@@ -110,12 +119,17 @@ class reinforcement_net(nn.Module):
                     flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_suck_feat.data.size())
                 
                 # Forward pass through branches, undo rotation on output predictions, upsample results
-                output_prob.append(nn.Upsample(scale_factor=16, mode='bilinear').forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')))
+                output_prob.append(nn.Upsample(scale_factor=16, mode='bilinear').forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')).cpu())
+                del interm_grasp_color_feat, interm_grasp_depth_feat, interm_grasp_feat, rotate_color, rotate_depth, flow_grid_after, flow_grid_before
+                torch.cuda.empty_cache()
             return output_prob, interm_feat
 
         else:
             self.output_prob = []
             self.interm_feat = []
+            if self.use_cuda:
+                input_color_data = input_color_data.cuda()
+                input_depth_data = input_depth_data.cuda()
 
             # Suck is undirectional, so don't have to rotate
             interm_suck_color_feat = self.suck_color_trunk.features(input_color_data)
@@ -128,7 +142,7 @@ class reinforcement_net(nn.Module):
             # Apply rotations to intermediate features
             # for rotate_idx in range(self.num_rotations):
             rotate_idx = specific_rotation
-            rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
+            rotate_theta = np.radians(-90.0+(180.0/self.num_rotations-1)*rotate_idx)
             
             # Compute sample grid for rotation BEFORE branches
             affine_mat_before = np.asarray([[np.cos(-rotate_theta), np.sin(-rotate_theta), 0],[-np.sin(-rotate_theta), np.cos(-rotate_theta), 0]])
