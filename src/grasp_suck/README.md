@@ -21,23 +21,23 @@ $ cd src/grasp_suck/src && python main.py [--force_cpu] [--last_model] PATH_TO_Y
 
 | Service name                              | Service type | Description |
 | :---:                                     | :---: | :---: |
-|<td colspan=3>**Gripper Related**|
+|<tr><td colspan=3><p align="center">**Gripper Related**</p></td></tr>|
 | /arduino_control/pheumatic_control | std_srvs/SetBool | Suction cup expansion and contraction |
 | /arduino_control/vacuum_control    | vacuum_conveyor_control/vacuum_control | Suction behavior control | 
 | /robotiq_finger_control_node/intial_gripper | std_srvs/Empty | Initialize gripper |
 | /robotiq_finger_control_node/close_gripper | std_srvs/Empty | Close gripper |
 | /robotiq_finger_control_node/open_gripper  | std_srvs/Empty | Open gripper | 
 | /robotiq_finger_control_node/get_grasp_state | std_srvs/SetBool | Get if grasp success |
-|<td colspan=3>**Robot Arm Related**| 
+|<tr><td colspan=3><p align="center">**Robot Arm Related**</p></td></tr>|
 | /ur5_control_server/ur_control/goto_joint_pose | arm_operation/joint_pose | Go to user given joint pose |
 | /ur5_control_server/ur_control/goto_pose | arm_operation/target_pose | Go to user given cartesian pose | 
-|<td colspan=3>**Visaul Related**| 
+|<tr><td colspan=3><p align="center">**Visaul Related**</p></td></tr>|
 | /get_reward/set_prior | std_srvs/Empty | Set depth image before action |
 | /get_reward/set_posterior | std_srvs/Empty | Set depth image after action |
 | /get_reward/get_result | std_srvs/SetBool | Get result of action |
 | /pixel_to_xyz/get_image | visual_system/get_image | Return cropped color and depth images |
 | /pixel_to_xyz/pixel_to_xyz | visual_system/get_xyz | Return 3D coordinate with request pixel in color_optical_frame |
-|<td colspan=3>**High-level Services**| 
+|<tr><td colspan=3><p align="center">**High-level Services**</p></td></tr>|
 | /helper_services_node/goto_target | grasp_suck/get_pose | Make arm contact with request point with specific motion primitive and angle
 | /helper_services_node/robot_go_home | std_srvs/Empty | Return arm to home and set posterior |
 | /helper_services_node/robot_go_place | std_srvs/Empty | Place the object with predifined pose |
