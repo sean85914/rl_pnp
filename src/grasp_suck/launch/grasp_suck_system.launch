@@ -15,16 +15,16 @@
   <include file="$(find arm_operation)/launch/tcp_publisher.launch"/>
   <!-- Vacuum -->
   <node pkg="vacuum_conveyor_control" type="arduino_control" name="arduino_control" output="screen" clear_params="true" required="true">
-    <param name="port" value="/dev/ttyUSB1"/>
+    <param name="port" value="/dev/ttyUSB0"/>
   </node>
   <!-- robotiq 2-finger gripper -->
-  <node pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" name="robotiq2FGripper" args="/dev/ttyUSB0" required="true"/>
+  <node pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" name="robotiq2FGripper" args="/dev/ttyUSB1" required="true"/>
   <!-- robotiq gripper control -->
   <node pkg="grasp_suck" type="robotiq_gripper_control" name="robotiq_finger_control_node" output="screen" required="true"/>
   <!-- Visual System -->
   <!-- Convert pixel to xyz coord. w.r.t. camera_color_optical_frame -->
   <node pkg="visual_system" type="pixel_to_xyz" name="pixel_to_xyz" output="screen" required="true">
-    <param name="debug" value="true"/>
+    <param name="verbose" value="true"/>
     <remap from="camera/color/image_raw" to="/camera1/color/image_raw"/>
     <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
     <remap from="camera/color/camera_info" to="/camera1/color/camera_info"/>
