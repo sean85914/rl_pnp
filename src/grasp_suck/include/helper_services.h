@@ -21,7 +21,7 @@
 #define GRASP false
 #define SUCK  true
 
-const int    REPEAT_TIME = 4;
+const int    REPEAT_TIME = 2;
 const double OFFSET = -0.01f; // Lower 1 centimeter to make sure have contract with object
 const double X_OFFSET = 0.02f; // Seems error from hand-eye calibration
 
