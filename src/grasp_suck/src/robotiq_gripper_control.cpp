@@ -4,7 +4,8 @@
 #include <robotiq_2f_gripper_control/Robotiq2FGripper_robot_input.h> // Information and state of gripper
 #include <robotiq_2f_gripper_control/Robotiq2FGripper_robot_output.h> // Command from user
 
-const int THRES = 210;  // Gripper position(PO) greater than this will consider as fail grasp
+const int UPPER_THRES = 230;  // Gripper position(PO) greater than this will consider as fail grasp
+const int LOWER_THRES = 10;
 ros::Publisher pub_gripper_out;
 ros::Subscriber sub_gripper_in;
 robotiq_2f_gripper_control::Robotiq2FGripper_robot_input now_state;
@@ -41,7 +42,7 @@ bool open_gripper_cb(std_srvs::Empty::Request &req, std_srvs::Empty::Response &r
 // Check if the action is success
 bool get_grasp_state_cb(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res){
   ROS_INFO("Now gripper position: %d", now_state.gPO);
-  if(now_state.gPO >= THRES){
+  if(now_state.gPO >= UPPER_THRES or now_state.gPO <= LOWER_THRES){
     res.success = false;
     res.message = "Fail to grasp object";
   } else{ // Gripper position now less than the threshold will be considered as succeed
