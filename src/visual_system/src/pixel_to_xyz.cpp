@@ -1,4 +1,5 @@
 #include <fstream>
+#include <opencv2/opencv.hpp> // cv
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -17,18 +18,19 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/CameraInfo.h>
-#include <opencv2/opencv.hpp> // cv
+#include <visualization_msgs/Marker.h>
 
 bool verbose;
 bool isReady = false;
 const int LENGTH = 224;
 const int X_MIN = 208;
 const int Y_MIN = 21;
+std::string frame_name;
 std::vector<double> intrinsic; // [fx, fy, cx, cy]
 std::vector<geometry_msgs::Point> pixel_to_xyz; // Column-major ((0, 0), (0, 1), ..., (1, 0), (1, 1), ...(223, 223))
 cv::Rect myROI(X_MIN, Y_MIN, LENGTH, LENGTH);
 cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
-ros::Publisher pub_pc, pub_color, pub_depth;
+ros::Publisher pub_pc, pub_color, pub_depth, pub_marker;
 
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, \
                   const sensor_msgs::CameraInfoConstPtr& cam_info);
@@ -48,6 +50,7 @@ int main(int argc, char** argv)
     pub_pc = pnh.advertise<sensor_msgs::PointCloud2>("point_cloud", 1);
     pub_color = pnh.advertise<sensor_msgs::Image>("crop_color", 1);
     pub_depth = pnh.advertise<sensor_msgs::Image>("crop_depth", 1);
+    pub_marker = pnh.advertise<visualization_msgs::Marker>("marker", 1);
   }
   else
     ROS_WARN("Not publish pointcloud");
@@ -69,6 +72,7 @@ int main(int argc, char** argv)
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, \
               const sensor_msgs::CameraInfoConstPtr& cam_info)
 {
+  frame_name = color_image->header.frame_id;
   intrinsic[0] = cam_info->K[0]; // fx
   intrinsic[1] = cam_info->K[4]; // fy
   intrinsic[2] = cam_info->K[2]; // cx
@@ -154,6 +158,17 @@ bool callback_service(visual_system::get_xyz::Request &req,
   }
   geometry_msgs::Point p = pixel_to_xyz[idx];
   res.result = p;
+  if(verbose){
+    visualization_msgs::Marker marker;
+    marker.header.frame_id = frame_name;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::SPHERE;
+    marker.pose.position = p;
+    marker.pose.orientation.w = 1.0;
+    marker.scale.x = marker.scale.y = marker.scale.z = 0.02;
+    marker.color.b = marker.color.a = 1.0; // BLUE
+    pub_marker.publish(marker);
+  }
   ROS_INFO("\nRequest: pixel(%d, %d)\n\
 Response: point(%f, %f, %f)", 
             req.point[0], req.point[1], p.x, p.y, p.z);
@@ -163,7 +178,7 @@ Response: point(%f, %f, %f)",
 
 bool callback_get_image(visual_system::get_image::Request &req,
                         visual_system::get_image::Response &res){
-  if(!isReady) {ROS_ERROR("Not ready, abort..."); return false;}
+  //if(!isReady) {ROS_ERROR("Not ready, abort..."); return false;}
   cv::Mat crop_color = color_img_ptr->image(myROI), 
           crop_depth = depth_img_ptr->image(myROI);
   cv_bridge::CvImage crop_color_cv_bridge(color_img_ptr->header, color_img_ptr->encoding, crop_color),
