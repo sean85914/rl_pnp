@@ -23,7 +23,7 @@ class Trainer(object):
             self.use_cuda = False
         
         # Model
-        self.model = reinforcement_net(self.use_cuda, 4)
+        self.model = reinforcement_net(self.use_cuda, 5)
         if self.use_cuda:
             self.model = self.model.cuda()
         self.suck_rewards = suck_rewards
@@ -69,8 +69,8 @@ class Trainer(object):
         for c in range(3):
             input_color_img[:, :, c] = (input_color_img[:, :, c] - image_mean[c]) / image_std[c]
         # Normalize depth image
-        image_mean = [0.005, 0.005, 0.005]
-        image_std =  [0.002, 0.002, 0.002]
+        image_mean = [0.008, 0.008, 0.008]
+        image_std =  [0.001, 0.001, 0.001]
         input_depth_img = depth_img_2x.astype(float)/65535 # np.uint16
         # Duplicate channel to DDD
         depth_img_2x.shape = (depth_img_2x.shape[0], depth_img_2x.shape[1], 1)
@@ -173,7 +173,7 @@ class Trainer(object):
             loss.backward()
             loss_value = loss.cpu().data.numpy()
             
-            # Symmetric
+            '''# Symmetric
             opposite_rotate_idx = (best_pix_idx[0] + self.model.num_rotations/2) % self.model.num_rotations
             suck_predictions, grasp_predicrtions, state_feat = self.forward(color_img, depth_img, is_volatile=False, specific_rotation=opposite_rotate_idx)
             if self.use_cuda:
@@ -184,7 +184,7 @@ class Trainer(object):
                                                                                    Variable(torch.from_numpy(label_weights).float(), requires_grad=False)
             loss = loss.sum()
             loss.backward()
-            loss_value = loss.cpu().data.numpy()
+            loss_value = loss.cpu().data.numpy()'''
             
             loss_value = loss_value/2
         print "Training loss: %f" % loss_value
