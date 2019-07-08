@@ -134,7 +134,7 @@ try:
 		action = 0 # GRASP
 		action_str = 'grasp'
 		angle = 0
-		pixel_index = []
+		pixel_index = [] # rotate_idx, x, y
 		print "suck max: \033[0;34m{}\033[0m| grasp max: \033[0;35m{}\033[0m".format(np.max(suck_predictions), \
                                                    np.max(grasp_predictions))
 		explore = np.random.uniform() < epsilon
