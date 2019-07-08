@@ -184,8 +184,8 @@ class Trainer(object):
                                                                                    Variable(torch.from_numpy(label_weights).float(), requires_grad=False)
             loss = loss.sum()
             loss.backward()
-            loss_value = loss.cpu().data.numpy()'''
+            loss_value = loss.cpu().data.numpy()
             
-            loss_value = loss_value/2
+            loss_value = loss_value/2 '''
         print "Training loss: %f" % loss_value
         self.optimizer.step()
