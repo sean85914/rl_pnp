@@ -8,3 +8,5 @@
 $ cd && git clone https://github.com/sean85914/flip_object.git
 $ cd flip_object && catkin_make
 ```
+
+## [DLP 2019 Final Project](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/README.md)
