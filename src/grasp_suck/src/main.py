@@ -28,13 +28,14 @@ args = parser.parse_args()
 # Parameter
 testing      = args.is_testing
 use_cpu      = args.force_cpu
-episode      = 0
+#episode      = 0
+epsilon      = 0.75
 iteration    = 0
 suck_reward  = 1.0
 grasp_reward = 1.0
 discount     = 0.5
 Z_THRES      = 0.645
-num_of_items = 10
+num_of_items = 5  ## Number of items when start
 save_every   = 5
 
 
@@ -85,6 +86,17 @@ go_place    = rospy.ServiceProxy('/helper_services_node/robot_goto_place', Empty
 pixel_to_xyz = rospy.ServiceProxy('/pixel_to_xyz/pixel_to_xyz', get_xyz)
 get_image    = rospy.ServiceProxy('/pixel_to_xyz/get_image', get_image)
 
+# Result list
+action_list = []
+target_list = []
+result_list = []
+loss_list   = []
+# Result file name
+action_file = csv_path + "action_primitive.csv"
+target_file = csv_path + "action_target.csv"
+result_file = csv_path + "action_result.csv"
+loss_file   = csv_path + "loss.csv"
+
 def get_imgs_from_msg(response):
 	color = br.imgmsg_to_cv2(response.crop_color_img)
 	depth = br.imgmsg_to_cv2(response.crop_depth_img)
@@ -101,7 +113,7 @@ total_time = 0.0
 try:
 	while num_of_items != 0:
 		print "\033[0;31;46mIteration: {}\033[0m".format(iteration)
-		epsilon = max(0.5 * np.power(0.9998, iteration), 0.1)
+		epsilon = max(epsilon * np.power(0.9998, iteration), 0.1)
 		iter_ts = time.time()	
 		# Get color and depth images
 		images = get_image()
@@ -138,6 +150,7 @@ try:
 		print "suck max: \033[0;34m{}\033[0m| grasp max: \033[0;35m{}\033[0m".format(np.max(suck_predictions), \
                                                    np.max(grasp_predictions))
 		explore = np.random.uniform() < epsilon
+		if explore: print "Using explore..."
 		if np.max(suck_predictions) > np.max(grasp_predictions):
 			if not explore:
 				action = 1 # SUCK
@@ -159,6 +172,8 @@ try:
 				action_str = 'suck'
 				tmp = np.where(suck_predictions == np.max(suck_predictions))
 				pixel_index = [tmp[0][0], tmp[2][0], tmp[1][0]]
+		
+		target_list.append(pixel_index)
 		del suck_predictions, grasp_predictions, state_feat
 		print "Take action: \033[0;31m %s\033[0m at \
 \033[0;32m(%d, %d)\033[0m with theta \033[0;33m%f \033[0m" %(action_str, pixel_index[1], \
@@ -185,6 +200,7 @@ try:
 			is_valid = False
 		
 		if is_valid:
+			action_list.append(action)
 			gotoTarget = get_poseRequest()
 			gotoTarget.point_in_cam = getXYZResult.result
 			gotoTarget.yaw = angle
@@ -192,6 +208,8 @@ try:
 		
 			goto_target(gotoTarget)
 			time.sleep(0.5)
+		else:
+			action_list.append(-1)
 
 		go_home() # TODO: service maybe block
 		#set_posterior_img()
@@ -202,6 +220,8 @@ try:
 				action_success = get_result(SetBoolRequest()).success
 		else:
 			action_success = False
+
+		result_list.append(action_success)
 		
 		if action_success:
 			go_place()
@@ -223,11 +243,15 @@ try:
 		cv2.imwrite(color_name, next_color)
 		cv2.imwrite(depth_name, next_depth)
 		ts = time.time()
-		label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
-		                                                         next_color, next_depth)
+		if is_valid:
+			label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
+		    	                                                     next_color, next_depth)
+		else: # invalid
+			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth)
 		print "Get label: {} seconds".format(time.time()-ts)
 		ts = time.time()
-		trainer.backprop(color, depth, action_str, pixel_index, label_value)
+		loss_value = trainer.backprop(color, depth, action_str, pixel_index, label_value)
+		loss_list.append(loss_value)
 		print "Backpropagation {} seconds".format(time.time() - ts)
 		iteration += 1
 		if iteration % save_every == 0:
@@ -239,8 +263,21 @@ try:
 		print "[Total time] \033[0;31m{}\033[0m s| [Iter time] \033[0;32m{}\033[0m s".format \
                                                                      (total_time, iter_time)
 		time.sleep(0.5) # Sleep 0.5 s for next iteration
+	# Num of item = 0
+	model_name = model_path + "final.pth"
+	torch.save(trainer.model.state_dict(), model_name)
+	print "Model: %s saved" % model_name
+	np.savetxt(action_file, action_list, delimiter=",")
+	np.savetxt(target_file, target_list, delimiter=",")
+	np.savetxt(result_file, result_list, delimiter=",")
+	np.savetxt(loss_file  , loss_list  , delimiter=",")
+	
 except KeyboardInterrupt:
 	print "Force terminate"
 	model_name = model_path + "force_terminate_{}.pth".format(iteration)
 	print "Model: %s saved" % model_name
 	torch.save(trainer.model.state_dict(), model_name)
+	np.savetxt(action_file, action_list, delimiter=",")
+	np.savetxt(target_file, target_list, delimiter=",")
+	np.savetxt(result_file, result_list, delimiter=",")
+	np.savetxt(loss_file  , loss_list  , delimiter=",")

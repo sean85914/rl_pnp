@@ -105,13 +105,15 @@ class Trainer(object):
         
     def get_label_value(self, primitive, action_success, next_color, next_depth):
         # Compute current reward
-        current_reward = 0
+        current_reward = -1
         if primitive == "grasp":
             if action_success:
                 current_reward = self.grasp_rewards
         if primitive == "suck":
             if action_success:
                 current_reward = self.suck_rewards
+        if primitive == "invalid":
+            current_reward = -10
         # Compute future reward
         next_suck_predictions, next_grasp_predictions, next_state_feat = self.forward(next_color, next_depth, is_volatile=True)
         future_reward = max(np.max(next_suck_predictions), np.max(next_grasp_predictions))
@@ -189,3 +191,4 @@ class Trainer(object):
             loss_value = loss_value/2 '''
         print "Training loss: %f" % loss_value
         self.optimizer.step()
+        return loss_value
