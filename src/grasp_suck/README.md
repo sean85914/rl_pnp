@@ -13,6 +13,8 @@ $ source devel/setup.bash # DO THIS IN EACH NEW TERMINAL
 [Terminal 3] $ roslaunch grasp_suck grasp_suck_system.launch
 [Terminal 4] $ cd src/grasp_suck/src && python main.py [--force_cpu] [--last_model] PATH_TO_YOUR_MODEL
 ```
+
+![System Pipeline](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/dqn_grasp_and_suck.png)
 ## grasp_suck_system.launch <a name="Launch"></a>
 
 | Type   | Path    | Description |
