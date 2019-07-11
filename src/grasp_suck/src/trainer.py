@@ -52,14 +52,14 @@ class Trainer(object):
         diag_length = float(color_img_2x.shape[0])*np.sqrt(2)
         diag_length = np.ceil(diag_length/32)*32 # Shrink 32 times in network
         padding_width = int((diag_length - color_img_2x.shape[0])/2)
+		# cv2 in BGR, change to RGB
         color_img_2x_b = np.pad(color_img_2x[:, :, 0], padding_width, 'constant', constant_values=0)
         color_img_2x_b.shape = (color_img_2x_b.shape[0], color_img_2x_b.shape[1], 1)
         color_img_2x_g = np.pad(color_img_2x[:, :, 1], padding_width, 'constant', constant_values=0)
         color_img_2x_g.shape = (color_img_2x_g.shape[0], color_img_2x_g.shape[1], 1)
         color_img_2x_r = np.pad(color_img_2x[:, :, 2], padding_width, 'constant', constant_values=0)
         color_img_2x_r.shape = (color_img_2x_r.shape[0], color_img_2x_r.shape[1], 1)
-        color_img_2x = np.concatenate((color_img_2x_b, color_img_2x_g, color_img_2x_r), axis=2)
-        
+        color_img_2x = np.concatenate((color_img_2x_r, color_img_2x_g, color_img_2x_b), axis=2)
         depth_img_2x = np.pad(depth_img_2x, padding_width, 'constant', constant_values=0)
         
         # Normalize color image
@@ -69,12 +69,17 @@ class Trainer(object):
         for c in range(3):
             input_color_img[:, :, c] = (input_color_img[:, :, c] - image_mean[c]) / image_std[c]
         # Normalize depth image
-        image_mean = [0.008, 0.008, 0.008]
-        image_std =  [0.001, 0.001, 0.001]
-        input_depth_img = depth_img_2x.astype(float)/65535 # np.uint16
+        image_mean = [0.003, 0.003, 0.003]
+        image_std =  [0.1, 0.1, 0.1]
+        tmp = depth_img_2x.astype(float)
+        # Make no-depth pixel as NAN
+        tmp *= 0.001 # To meter
+        tmp = 0.655-tmp # Height from bottom
+        tmp[tmp<0] = 0 
+        tmp[tmp==-0.655] = 0
         # Duplicate channel to DDD
-        depth_img_2x.shape = (depth_img_2x.shape[0], depth_img_2x.shape[1], 1)
-        input_depth_img = np.concatenate((depth_img_2x, depth_img_2x, depth_img_2x), axis=2)
+        tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
+        input_depth_img = np.concatenate((tmp, tmp, tmp), axis=2)
         for c in range(3):
             input_depth_img[:, :, c] = (input_depth_img[:, :, c] - image_mean[c]) / image_std[c]
             
@@ -84,9 +89,6 @@ class Trainer(object):
         input_depth_img.shape = (input_depth_img.shape[0], input_depth_img.shape[1], input_depth_img.shape[2], 1)
         input_color_data = torch.from_numpy(input_color_img.astype(np.float32)).permute(3, 2, 0, 1)
         input_depth_data = torch.from_numpy(input_depth_img.astype(np.float32)).permute(3, 2, 0, 1)
-        '''if self.use_cuda:
-            input_color_data = input_color_data.cuda()
-            input_depth_data = input_depth_data.cuda()'''
         # Pass input data to model
         output_prob, state_feat = self.model.forward(input_color_data, input_depth_data, is_volatile, specific_rotation)
         
@@ -103,9 +105,9 @@ class Trainer(object):
         
         return suck_predictions, grasp_predictions, state_feat
         
-    def get_label_value(self, primitive, action_success, next_color, next_depth):
+    def get_label_value(self, primitive, action_success, next_color, next_depth, num_of_items):
         # Compute current reward
-        current_reward = -1
+        current_reward = -2
         if primitive == "grasp":
             if action_success:
                 current_reward = self.grasp_rewards
@@ -113,11 +115,13 @@ class Trainer(object):
             if action_success:
                 current_reward = self.suck_rewards
         if primitive == "invalid":
-            current_reward = -10
+            current_reward = -4
         # Compute future reward
         next_suck_predictions, next_grasp_predictions, next_state_feat = self.forward(next_color, next_depth, is_volatile=True)
         future_reward = max(np.max(next_suck_predictions), np.max(next_grasp_predictions))
         
+        if num_of_items == 0:
+            future_reward = 0
         # Compute expected reward
         expected_reward = current_reward + self.discount_factor * future_reward
         
@@ -152,11 +156,13 @@ class Trainer(object):
             suck_predictions, grasp_predictions, state_feat = self.forward(color_img, depth_img, is_volatile=False)
             
             if self.use_cuda:
-                loss = self.criterion(self.model.output_prob[0].view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda())) * \
-                                                                                   Variable(torch.from_numpy(label_weights).float().cuda(), requires_grad=False)
+                loss = self.criterion(self.model.output_prob[0].view(1, 320, 320), 
+                                      Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(), 
+                                      requires_grad=False)
             else:
-                loss = self.criterion(self.model.output_prob[0].view(1, 320, 320), Variable(torch.from_numpy(label).float())) * \
-                                                                                   Variable(torch.from_numpy(label_weights).float(), requires_grad=False)
+                loss = self.criterion(self.model.output_prob[0].view(1, 320, 320), 
+                                      Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(), 
+                                      requires_grad=False)
             loss = loss.sum()
             loss.backward()
             loss_value = loss.cpu().data.numpy()
