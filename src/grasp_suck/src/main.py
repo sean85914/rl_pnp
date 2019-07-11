@@ -22,6 +22,7 @@ parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="usin
 parser.add_argument("--is_testing", action="store_true", default=False)
 parser.add_argument("--force_cpu",  action="store_true", default=False)
 parser.add_argument("--last_model", type=str, default="", help="If provided, continue training with provided model file")
+parser.add_argument("--episode",    type=int)
 
 args = parser.parse_args()
 
@@ -31,8 +32,9 @@ use_cpu      = args.force_cpu
 #episode      = 0
 epsilon      = 0.75
 iteration    = 0
-suck_reward  = 1.0
-grasp_reward = 1.0
+episode      = args.episode
+suck_reward  = 2
+grasp_reward = 2
 discount     = 0.5
 Z_THRES      = 0.645
 num_of_items = 5  ## Number of items when start
@@ -42,10 +44,18 @@ save_every   = 5
 # Logger path
 r = rospkg.RosPack()
 package_path = r.get_path('grasp_suck')
-csv_path   = package_path + '/logger/'
-image_path = package_path + '/logger/images/'
-feat_path  = package_path + '/logger/feat/'
-model_path = package_path + '/logger/models/'
+logger_dir = '/logger_{}/'.format(episode)
+csv_path   =  package_path + logger_dir
+image_path =  package_path + logger_dir + 'images/'
+mixed_path =  package_path + logger_dir + 'mixed_img/'
+feat_path  =  package_path + logger_dir + 'feat/'
+grasp_path = [feat_path + 'rotate_idx_0/',
+              feat_path + 'rotate_idx_1/',
+              feat_path + 'rotate_idx_2/',
+              feat_path + 'rotate_idx_3/',
+              feat_path + 'rotate_idx_4/']
+model_path =  package_path + logger_dir + 'models/'
+vis_path   =  package_path + logger_dir + 'vis/'
 
 if not os.path.exists(image_path):
 	os.makedirs(image_path)
@@ -53,6 +63,13 @@ if not os.path.exists(feat_path):
 	os.makedirs(feat_path)
 if not os.path.exists(model_path):
 	os.makedirs(model_path)
+if not os.path.exists(mixed_path):
+	os.makedirs(mixed_path)
+if not os.path.exists(vis_path):
+	os.makedirs(vis_path)
+for i in range(5):
+	if not os.path.exists(grasp_path[i]):
+		os.makedirs(grasp_path[i])
 
 # cv bridge
 br = CvBridge()
@@ -87,20 +104,50 @@ pixel_to_xyz = rospy.ServiceProxy('/pixel_to_xyz/pixel_to_xyz', get_xyz)
 get_image    = rospy.ServiceProxy('/pixel_to_xyz/get_image', get_image)
 
 # Result list
-action_list = []
-target_list = []
-result_list = []
-loss_list   = []
+action_list  = []
+target_list  = []
+result_list  = []
+loss_list    = []
+explore_list = []
+return_      = 0.0
 # Result file name
-action_file = csv_path + "action_primitive.csv"
-target_file = csv_path + "action_target.csv"
-result_file = csv_path + "action_result.csv"
-loss_file   = csv_path + "loss.csv"
+action_file  = csv_path + "action_primitive.csv"
+target_file  = csv_path + "action_target.csv"
+result_file  = csv_path + "action_result.csv"
+loss_file    = csv_path + "loss.csv"
+explore_file = csv_path + "explore.csv"
+curve_file   = csv_path + "curve.txt"
 
+f = open(curve_file, "w")
+
+# Get color and depth images from service response
 def get_imgs_from_msg(response):
 	color = br.imgmsg_to_cv2(response.crop_color_img)
 	depth = br.imgmsg_to_cv2(response.crop_depth_img)
 	return color, depth
+
+def draw_image(image, primitive, pixel_index):
+	center = (pixel_index[2], pixel_index[1])
+	result = cv2.circle(image, center, 7, (255, 255, 255), 2)
+	X = 20
+	Y = 7
+	theta = np.radians(-90.0+45.0*pixel_index[0])
+	x_unit = [ np.cos(theta), np.sin(theta)]
+	y_unit = [-np.sin(theta), np.cos(theta)]
+	if not primitive: # GRASP
+		p1  = (center[0]+np.ceil(x_unit[0]*X), center[1]+np.ceil(x_unit[1]*X))
+		p2  = (center[0]-np.ceil(x_unit[0]*X), center[1]-np.ceil(x_unit[1]*X))
+		p11 = (np.clip(p1[0]-np.ceil(y_unit[0]*Y), 0, 223), np.clip(p1[1]-np.ceil(y_unit[1]*Y), 0, 223))
+		p12 = (np.clip(p1[0]+np.ceil(y_unit[0]*Y), 0, 223), np.clip(p1[1]+np.ceil(y_unit[1]*Y), 0, 223))
+		p21 = (np.clip(p2[0]-np.ceil(y_unit[0]*Y), 0, 223), np.clip(p2[1]-np.ceil(y_unit[1]*Y), 0, 223))
+		p22 = (np.clip(p2[0]+np.ceil(y_unit[0]*Y), 0, 223), np.clip(p2[1]+np.ceil(y_unit[1]*Y), 0, 223))
+		p11 = (int(p11[0]), int(p11[1]))
+		p12 = (int(p12[0]), int(p12[1]))
+		p21 = (int(p21[0]), int(p21[1]))
+		p22 = (int(p22[0]), int(p22[1]))
+		result = cv2.line(result, p11, p12, (255, 255, 255), 2)
+		result = cv2.line(result, p21, p22, (255, 255, 255), 2)
+	return result
 
 print "Initializing..."
 go_home()
@@ -131,18 +178,34 @@ try:
                           trainer.forward(color, depth, is_volatile=True)
 		print "  {} seconds".format(time.time() - ts)
 		# Convert feature to heatmap and save
-		tmp = ((suck_predictions-np.min(suck_predictions))/np.max(suck_predictions)* \
-                                                255).astype(np.uint8).transpose(1, 2, 0)
+		tmp = np.copy(suck_predictions)
+		# View the value as probability
+		#tmp[suck_predictions<0] = 0
+		# Eliminate bias by linear mapping to [0, 1]
+		weight = 1/(np.max(tmp) - np.min(tmp))
+		tmp = (tmp-np.min(tmp))*weight
+		tmp = (tmp*255).astype(np.uint8)
+		tmp.shape = (tmp.shape[1], tmp.shape[2])
 		suck_heatmap = cv2.applyColorMap(tmp, cv2.COLORMAP_JET)
 		suck_name = feat_path + "suck_{:06}.jpg".format(iteration)
 		cv2.imwrite(suck_name, suck_heatmap)
+		suck_mixed = cv2.addWeighted(color, 1.0, suck_heatmap, 0.4, 0)
+		suck_name = mixed_path + "suck_{:06}.jpg".format(iteration)
+		grasp_mixed = []
+		cv2.imwrite(suck_name, suck_mixed)
 		for rotate_idx in range(len(grasp_predictions)):
-			tmp = ((grasp_predictions[rotate_idx]-np.min(grasp_predictions[rotate_idx]))/ \
-                              np.max(grasp_predictions[rotate_idx])*255).astype(np.uint8)
-			tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
+			tmp = np.copy(grasp_predictions[rotate_idx])
+			tmp[grasp_predictions[rotate_idx]<0] = 0
+			tmp[grasp_predictions[rotate_idx]>1] = 1
+			tmp = (tmp*255).astype(np.uint8)
+			tmp.resize((tmp.shape[0], tmp.shape[1], 1))
 			grasp_heatmap = cv2.applyColorMap(tmp, cv2.COLORMAP_JET)
-			grasp_name = feat_path + "grasp_{:06}_idx_{}.jpg".format(iteration, rotate_idx)
+			grasp_name = grasp_path[rotate_idx] + "grasp_{:06}.jpg".format(iteration, rotate_idx)
 			cv2.imwrite(grasp_name, grasp_heatmap)
+			grasp_mixed_idx = cv2.addWeighted(color, 1.0, grasp_heatmap, 0.4, 0)
+			grasp_mixed.append(grasp_mixed_idx)
+			grasp_name = mixed_path + "grasp_{:06}_idx_{}.jpg".format(iteration, rotate_idx)
+			cv2.imwrite(grasp_name, grasp_mixed_idx)
 		action = 0 # GRASP
 		action_str = 'grasp'
 		angle = 0
@@ -150,48 +213,56 @@ try:
 		print "suck max: \033[0;34m{}\033[0m| grasp max: \033[0;35m{}\033[0m".format(np.max(suck_predictions), \
                                                    np.max(grasp_predictions))
 		explore = np.random.uniform() < epsilon
+		explore_list.append(explore)
 		if explore: print "Using explore..."
 		if np.max(suck_predictions) > np.max(grasp_predictions):
 			if not explore:
 				action = 1 # SUCK
 				action_str = 'suck'
 				tmp = np.where(suck_predictions == np.max(suck_predictions))
-				pixel_index = [tmp[0][0], tmp[2][0], tmp[1][0]]
+				pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
 		
-			else:
+			else: # GRASP
 				tmp = np.where(grasp_predictions == np.max(grasp_predictions))
-				pixel_index = [tmp[0][0], tmp[2][0], tmp[1][0]]
+				pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
 				angle = np.radians(-90+45*pixel_index[0])
 		else:
 			if not explore:
 				tmp = np.where(grasp_predictions == np.max(grasp_predictions))
-				pixel_index = [tmp[0][0], tmp[2][0], tmp[1][0]]
+				pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
 				angle = np.radians(-90+45*pixel_index[0])
 			else:
 				action = 1 # SUCK
 				action_str = 'suck'
 				tmp = np.where(suck_predictions == np.max(suck_predictions))
-				pixel_index = [tmp[0][0], tmp[2][0], tmp[1][0]]
+				pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
 		
-		target_list.append(pixel_index)
 		del suck_predictions, grasp_predictions, state_feat
 		print "Take action: \033[0;31m %s\033[0m at \
 \033[0;32m(%d, %d)\033[0m with theta \033[0;33m%f \033[0m" %(action_str, pixel_index[1], \
                                                              pixel_index[2], angle)
 		set_prior_img()
 		getXYZ = get_xyzRequest()
-		getXYZ.point[0] = pixel_index[1] # X
-		getXYZ.point[1] = pixel_index[2] # Y
+		getXYZ.point[0] = pixel_index[2] # X
+		getXYZ.point[1] = pixel_index[1] # Y
+		getXYZ.color = images.crop_color_img
+		getXYZ.depth = images.crop_depth_img
 		getXYZResult = pixel_to_xyz(getXYZ)
 		
 		is_valid = True
+		# Draw color + heatmap + motion
+		visual_img = None
+		if action: # SUCK
+			visual_img = draw_image(suck_mixed, action, pixel_index)
+		else:
+			visual_img = draw_image(grasp_mixed[pixel_index[0]], action, pixel_index)
+		vis_name = vis_path + "vis_{:06}.jpg".format(iteration)
+		cv2.imwrite(vis_name, visual_img)
 		# Invalid conditions:
 		# 1. NaN point
 		# 2. Point with z too far, which presents the plane of convayor
 		# TODO 3. Gripper collision with object
-		if getXYZResult.result.x == 0.0 and \
-		   getXYZResult.result.y == 0.0 and \
-		   getXYZResult.result.z == 0.0:
+		if np.isnan(getXYZResult.result.x):
 			print "\033[0;31;44mInvalid pointcloud. Ignore...\033[0m"
 			is_valid = False
 			
@@ -208,14 +279,15 @@ try:
 		
 			goto_target(gotoTarget)
 			time.sleep(0.5)
+
+			go_home() # TODO: service maybe block
 		else:
 			action_list.append(-1)
-
-		go_home() # TODO: service maybe block
-		#set_posterior_img()
+		target_list.append(pixel_index)
+		
 		if is_valid:
 			if not action: # GRASP
-				action_success = grasp_state().success
+				action_success = grasp_state().success #and get_result(SetBoolRequest()).success 
 			else: # SUCK
 				action_success = get_result(SetBoolRequest()).success
 		else:
@@ -245,10 +317,11 @@ try:
 		ts = time.time()
 		if is_valid:
 			label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
-		    	                                                     next_color, next_depth)
+		    	                                                     next_color, next_depth, num_of_items)
 		else: # invalid
-			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth)
+			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, num_of_items)
 		print "Get label: {} seconds".format(time.time()-ts)
+		return_ += prev_reward_value * np.power(discount, iteration)
 		ts = time.time()
 		loss_value = trainer.backprop(color, depth, action_str, pixel_index, label_value)
 		loss_list.append(loss_value)
@@ -267,11 +340,14 @@ try:
 	model_name = model_path + "final.pth"
 	torch.save(trainer.model.state_dict(), model_name)
 	print "Model: %s saved" % model_name
-	np.savetxt(action_file, action_list, delimiter=",")
-	np.savetxt(target_file, target_list, delimiter=",")
-	np.savetxt(result_file, result_list, delimiter=",")
-	np.savetxt(loss_file  , loss_list  , delimiter=",")
-	
+	np.savetxt(action_file , action_list , delimiter=",")
+	np.savetxt(target_file , target_list , delimiter=",")
+	np.savetxt(result_file , result_list , delimiter=",")
+	np.savetxt(loss_file   , loss_list   , delimiter=",")
+	np.savetxt(explore_file, explore_list, delimiter=",")
+	f.write(str(return_))
+	f.close()
+
 except KeyboardInterrupt:
 	print "Force terminate"
 	model_name = model_path + "force_terminate_{}.pth".format(iteration)
@@ -281,3 +357,5 @@ except KeyboardInterrupt:
 	np.savetxt(target_file, target_list, delimiter=",")
 	np.savetxt(result_file, result_list, delimiter=",")
 	np.savetxt(loss_file  , loss_list  , delimiter=",")
+	f.write(str(return_))
+	f.close()
