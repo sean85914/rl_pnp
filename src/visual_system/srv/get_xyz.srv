@@ -1,3 +1,5 @@
+sensor_msgs/Image color
+sensor_msgs/Image depth
 int16[2] point # pixel, in x y
 ---
 geometry_msgs/Point result
