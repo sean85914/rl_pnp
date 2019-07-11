@@ -69,4 +69,5 @@ add_executable(save_all src/save_all.cpp)
 target_link_libraries(save_all ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(pixel_to_xyz src/pixel_to_xyz.cpp)
+add_dependencies(get_target_pc visual_system_gencpp)
 target_link_libraries(pixel_to_xyz ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
