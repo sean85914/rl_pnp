@@ -204,6 +204,8 @@ bool Helper_Services::go_target_service_callback(
   // Correction
   res.result_pose.position.x += X_OFFSET; 
   res.result_pose.position.z += OFFSET;
+  if(req.primmitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.01f; // Low object, for instance, cuboid lying down
+  if(req.primmitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.01f; // Hight object, for instance, standed cylinder
   arm_operation::target_pose myPoseReq;
   myPoseReq.request.target_pose = res.result_pose;
   myPoseReq.request.factor = 0.5f;
