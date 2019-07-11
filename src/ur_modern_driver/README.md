@@ -2,6 +2,9 @@
 [![Build Status](https://travis-ci.org/ros-industrial/ur_modern_driver.svg?branch=kinetic-devel)](https://travis-ci.org/ros-industrial/ur_modern_driver)
 [![license - apache 2.0](https://img.shields.io/:license-Apache%202.0-yellowgreen.svg)](https://opensource.org/licenses/Apache-2.0)
 
+
+[![support level: community](https://img.shields.io/badge/support%20level-community-lightgray.png)](http://rosindustrial.org/news/2016/10/7/better-supporting-a-growing-ros-industrial-software-platform)
+
 A new driver for the UR3/UR5/UR10 robot arms from Universal Robots. It is designed to replace the old driver transparently, while solving some issues, improving usability as well as enabling compatibility  of ros_control.
 
 ## Improvements
@@ -78,7 +81,11 @@ executor more "tolerant" to execution delays. There is also another parameter:
 
 **As the driver communicates with the robot via ethernet and depends on reliable continous communication, it is not possible to reliably control a UR from a virtual machine.**
 
-Just clone the repository into your catkin working directory and make it with ```catkin_make```.
+If building this package from source, you can clone this repository into the source space of your Catkin workspace using the following command:
+
+```bash
+$ git clone -b kinetic-devel https://github.com/ros-industrial/ur_modern_driver.git
+```
 
 Note that this package depends on ur_msgs, hardware_interface, and controller_manager so it cannot directly be used with ROS versions prior to hydro.
 

@@ -37,6 +37,9 @@ bool RTPublisher::publishWrench(RTShared& packet, Time& t)
 {
   geometry_msgs::WrenchStamped wrench_msg;
   wrench_msg.header.stamp = t;
+  // Setting this to what is configured as the "base frame" through ROS parameters.
+  // Refer to ros-industrial/ur_modern_driver#318 for the rationale.
+  wrench_msg.header.frame_id = base_frame_;
   wrench_msg.wrench.force.x = packet.tcp_force[0];
   wrench_msg.wrench.force.y = packet.tcp_force[1];
   wrench_msg.wrench.force.z = packet.tcp_force[2];
@@ -98,7 +101,10 @@ bool RTPublisher::publishTemperature(RTShared& packet, Time& t)
   {
     sensor_msgs::Temperature msg;
     msg.header.stamp = t;
-    msg.header.frame_id = joint_names_[i];
+    // assumption: origins of the link frames are coincident with the origins
+    // of the joints. As the temperature sensors are assumed to be located in
+    // the joints, using the names of the link frames here should be acceptable.
+    msg.header.frame_id = link_names_[i];
     msg.temperature = packet.motor_temperatures[i];
 
     joint_temperature_pub_.publish(msg);

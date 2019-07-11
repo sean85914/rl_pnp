@@ -28,7 +28,8 @@
   <arg name="tool_frame" default="$(arg prefix)tool0_controller" />
   <arg name="shutdown_on_disconnect" default="true" />
   <!-- robot model -->
-  <include file="$(find robot_description)/launch/system.launch">
+  <include file="$(find ur_description)/launch/ur5_upload.launch">
+    <arg name="limited" value="$(arg limited)"/>
   </include>
 
   <!-- ur common -->
