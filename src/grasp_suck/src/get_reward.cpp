@@ -28,7 +28,7 @@ const int LOWER  = -100;  // 10 cm
 const int X_MIN  = 208;
 const int Y_MIN  = 21;
 const int LENGTH = 224;
-std::string file_path = ros::package::getPath("grasp_suck") + "/images";
+//std::string file_path = ros::package::getPath("grasp_suck") + "/images";
 
 cv::Mat prior, post;
 cv::Rect myROI(X_MIN, Y_MIN, LENGTH, LENGTH);
@@ -42,8 +42,8 @@ bool cb_cal(std_srvs::SetBool::Request&, std_srvs::SetBool::Response&);
 
 int main(int argc, char** argv)
 {
-  boost::filesystem::path p(file_path);
-  if(!boost::filesystem::exists(p)){ROS_WARN("images directory doesn't exist, create one."); boost::filesystem::create_directory(p);}
+  //boost::filesystem::path p(file_path);
+  //if(!boost::filesystem::exists(p)){ROS_WARN("images directory doesn't exist, create one."); boost::filesystem::create_directory(p);}
   ros::init(argc, argv, "get_action_state");
   ros::NodeHandle pnh("~");
   if(!pnh.getParam("thres", thres)) thres = 180;
