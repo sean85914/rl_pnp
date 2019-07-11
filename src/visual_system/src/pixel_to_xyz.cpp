@@ -21,14 +21,13 @@
 #include <visualization_msgs/Marker.h>
 
 bool verbose;
-bool isReady = false;
 const int LENGTH = 224;
-const int X_MIN = 208;
-const int Y_MIN = 21;
+const int X_MIN = 246; // 208
+const int Y_MIN = 93; // 21
 std::string frame_name;
 std::vector<double> intrinsic; // [fx, fy, cx, cy]
-std::vector<geometry_msgs::Point> pixel_to_xyz; // Column-major ((0, 0), (0, 1), ..., (1, 0), (1, 1), ...(223, 223))
 cv::Rect myROI(X_MIN, Y_MIN, LENGTH, LENGTH);
+cv::Mat last_color, last_depth;
 cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
 ros::Publisher pub_pc, pub_color, pub_depth, pub_marker;
 
@@ -41,7 +40,7 @@ bool callback_get_image(visual_system::get_image::Request &req,
 
 int main(int argc, char** argv)
 {
-  intrinsic.resize(4); pixel_to_xyz.resize(LENGTH*LENGTH);
+  intrinsic.resize(4);
   ros::init(argc, argv, "pixel_to_xyz");
   ros::NodeHandle nh, pnh("~");
   if(!pnh.getParam("verbose", verbose)) verbose = false;
@@ -89,7 +88,6 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_ms
   }
  
   pcl::PointCloud<pcl::PointXYZRGB> pc;
-  int idx_cnt = 0;
   for(int x=X_MIN; x<=X_MIN+LENGTH-1; ++x){ // 208~431
     for(int y=Y_MIN; y<=Y_MIN+LENGTH-1; ++y){ // 21~244
       // More readable
@@ -123,11 +121,9 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_ms
         geometry_msgs::Point p;
         p.x = p.y = p.z = std::numeric_limits<double>::quiet_NaN();
       }
-      pixel_to_xyz[idx_cnt] = p; ++idx_cnt;
       pc.height = 1; pc.width = pc.points.size();
     } // End for(y)
   } // End for(x) 
-  isReady = true;
   if(verbose){
     sensor_msgs::PointCloud2 pc_out;
     pcl::toROSMsg(pc, pc_out);
@@ -142,15 +138,8 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_ms
   }
 }
 
-bool callback_service(visual_system::get_xyz::Request &req,
+/*bool callback_service(visual_system::get_xyz::Request &req,
                       visual_system::get_xyz::Response &res){
-  if(!isReady){
-    ROS_WARN("Receive request while not ready.");
-    res.result.x = std::numeric_limits<double>::quiet_NaN();
-    res.result.y = std::numeric_limits<double>::quiet_NaN();
-    res.result.z = std::numeric_limits<double>::quiet_NaN();
-    return true;
-  }
   int idx = req.point[0]*LENGTH+req.point[1];
   if(idx>=pixel_to_xyz.size()){
     ROS_WARN("Invalid request index, please remember to subtract 208 for x and 21 for y index");
@@ -172,15 +161,45 @@ bool callback_service(visual_system::get_xyz::Request &req,
   ROS_INFO("\nRequest: pixel(%d, %d)\n\
 Response: point(%f, %f, %f)", 
             req.point[0], req.point[1], p.x, p.y, p.z);
-  isReady = false; // Change to false 
+  return true;
+}*/
+
+bool callback_service(visual_system::get_xyz::Request  &req,
+                      visual_system::get_xyz::Response &res){
+  geometry_msgs::Point p;
+  int pixel_x = X_MIN+req.point[0],
+      pixel_y = Y_MIN+req.point[1];
+  auto depth = last_depth.at<unsigned short>(cv::Point(req.point[0], req.point[1]));
+  if(depth==0){
+    p.x = p.y = p.z = std::numeric_limits<double>::quiet_NaN();
+  } else{
+    p.z = depth * 0.001f; // 1mm
+    p.x = (pixel_x-intrinsic[2])/intrinsic[0]*p.z; // x = (u-cx)/fx*z
+    p.y = (pixel_y-intrinsic[3])/intrinsic[1]*p.z; // y = (v-cy)/fy*z
+  }
+  res.result = p;
+  if(verbose){
+    visualization_msgs::Marker marker;
+    marker.header.frame_id = frame_name;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::SPHERE;
+    marker.pose.position = p;
+    marker.pose.orientation.w = 1.0;
+    marker.scale.x = marker.scale.y = marker.scale.z = 0.02;
+    marker.color.b = marker.color.a = 1.0; // BLUE
+    pub_marker.publish(marker);
+  }
+  ROS_INFO("\nRequest: pixel(%d, %d)\n\
+Response: point(%f, %f, %f)", 
+            req.point[1], req.point[0], p.x, p.y, p.z);
   return true;
 }
 
 bool callback_get_image(visual_system::get_image::Request &req,
                         visual_system::get_image::Response &res){
-  //if(!isReady) {ROS_ERROR("Not ready, abort..."); return false;}
   cv::Mat crop_color = color_img_ptr->image(myROI), 
           crop_depth = depth_img_ptr->image(myROI);
+  last_color = crop_color; last_depth = crop_depth;
   cv_bridge::CvImage crop_color_cv_bridge(color_img_ptr->header, color_img_ptr->encoding, crop_color),
                      crop_depth_cv_bridge(depth_img_ptr->header, depth_img_ptr->encoding, crop_depth);
   res.crop_color_img = *crop_color_cv_bridge.toImageMsg();
