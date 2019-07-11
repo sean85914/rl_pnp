@@ -4,7 +4,7 @@
 #include <robotiq_2f_gripper_control/Robotiq2FGripper_robot_input.h> // Information and state of gripper
 #include <robotiq_2f_gripper_control/Robotiq2FGripper_robot_output.h> // Command from user
 
-const int UPPER_THRES = 230;  // Gripper position(PO) greater than this will consider as fail grasp
+const int UPPER_THRES = 222;  // Gripper position(PO) greater than this will consider as fail grasp
 const int LOWER_THRES = 10;
 ros::Publisher pub_gripper_out;
 ros::Subscriber sub_gripper_in;
