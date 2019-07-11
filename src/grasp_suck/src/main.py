@@ -29,8 +29,7 @@ args = parser.parse_args()
 # Parameter
 testing      = args.is_testing
 use_cpu      = args.force_cpu
-#episode      = 0
-epsilon      = 0.75
+epsilon      = 0.5
 iteration    = 0
 episode      = args.episode
 suck_reward  = 2
@@ -125,10 +124,10 @@ def get_imgs_from_msg(response):
 	color = br.imgmsg_to_cv2(response.crop_color_img)
 	depth = br.imgmsg_to_cv2(response.crop_depth_img)
 	return color, depth
-
+# Draw symbols in the color image with different primitive
 def draw_image(image, primitive, pixel_index):
 	center = (pixel_index[2], pixel_index[1])
-	result = cv2.circle(image, center, 7, (255, 255, 255), 2)
+	result = cv2.circle(image, center, 7, (0, 0, 0), 2)
 	X = 20
 	Y = 7
 	theta = np.radians(-90.0+45.0*pixel_index[0])
@@ -145,8 +144,8 @@ def draw_image(image, primitive, pixel_index):
 		p12 = (int(p12[0]), int(p12[1]))
 		p21 = (int(p21[0]), int(p21[1]))
 		p22 = (int(p22[0]), int(p22[1]))
-		result = cv2.line(result, p11, p12, (255, 255, 255), 2)
-		result = cv2.line(result, p21, p22, (255, 255, 255), 2)
+		result = cv2.line(result, p11, p12, (0, 0, 0), 2)
+		result = cv2.line(result, p21, p22, (0, 0, 0), 2)
 	return result
 
 print "Initializing..."
@@ -180,10 +179,10 @@ try:
 		# Convert feature to heatmap and save
 		tmp = np.copy(suck_predictions)
 		# View the value as probability
-		#tmp[suck_predictions<0] = 0
 		# Eliminate bias by linear mapping to [0, 1]
 		weight = 1/(np.max(tmp) - np.min(tmp))
 		tmp = (tmp-np.min(tmp))*weight
+		tmp[tmp<0.25] = 0
 		tmp = (tmp*255).astype(np.uint8)
 		tmp.shape = (tmp.shape[1], tmp.shape[2])
 		suck_heatmap = cv2.applyColorMap(tmp, cv2.COLORMAP_JET)
@@ -345,7 +344,7 @@ try:
 	np.savetxt(result_file , result_list , delimiter=",")
 	np.savetxt(loss_file   , loss_list   , delimiter=",")
 	np.savetxt(explore_file, explore_list, delimiter=",")
-	f.write(str(return_))
+	result_str = str("Return: %f\n Mean loss: %f" % (return_, np.mean(loss_list)))
 	f.close()
 
 except KeyboardInterrupt:
@@ -357,5 +356,5 @@ except KeyboardInterrupt:
 	np.savetxt(target_file, target_list, delimiter=",")
 	np.savetxt(result_file, result_list, delimiter=",")
 	np.savetxt(loss_file  , loss_list  , delimiter=",")
-	f.write(str(return_))
+	result_str = str("Return: %f\n Mean loss: %f" % (return_, np.mean(loss_list)))
 	f.close()
