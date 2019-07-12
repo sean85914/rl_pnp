@@ -21,24 +21,37 @@ from vacuum_conveyor_control.srv import vacuum_control, vacuum_controlRequest
 parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="using color and depth images to do pick and place")
 parser.add_argument("--is_testing", action="store_true", default=False)
 parser.add_argument("--force_cpu",  action="store_true", default=False)
-parser.add_argument("--last_model", type=str, default="", help="If provided, continue training with provided model file")
-parser.add_argument("--episode",    type=int)
+parser.add_argument("--last_model",   type=str, default="", help="If provided, continue training with provided model file")
+parser.add_argument("--episode",      type=int)
+parser.add_argument("--num_of_items", type=int, default=5)
 
 args = parser.parse_args()
 
 # Parameter
 testing      = args.is_testing
 use_cpu      = args.force_cpu
-epsilon      = 0.5
+epsilon      = None
 iteration    = 0
 episode      = args.episode
 suck_reward  = 2
 grasp_reward = 2
 discount     = 0.5
 Z_THRES      = 0.645
-num_of_items = 5  ## Number of items when start
+num_of_items = args.num_of_items  ## Number of items when start
 save_every   = 5
 
+if testing:
+	print "########TESTING MODE########"
+	epsilon = 0.1
+else:
+	if episode < 5:
+		epsilon = 0.75
+	elif episode < 10:
+		epsilon = 0.5
+	elif episode < 15:
+		epsilon = 0.3
+	elif episode < 20:
+		epsilon = 0.2
 
 # Logger path
 r = rospkg.RosPack()
@@ -78,7 +91,7 @@ trainer = Trainer(suck_reward, grasp_reward, discount, testing, use_cpu)
 
 # Load model if provided last model
 if args.last_model != "":
-	print "Loading provided model..."
+	print "[%f]: Loading provided model..." %(time.time())
 	trainer.model.load_state_dict(torch.load(args.last_model))
 
 # Service client
@@ -117,7 +130,7 @@ loss_file    = csv_path + "loss.csv"
 explore_file = csv_path + "explore.csv"
 curve_file   = csv_path + "curve.txt"
 
-f = open(curve_file, "w")
+if not testing:	f = open(curve_file, "w")
 
 # Get color and depth images from service response
 def get_imgs_from_msg(response):
@@ -136,16 +149,16 @@ def draw_image(image, primitive, pixel_index):
 	if not primitive: # GRASP
 		p1  = (center[0]+np.ceil(x_unit[0]*X), center[1]+np.ceil(x_unit[1]*X))
 		p2  = (center[0]-np.ceil(x_unit[0]*X), center[1]-np.ceil(x_unit[1]*X))
-		p11 = (np.clip(p1[0]-np.ceil(y_unit[0]*Y), 0, 223), np.clip(p1[1]-np.ceil(y_unit[1]*Y), 0, 223))
-		p12 = (np.clip(p1[0]+np.ceil(y_unit[0]*Y), 0, 223), np.clip(p1[1]+np.ceil(y_unit[1]*Y), 0, 223))
-		p21 = (np.clip(p2[0]-np.ceil(y_unit[0]*Y), 0, 223), np.clip(p2[1]-np.ceil(y_unit[1]*Y), 0, 223))
-		p22 = (np.clip(p2[0]+np.ceil(y_unit[0]*Y), 0, 223), np.clip(p2[1]+np.ceil(y_unit[1]*Y), 0, 223))
+		p11 = (p1[0]-np.ceil(y_unit[0]*Y), p1[1]-np.ceil(y_unit[1]*Y))
+		p12 = (p1[0]+np.ceil(y_unit[0]*Y), p1[1]+np.ceil(y_unit[1]*Y))
+		p21 = (p2[0]-np.ceil(y_unit[0]*Y), p2[1]-np.ceil(y_unit[1]*Y))
+		p22 = (p2[0]+np.ceil(y_unit[0]*Y), p2[1]+np.ceil(y_unit[1]*Y))
 		p11 = (int(p11[0]), int(p11[1]))
 		p12 = (int(p12[0]), int(p12[1]))
 		p21 = (int(p21[0]), int(p21[1]))
 		p22 = (int(p22[0]), int(p22[1]))
-		result = cv2.line(result, p11, p12, (0, 0, 0), 2)
-		result = cv2.line(result, p21, p22, (0, 0, 0), 2)
+		result = cv2.line(result, p11, p12, (0, 0, 0), 2) # Black
+		result = cv2.line(result, p21, p22, (0, 0, 0), 2) # Black
 	return result
 
 print "Initializing..."
@@ -171,18 +184,24 @@ try:
 		cv2.imwrite(color_name, color)
 		cv2.imwrite(depth_name, depth)
 		ts = time.time()
-		print "Forward pass...", 
+		print "[%f]: Forward pass..." %(time.time()), 
 		sys.stdout.write('')
 		suck_predictions, grasp_predictions, state_feat = \
                           trainer.forward(color, depth, is_volatile=True)
 		print "  {} seconds".format(time.time() - ts)
+		# Standardization
+		mean = np.mean(suck_predictions)
+		std  = np.std(suck_predictions)
+		suck_predictions = (suck_predictions-mean)/std
+		for i in range(len(grasp_predictions)):
+			mean = np.mean(grasp_predictions[i])
+			std  = np.std(grasp_predictions[i])
+			grasp_predictions[i] = (grasp_predictions[i]-mean)/std
 		# Convert feature to heatmap and save
 		tmp = np.copy(suck_predictions)
 		# View the value as probability
-		# Eliminate bias by linear mapping to [0, 1]
-		weight = 1/(np.max(tmp) - np.min(tmp))
-		tmp = (tmp-np.min(tmp))*weight
-		tmp[tmp<0.25] = 0
+		tmp[tmp<0] = 0
+		tmp[tmp>1] = 1
 		tmp = (tmp*255).astype(np.uint8)
 		tmp.shape = (tmp.shape[1], tmp.shape[2])
 		suck_heatmap = cv2.applyColorMap(tmp, cv2.COLORMAP_JET)
@@ -209,7 +228,7 @@ try:
 		action_str = 'grasp'
 		angle = 0
 		pixel_index = [] # rotate_idx, x, y
-		print "suck max: \033[0;34m{}\033[0m| grasp max: \033[0;35m{}\033[0m".format(np.max(suck_predictions), \
+		print "[{:.6f}]: suck max: \033[0;34m{}\033[0m| grasp max: \033[0;35m{}\033[0m".format(time.time(), np.max(suck_predictions), \
                                                    np.max(grasp_predictions))
 		explore = np.random.uniform() < epsilon
 		explore_list.append(explore)
@@ -235,10 +254,14 @@ try:
 				action_str = 'suck'
 				tmp = np.where(suck_predictions == np.max(suck_predictions))
 				pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
-		
+		'''prediction_file = csv_path + "prediction_{:06}.csv".format(iteration)
+		if action: #SUCK
+			np.savetxt(prediction_file, suck_predictions[0], delimiter=",")
+		else: #GRASP
+			np.savetxt(prediction_file, grasp_predictions[pixel_index[0]], delimiter=",")'''
 		del suck_predictions, grasp_predictions, state_feat
-		print "Take action: \033[0;31m %s\033[0m at \
-\033[0;32m(%d, %d)\033[0m with theta \033[0;33m%f \033[0m" %(action_str, pixel_index[1], \
+		print "[%f]: Take action: \033[0;31m %s\033[0m at \
+\033[0;32m(%d, %d)\033[0m with theta \033[0;33m%f \033[0m" %(time.time(), action_str, pixel_index[1], \
                                                              pixel_index[2], angle)
 		set_prior_img()
 		getXYZ = get_xyzRequest()
@@ -304,48 +327,58 @@ try:
 			else:
 				pheumatic(SetBoolRequest(False))
 				vacuum(vacuum_controlRequest(0))
-	
-		# Get images after action
-		images = get_image()
-		next_color, next_depth = get_imgs_from_msg(images)
-		# Save images
-		color_name = image_path + "next_color_{:06}.jpg".format(iteration)
-		depth_name = image_path + "next_depth_{:06}.png".format(iteration)
-		cv2.imwrite(color_name, next_color)
-		cv2.imwrite(depth_name, next_depth)
-		ts = time.time()
-		if is_valid:
-			label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
-		    	                                                     next_color, next_depth, num_of_items)
-		else: # invalid
-			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, num_of_items)
-		print "Get label: {} seconds".format(time.time()-ts)
-		return_ += prev_reward_value * np.power(discount, iteration)
-		ts = time.time()
-		loss_value = trainer.backprop(color, depth, action_str, pixel_index, label_value)
-		loss_list.append(loss_value)
-		print "Backpropagation {} seconds".format(time.time() - ts)
 		iteration += 1
-		if iteration % save_every == 0:
-			model_name = model_path + "iter_{:06}.pth".format(iteration)
-			torch.save(trainer.model.state_dict(), model_name)
-			print "Model: %s saved" %model_name
+		if not testing:
+			# Get images after action
+			images = get_image()
+			next_color, next_depth = get_imgs_from_msg(images)
+			# Save images
+			color_name = image_path + "next_color_{:06}.jpg".format(iteration)
+			depth_name = image_path + "next_depth_{:06}.png".format(iteration)
+			cv2.imwrite(color_name, next_color)
+			cv2.imwrite(depth_name, next_depth)
+			ts = time.time()
+			if is_valid:
+				label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
+		    	                                                     next_color, next_depth, num_of_items)
+			else: # invalid
+				label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, num_of_items)
+			print "Get label: {} seconds".format(time.time()-ts)
+			return_ += prev_reward_value * np.power(discount, iteration)
+			ts = time.time()
+			loss_value = trainer.backprop(color, depth, action_str, pixel_index, label_value)
+			loss_list.append(loss_value)
+			print "Backpropagation {} seconds".format(time.time() - ts)
+			if iteration % save_every == 0:
+				model_name = model_path + "iter_{:06}.pth".format(iteration)
+				torch.save(trainer.model.state_dict(), model_name)
+				print "Model: %s saved" %model_name
 		iter_time = time.time() - iter_ts
 		total_time += iter_time
 		print "[Total time] \033[0;31m{}\033[0m s| [Iter time] \033[0;32m{}\033[0m s".format \
-                                                                     (total_time, iter_time)
-		time.sleep(0.5) # Sleep 0.5 s for next iteration
+	                                                                    (total_time, iter_time)
+		time.sleep(0.5) # Sleep 0.5 s for next iteration	
+		
 	# Num of item = 0
-	model_name = model_path + "final.pth"
-	torch.save(trainer.model.state_dict(), model_name)
-	print "Model: %s saved" % model_name
+	if not testing:
+		model_name = model_path + "final.pth"
+		torch.save(trainer.model.state_dict(), model_name)
+		print "Model: %s saved" % model_name
+		np.savetxt(loss_file   , loss_list   , delimiter=",")
+		num_of_invalid = np.where(np.array(action_list) == -1)[0].size
+		num_of_grasp   = np.where(np.array(action_list) == 0)[0].size
+		num_of_suck    = np.where(np.array(action_list) == 1)[0].size
+		ratio          = float(num_of_grasp)/num_of_suck
+		result_str = str("Iteration: %d\nReturn: %f\nMean loss: %f\nNum of invalid action: %d\nNum of valid action: %d\nRatio: %f" 
+             	    % (iteration, return_, np.mean(loss_list), num_of_invalid, iteration-num_of_invalid, ratio))
+		f.write(result_str)
+		f.close()
 	np.savetxt(action_file , action_list , delimiter=",")
 	np.savetxt(target_file , target_list , delimiter=",")
 	np.savetxt(result_file , result_list , delimiter=",")
-	np.savetxt(loss_file   , loss_list   , delimiter=",")
 	np.savetxt(explore_file, explore_list, delimiter=",")
-	result_str = str("Return: %f\n Mean loss: %f" % (return_, np.mean(loss_list)))
-	f.close()
+	
+	
 
 except KeyboardInterrupt:
 	print "Force terminate"
@@ -355,6 +388,10 @@ except KeyboardInterrupt:
 	np.savetxt(action_file, action_list, delimiter=",")
 	np.savetxt(target_file, target_list, delimiter=",")
 	np.savetxt(result_file, result_list, delimiter=",")
-	np.savetxt(loss_file  , loss_list  , delimiter=",")
-	result_str = str("Return: %f\n Mean loss: %f" % (return_, np.mean(loss_list)))
-	f.close()
+	if not testing:
+		num_of_invalid = np.where(np.array(action_list) == -1)[0].size
+		result_str = str("Iteration: %d\nReturn: %f\nMean loss: %f\nNum of invalid action: %d\nNum of valid action: %d" 
+        	         % (iteration, return_, np.mean(loss_list), num_of_invalid, iteration-num_of_invalid))
+		f.write(result_str)
+		f.close()
+		np.savetxt(loss_file  , loss_list  , delimiter=",")
