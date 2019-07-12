@@ -18,9 +18,9 @@ inline bool inRange(const int data, const int upper, const int lower){
   else return false;
 }
 
+bool lock = false;
 bool prior_ready = false;
 bool post_ready  = false;
-bool img_ready   = false;
 int req_cnt = 0;
 int thres; // Number of huge change pixel greater than this number will be considered as success
 const int UPPER  = -10; // 1 cm
@@ -59,7 +59,7 @@ int main(int argc, char** argv)
 void cb_depth_img(const sensor_msgs::ImageConstPtr& msg){
   try{
     cv_depth_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
-    img_ready = true;
+    lock = true;
   } catch(cv_bridge::Exception &e) {
     ROS_ERROR("cv_bridge exception: %s", e.what()); return;
   }
@@ -74,30 +74,22 @@ void cb_depth_img(const sensor_msgs::ImageConstPtr& msg){
 }*/
 
 bool cb_prior(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
-  prior = cv_depth_ptr->image(myROI);
-  prior_ready = true; img_ready = false;
-  /*std::stringstream ss;
-  ss << std::setfill('0') << std::setw(6);
-  ss << req_cnt;
-  std::string file_name = ss.str();
-  file_name = file_path + "/prior_" + file_name + ".jpg";
-  cv::imwrite(file_name, cv_color_ptr->image(myROI));*/
-  ROS_INFO("Prior ready!");
-  return true;
+  if(lock){
+    prior = cv_depth_ptr->image(myROI);
+    prior_ready = true; lock = false;
+    ROS_INFO("Prior ready!");
+    return true;
+  }
 }
 
 bool cb_post(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   if(!prior_ready) {ROS_INFO("Prior not ready yet!"); return false;}
-  post = cv_depth_ptr->image(myROI);
-  post_ready = true; img_ready = false;
-  /*std::stringstream ss;
-  ss << std::setfill('0') << std::setw(6);
-  ss << req_cnt;
-  std::string file_name = ss.str();
-  file_name = file_path + "/post_" + file_name + ".jpg";
-  cv::imwrite(file_name, cv_color_ptr->image(myROI));*/
-  ROS_INFO("Posterior ready!");
-  return true;
+  if(lock){
+    post = cv_depth_ptr->image(myROI);
+    post_ready = true; lock = false;
+    ROS_INFO("Posterior ready!");
+    return true;
+  }
 }
 
 bool cb_cal(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res){
