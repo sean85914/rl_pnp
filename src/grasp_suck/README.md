@@ -16,7 +16,7 @@ $ source devel/setup.bash # DO THIS IN EACH NEW TERMINAL
 ```
 ## System Pipeline <a name="Pipeline"></a>
 <img src="img/dqn_grasp_and_suck.png" height=640px align="center"/>
-The system is start with <mark>item = N</mark> and the process stop when <mark>item = 0</mark>
+The system is start with <code>item = N</code> and the process stop when <code>item = 0</code>
 
 ## grasp_suck_system.launch <a name="Launch"></a>
 
