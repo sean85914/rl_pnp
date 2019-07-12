@@ -76,7 +76,7 @@ class Trainer(object):
         tmp *= 0.001 # To meter
         tmp = 0.655-tmp # Height from bottom
         tmp[tmp<0] = 0 
-        tmp[tmp==-0.655] = 0
+        tmp[tmp==-0.655] = np.nan
         # Duplicate channel to DDD
         tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
         input_depth_img = np.concatenate((tmp, tmp, tmp), axis=2)
