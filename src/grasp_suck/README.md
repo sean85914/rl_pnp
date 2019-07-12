@@ -12,7 +12,11 @@ $ source devel/setup.bash # DO THIS IN EACH NEW TERMINAL
 [Terminal 1] $ roslaunch arm_operation ur5_real.launch robot_ip:=192.168.50.11 tool_length:=0.0
 [Terminal 2] $ roslaunch realsense2_camera rs_rgbd.launch camera:=caemra1
 [Terminal 3] $ roslaunch grasp_suck grasp_suck_system.launch
-[Terminal 4] $ cd src/grasp_suck/src && python main.py [--force_cpu] [--last_model] PATH_TO_YOUR_MODEL
+[Terminal 4] $ cd src/grasp_suck/src && python main.py [--force_cpu] [--model PATH_TO_YOUR_MODEL] [--epidode EPISODE]
+```
+For testing, run
+```
+[Terminal 4] $ python main.py [--force_cpu] [--is_testing] [--model PATH_TO_YOUR_MODEL] [--num_of_items NUM_OF_ITEMS]
 ```
 ## System Pipeline <a name="Pipeline"></a>
 <img src="img/dqn_grasp_and_suck.png" height=640px align="center"/>
