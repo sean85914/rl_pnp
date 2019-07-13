@@ -6,9 +6,9 @@ END=100
 for ((i=$BEGIN; i<=$END; i++))
 do
   read -p "[Set $(echo -e $RED"Prior"$RESET)] Press enter to continue..."
-  rosservice call /get_action_state/set_prior
+  rosservice call /get_reward/set_prior
   read -p "[Set $(echo -e $PURPLE"Posterior"$RESET)] Press enter to continue..."
-  rosservice call /get_action_state/set_posterior
-  rosservice call /get_action_state/get_result
+  rosservice call /get_reward/set_posterior
+  rosservice call /get_reward/get_result "data: false"
   echo "$i"
 done
