@@ -25,8 +25,8 @@ int req_cnt = 0;
 int thres; // Number of huge change pixel greater than this number will be considered as success
 const int UPPER  = -10; // 1 cm
 const int LOWER  = -100;  // 10 cm
-const int X_MIN  = 208;
-const int Y_MIN  = 21;
+const int X_MIN  = 246;
+const int Y_MIN  = 93;
 const int LENGTH = 224;
 //std::string file_path = ros::package::getPath("grasp_suck") + "/images";
 
