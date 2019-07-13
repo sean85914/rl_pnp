@@ -19,11 +19,12 @@ from visual_system.srv import get_image, get_imageRequest, get_imageResponse, \
 from vacuum_conveyor_control.srv import vacuum_control, vacuum_controlRequest
 
 parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="using color and depth images to do pick and place")
-parser.add_argument("--is_testing", action="store_true", default=False)
-parser.add_argument("--force_cpu",  action="store_true", default=False)
-parser.add_argument("--last_model",   type=str, default="", help="If provided, continue training with provided model file")
-parser.add_argument("--episode",      type=int)
-parser.add_argument("--num_of_items", type=int, default=5)
+parser.add_argument("--is_testing", action="store_true", default=False, help="True if testing")
+parser.add_argument("--force_cpu",  action="store_true", default=False, help="True if using CPU")
+parser.add_argument("--model",        type=str, default="", help="If provided, continue training with provided model file")
+parser.add_argument("--episode",      type=int, default=0, help="Which episode is this run")
+parser.add_argument("--num_of_items", type=int, default=5, help="Number of items in the workspace")
+parser.add_argument("--epsilon",      type=float, default=0.7, help="Probability to do random action")
 
 args = parser.parse_args()
 
@@ -44,19 +45,13 @@ if testing:
 	print "########TESTING MODE########"
 	epsilon = 0.1
 else:
-	if episode < 5:
-		epsilon = 0.75
-	elif episode < 10:
-		epsilon = 0.5
-	elif episode < 15:
-		epsilon = 0.3
-	elif episode < 20:
-		epsilon = 0.2
+	epsilon = args.epsilon
 
 # Logger path
 r = rospkg.RosPack()
 package_path = r.get_path('grasp_suck')
-logger_dir = '/logger_{}/'.format(episode)
+if not testing: logger_dir = '/logger_{}/'.format(episode)
+else: logger_dir = '/test_logger/'
 csv_path   =  package_path + logger_dir
 image_path =  package_path + logger_dir + 'images/'
 mixed_path =  package_path + logger_dir + 'mixed_img/'
@@ -73,7 +68,7 @@ if not os.path.exists(image_path):
 	os.makedirs(image_path)
 if not os.path.exists(feat_path):
 	os.makedirs(feat_path)
-if not os.path.exists(model_path):
+if not os.path.exists(model_path) and not testing:
 	os.makedirs(model_path)
 if not os.path.exists(mixed_path):
 	os.makedirs(mixed_path)
@@ -90,9 +85,9 @@ br = CvBridge()
 trainer = Trainer(suck_reward, grasp_reward, discount, testing, use_cpu)
 
 # Load model if provided last model
-if args.last_model != "":
+if args.model != "":
 	print "[%f]: Loading provided model..." %(time.time())
-	trainer.model.load_state_dict(torch.load(args.last_model))
+	trainer.model.load_state_dict(torch.load(args.model))
 
 # Service client
 # Gripper
@@ -172,7 +167,7 @@ total_time = 0.0
 try:
 	while num_of_items != 0:
 		print "\033[0;31;46mIteration: {}\033[0m".format(iteration)
-		epsilon = max(epsilon * np.power(0.9998, iteration), 0.1)
+		epsilon_ = max(epsilon * np.power(0.9998, iteration), 0.1)
 		iter_ts = time.time()	
 		# Get color and depth images
 		images = get_image()
@@ -230,7 +225,7 @@ try:
 		pixel_index = [] # rotate_idx, x, y
 		print "[{:.6f}]: suck max: \033[0;34m{}\033[0m| grasp max: \033[0;35m{}\033[0m".format(time.time(), np.max(suck_predictions), \
                                                    np.max(grasp_predictions))
-		explore = np.random.uniform() < epsilon
+		explore = np.random.uniform() < epsilon_
 		explore_list.append(explore)
 		if explore: print "Using explore..."
 		if np.max(suck_predictions) > np.max(grasp_predictions):
@@ -368,7 +363,10 @@ try:
 		num_of_invalid = np.where(np.array(action_list) == -1)[0].size
 		num_of_grasp   = np.where(np.array(action_list) == 0)[0].size
 		num_of_suck    = np.where(np.array(action_list) == 1)[0].size
-		ratio          = float(num_of_grasp)/num_of_suck
+		try:
+			ratio          = float(num_of_grasp)/num_of_suck
+		except ZeroDivisionError:
+			ratio = float('nan')
 		result_str = str("Iteration: %d\nReturn: %f\nMean loss: %f\nNum of invalid action: %d\nNum of valid action: %d\nRatio: %f" 
              	    % (iteration, return_, np.mean(loss_list), num_of_invalid, iteration-num_of_invalid, ratio))
 		f.write(result_str)
