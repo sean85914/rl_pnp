@@ -40,12 +40,18 @@ discount     = 0.5
 Z_THRES      = 0.645
 num_of_items = args.num_of_items  ## Number of items when start
 save_every   = 5
+cnt_invalid  = 0 # Consecutive invalid action counter
 
 if testing:
 	print "########TESTING MODE########"
 	epsilon = 0.1
+	
 else:
 	epsilon = args.epsilon
+
+if args.model == "" and testing:# TEST SHOULD PROVIDE MODEL
+	print "\033[0;31mNo model provided, exist!\033[0m"
+	os._exit(0)
 
 # Logger path
 r = rospkg.RosPack()
@@ -83,11 +89,16 @@ br = CvBridge()
 
 # trainer
 trainer = Trainer(suck_reward, grasp_reward, discount, testing, use_cpu)
+# Still using small learning rate to backpropagate when testing
+if testing:
+	for param_group in trainer.optimizer.param_groups:
+		param_group['lr'] = 1e-5
 
 # Load model if provided last model
 if args.model != "":
 	print "[%f]: Loading provided model..." %(time.time())
 	trainer.model.load_state_dict(torch.load(args.model))
+
 
 # Service client
 # Gripper
@@ -125,7 +136,7 @@ loss_file    = csv_path + "loss.csv"
 explore_file = csv_path + "explore.csv"
 curve_file   = csv_path + "curve.txt"
 
-if not testing:	f = open(curve_file, "w")
+f = open(curve_file, "w")
 
 # Get color and depth images from service response
 def get_imgs_from_msg(response):
@@ -249,11 +260,6 @@ try:
 				action_str = 'suck'
 				tmp = np.where(suck_predictions == np.max(suck_predictions))
 				pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
-		'''prediction_file = csv_path + "prediction_{:06}.csv".format(iteration)
-		if action: #SUCK
-			np.savetxt(prediction_file, suck_predictions[0], delimiter=",")
-		else: #GRASP
-			np.savetxt(prediction_file, grasp_predictions[pixel_index[0]], delimiter=",")'''
 		del suck_predictions, grasp_predictions, state_feat
 		print "[%f]: Take action: \033[0;31m %s\033[0m at \
 \033[0;32m(%d, %d)\033[0m with theta \033[0;33m%f \033[0m" %(time.time(), action_str, pixel_index[1], \
@@ -282,12 +288,17 @@ try:
 		if np.isnan(getXYZResult.result.x):
 			print "\033[0;31;44mInvalid pointcloud. Ignore...\033[0m"
 			is_valid = False
+			if testing:
+				cnt_invalid += 1
 			
 		if getXYZResult.result.z >= Z_THRES:
 			print "\033[0;31;44mTarget on converyor! Ignore...\033[0m"
 			is_valid = False
+			if testing:
+				cnt_invalid += 1
 		
 		if is_valid:
+			cnt_invalid = 0 # Reset cnt
 			action_list.append(action)
 			gotoTarget = get_poseRequest()
 			gotoTarget.point_in_cam = getXYZResult.result
@@ -323,35 +334,42 @@ try:
 				pheumatic(SetBoolRequest(False))
 				vacuum(vacuum_controlRequest(0))
 		iteration += 1
-		if not testing:
-			# Get images after action
-			images = get_image()
-			next_color, next_depth = get_imgs_from_msg(images)
-			# Save images
-			color_name = image_path + "next_color_{:06}.jpg".format(iteration)
-			depth_name = image_path + "next_depth_{:06}.png".format(iteration)
-			cv2.imwrite(color_name, next_color)
-			cv2.imwrite(depth_name, next_depth)
-			ts = time.time()
-			if is_valid:
-				label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
-		    	                                                     next_color, next_depth, num_of_items)
-			else: # invalid
-				label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, num_of_items)
-			print "Get label: {} seconds".format(time.time()-ts)
-			return_ += prev_reward_value * np.power(discount, iteration)
-			ts = time.time()
-			loss_value = trainer.backprop(color, depth, action_str, pixel_index, label_value)
-			loss_list.append(loss_value)
-			print "Backpropagation {} seconds".format(time.time() - ts)
-			if iteration % save_every == 0:
-				model_name = model_path + "iter_{:06}.pth".format(iteration)
-				torch.save(trainer.model.state_dict(), model_name)
-				print "Model: %s saved" %model_name
+		# Get images after action
+		images = get_image()
+		next_color, next_depth = get_imgs_from_msg(images)
+		# Save images
+		color_name = image_path + "next_color_{:06}.jpg".format(iteration)
+		depth_name = image_path + "next_depth_{:06}.png".format(iteration)
+		cv2.imwrite(color_name, next_color)
+		cv2.imwrite(depth_name, next_depth)
+		ts = time.time()
+		if is_valid:
+			label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
+		                                                         next_color, next_depth, num_of_items)
+		else: # invalid
+			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, num_of_items)
+		print "Get label: {} seconds".format(time.time()-ts)
+		return_ += prev_reward_value * np.power(discount, iteration)
+		ts = time.time()
+		loss_value = trainer.backprop(color, depth, action_str, pixel_index, label_value)
+		loss_list.append(loss_value)
+		print "Backpropagation {} seconds".format(time.time() - ts)
+		if iteration % save_every == 0 and not testing:
+			model_name = model_path + "iter_{:06}.pth".format(iteration)
+			torch.save(trainer.model.state_dict(), model_name)
+			print "Model: %s saved" %model_name
 		iter_time = time.time() - iter_ts
 		total_time += iter_time
 		print "[Total time] \033[0;31m{}\033[0m s| [Iter time] \033[0;32m{}\033[0m s".format \
 	                                                                    (total_time, iter_time)
+		# Pass test checker
+		if testing:
+			if iterations == 10*num_of_items:
+				print "Fail to pass test since too much iterations!"
+				break
+			if cnt_invalid == 3*num_of_items:
+				print "Fail to pass test since too much invalid target"
+				break
 		time.sleep(0.5) # Sleep 0.5 s for next iteration	
 		
 	# Num of item = 0
@@ -359,18 +377,18 @@ try:
 		model_name = model_path + "final.pth"
 		torch.save(trainer.model.state_dict(), model_name)
 		print "Model: %s saved" % model_name
-		np.savetxt(loss_file   , loss_list   , delimiter=",")
-		num_of_invalid = np.where(np.array(action_list) == -1)[0].size
-		num_of_grasp   = np.where(np.array(action_list) == 0)[0].size
-		num_of_suck    = np.where(np.array(action_list) == 1)[0].size
-		try:
-			ratio          = float(num_of_grasp)/num_of_suck
-		except ZeroDivisionError:
-			ratio = float('nan')
-		result_str = str("Iteration: %d\nReturn: %f\nMean loss: %f\nNum of invalid action: %d\nNum of valid action: %d\nRatio: %f" 
-             	    % (iteration, return_, np.mean(loss_list), num_of_invalid, iteration-num_of_invalid, ratio))
-		f.write(result_str)
-		f.close()
+	np.savetxt(loss_file   , loss_list   , delimiter=",")
+	num_of_invalid = np.where(np.array(action_list) == -1)[0].size
+	num_of_grasp   = np.where(np.array(action_list) == 0)[0].size
+	num_of_suck    = np.where(np.array(action_list) == 1)[0].size
+	try:
+		ratio          = float(num_of_grasp)/num_of_suck
+	except ZeroDivisionError:
+		ratio = float('nan')
+	result_str = str("Iteration: %d\nReturn: %f\nMean loss: %f\nNum of invalid action: %d\nNum of valid action: %d\nRatio: %f" 
+            	    % (iteration, return_, np.mean(loss_list), num_of_invalid, iteration-num_of_invalid, ratio))
+	f.write(result_str)
+	f.close()
 	np.savetxt(action_file , action_list , delimiter=",")
 	np.savetxt(target_file , target_list , delimiter=",")
 	np.savetxt(result_file , result_list , delimiter=",")
@@ -381,15 +399,15 @@ try:
 except KeyboardInterrupt:
 	print "Force terminate"
 	model_name = model_path + "force_terminate_{}.pth".format(iteration)
-	print "Model: %s saved" % model_name
-	torch.save(trainer.model.state_dict(), model_name)
+	if not testing:
+		torch.save(trainer.model.state_dict(), model_name)
+		print "Model: %s saved" % model_name
 	np.savetxt(action_file, action_list, delimiter=",")
 	np.savetxt(target_file, target_list, delimiter=",")
 	np.savetxt(result_file, result_list, delimiter=",")
-	if not testing:
-		num_of_invalid = np.where(np.array(action_list) == -1)[0].size
-		result_str = str("Iteration: %d\nReturn: %f\nMean loss: %f\nNum of invalid action: %d\nNum of valid action: %d" 
+	num_of_invalid = np.where(np.array(action_list) == -1)[0].size
+	result_str = str("Iteration: %d\nReturn: %f\nMean loss: %f\nNum of invalid action: %d\nNum of valid action: %d" 
         	         % (iteration, return_, np.mean(loss_list), num_of_invalid, iteration-num_of_invalid))
-		f.write(result_str)
-		f.close()
-		np.savetxt(loss_file  , loss_list  , delimiter=",")
+	f.write(result_str)
+	f.close()
+	np.savetxt(loss_file  , loss_list  , delimiter=",")
