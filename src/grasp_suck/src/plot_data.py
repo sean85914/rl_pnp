@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 from matplotlib import pyplot as plt
 import argparse
 
@@ -17,10 +18,12 @@ def parse_data(string, list_):
 	list_.append(data)
 	return list_
 
-parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="Plit logged data")
+parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="Plot logged data")
 parser.add_argument("--episode", type=int, help="Episodes trained")
 parser.add_argument("--data_path", type=str, help="Path to logged data")
 parser.add_argument("--img_name", type=str, help="Name of saved image")
+parser.add_argument("--draw_init", action="store_true", help="If draw first images")
+parser.add_argument("--is_testing", action="store_true", help="Test mode if provided")
 
 args = parser.parse_args()
 
@@ -36,6 +39,8 @@ action_ratio = [] # \frac{valid_action}{Total iter}
 
 for i in range(trained_episode):
 	file_name = args.data_path + "logger_{}/curve.txt".format(i)
+	if args.is_testing:
+		file_name = args.data_path + "test_logger_{}/curve.txt".format(i)
 	f = open(file_name, 'r')
 	s = f.readline()
 	iterations = parse_data(s, iterations)
@@ -75,4 +80,17 @@ plt.plot(action_ratio)
 plt.title("Valid Action / Total Iterations")
 
 plt.savefig("%s.png" %args.img_name, dpi=100)
-#plt.show()
+
+#######################################################################
+# Initial image
+if args.draw_init:
+	result = np.zeros((112*8, 112*8, 3))
+	for i in range(trained_episode):
+		col = i % 8
+		row = i / 8
+		image_name = args.data_path + "logger_{}/images/color_000000.jpg".format(i)
+		img = cv2.imread(image_name)
+		img_resize = cv2.resize(img, (112, 112))
+		result[row*112:(row+1)*112, col*112: (col+1)*112, :] = img_resize
+
+	cv2.imwrite("initial.jpg", result)
