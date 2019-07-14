@@ -16,7 +16,7 @@ $ source devel/setup.bash # DO THIS IN EACH NEW TERMINAL
 ```
 For testing, run
 ```
-[Terminal 4] $ python main.py --is_testing [--force_cpu]  [--model PATH_TO_YOUR_MODEL] [--num_of_items NUM_OF_ITEMS]
+[Terminal 4] $ python main.py --is_testing [--force_cpu] [--episode EPISODE] [--model PATH_TO_YOUR_MODEL] [--num_of_items NUM_OF_ITEMS]
 ```
 ## System Pipeline <a name="Pipeline"></a>
 <img src="img/dqn_grasp_and_suck.png" height=640px align="center"/>
