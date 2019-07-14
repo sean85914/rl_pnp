@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-#from threading import Thread, currentThread
 import numpy as np
 import cv2
 import argparse
@@ -9,6 +8,7 @@ import torch
 import rospy
 import rospkg
 from cv_bridge import CvBridge, CvBridgeError
+# Network
 from trainer import Trainer
 # SRV
 from std_srvs.srv import Empty, SetBool, SetBoolRequest, SetBoolResponse, \
@@ -18,14 +18,13 @@ from visual_system.srv import get_image, get_imageRequest, get_imageResponse, \
                               get_xyz, get_xyzRequest, get_xyzResponse
 from vacuum_conveyor_control.srv import vacuum_control, vacuum_controlRequest
 
-parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="using color and depth images to do pick and place")
+parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="pick and place by trial and error using DQN")
 parser.add_argument("--is_testing", action="store_true", default=False, help="True if testing")
 parser.add_argument("--force_cpu",  action="store_true", default=False, help="True if using CPU")
-parser.add_argument("--model",        type=str, default="", help="If provided, continue training with provided model file")
-parser.add_argument("--episode",      type=int, default=0, help="Which episode is this run")
-parser.add_argument("--num_of_items", type=int, default=5, help="Number of items in the workspace")
-parser.add_argument("--epsilon",      type=float, default=0.7, help="Probability to do random action")
-
+parser.add_argument("--model",        type=str,          default="",    help="If provided, continue training with provided model file")
+parser.add_argument("--episode",      type=int,          default=0,     help="Which episode is this run")
+parser.add_argument("--num_of_items", type=int,          default=5,     help="Number of items in the workspace")
+parser.add_argument("--epsilon",      type=float,        default=0.7,   help="Probability to do random action")
 args = parser.parse_args()
 
 # Parameter
@@ -37,14 +36,15 @@ episode      = args.episode
 suck_reward  = 2
 grasp_reward = 2
 discount     = 0.5
-Z_THRES      = 0.645
-num_of_items = args.num_of_items  ## Number of items when start
+Z_THRES      = 0.645 # Distance from camera larger than this value will be considered as invalid
+num_of_items = args.num_of_items  # Number of items when start
+init_num     = num_of_items
 save_every   = 5
 cnt_invalid  = 0 # Consecutive invalid action counter
 
 if testing:
 	print "########TESTING MODE########"
-	epsilon = 0.1
+	epsilon = 0.2
 	
 else:
 	epsilon = args.epsilon
@@ -57,7 +57,7 @@ if args.model == "" and testing:# TEST SHOULD PROVIDE MODEL
 r = rospkg.RosPack()
 package_path = r.get_path('grasp_suck')
 if not testing: logger_dir = '/logger_{}/'.format(episode)
-else: logger_dir = '/test_logger/'
+else: logger_dir = '/test_logger_{}/'.format(episode)
 csv_path   =  package_path + logger_dir
 image_path =  package_path + logger_dir + 'images/'
 mixed_path =  package_path + logger_dir + 'mixed_img/'
@@ -74,7 +74,7 @@ if not os.path.exists(image_path):
 	os.makedirs(image_path)
 if not os.path.exists(feat_path):
 	os.makedirs(feat_path)
-if not os.path.exists(model_path) and not testing:
+if not os.path.exists(model_path) and not testing: # Test will not save models
 	os.makedirs(model_path)
 if not os.path.exists(mixed_path):
 	os.makedirs(mixed_path)
@@ -176,11 +176,11 @@ vacuum(vacuum_controlRequest(0))
 total_time = 0.0
 
 try:
-	while num_of_items != 0:
+	while num_of_items != 0: # Do until workspace is empty
 		print "\033[0;31;46mIteration: {}\033[0m".format(iteration)
-		epsilon_ = max(epsilon * np.power(0.9998, iteration), 0.1)
+		epsilon_ = max(epsilon * np.power(0.9998, iteration), 0.2)
 		iter_ts = time.time()	
-		# Get color and depth images
+		# Get color and depth images in ROS format
 		images = get_image()
 		# Convert to cv2
 		color, depth = get_imgs_from_msg(images)
@@ -194,7 +194,7 @@ try:
 		sys.stdout.write('')
 		suck_predictions, grasp_predictions, state_feat = \
                           trainer.forward(color, depth, is_volatile=True)
-		print "  {} seconds".format(time.time() - ts)
+		print " {} seconds".format(time.time() - ts)
 		# Standardization
 		mean = np.mean(suck_predictions)
 		std  = np.std(suck_predictions)
@@ -234,11 +234,11 @@ try:
 		action_str = 'grasp'
 		angle = 0
 		pixel_index = [] # rotate_idx, x, y
-		print "[{:.6f}]: suck max: \033[0;34m{}\033[0m| grasp max: \033[0;35m{}\033[0m".format(time.time(), np.max(suck_predictions), \
-                                                   np.max(grasp_predictions))
+		print "[{:.6f}]: suck max: \033[0;34m{}\033[0m| grasp max: \033[0;35m{}\033[0m".format(time.time(), \
+                                                   np.max(suck_predictions), np.max(grasp_predictions))
 		explore = np.random.uniform() < epsilon_
 		explore_list.append(explore)
-		if explore: print "Using explore..."
+		if explore: print "Use exploring..."
 		if np.max(suck_predictions) > np.max(grasp_predictions):
 			if not explore:
 				action = 1 # SUCK
@@ -251,7 +251,7 @@ try:
 				pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
 				angle = np.radians(-90+45*pixel_index[0])
 		else:
-			if not explore:
+			if not explore: # GRASP
 				tmp = np.where(grasp_predictions == np.max(grasp_predictions))
 				pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
 				angle = np.radians(-90+45*pixel_index[0])
@@ -277,7 +277,7 @@ try:
 		visual_img = None
 		if action: # SUCK
 			visual_img = draw_image(suck_mixed, action, pixel_index)
-		else:
+		else: # GRASP
 			visual_img = draw_image(grasp_mixed[pixel_index[0]], action, pixel_index)
 		vis_name = vis_path + "vis_{:06}.jpg".format(iteration)
 		cv2.imwrite(vis_name, visual_img)
@@ -309,7 +309,7 @@ try:
 			time.sleep(0.5)
 
 			go_home() # TODO: service maybe block
-		else:
+		else: # INVALID
 			action_list.append(-1)
 		target_list.append(pixel_index)
 		
@@ -330,7 +330,7 @@ try:
 		else:
 			if not action: # GRASP
 				open_gripper()
-			else:
+			else: # SUCK
 				pheumatic(SetBoolRequest(False))
 				vacuum(vacuum_controlRequest(0))
 		iteration += 1
@@ -349,7 +349,7 @@ try:
 		else: # invalid
 			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, num_of_items)
 		print "Get label: {} seconds".format(time.time()-ts)
-		return_ += prev_reward_value * np.power(discount, iteration)
+		return_ += prev_reward_value * np.power(discount, iteration-1)
 		ts = time.time()
 		loss_value = trainer.backprop(color, depth, action_str, pixel_index, label_value)
 		loss_list.append(loss_value)
@@ -364,10 +364,10 @@ try:
 	                                                                    (total_time, iter_time)
 		# Pass test checker
 		if testing:
-			if iterations == 10*num_of_items:
+			if iteration >= 10*init_num:
 				print "Fail to pass test since too much iterations!"
 				break
-			if cnt_invalid == 3*num_of_items:
+			if cnt_invalid >= 3*init_num:
 				print "Fail to pass test since too much invalid target"
 				break
 		time.sleep(0.5) # Sleep 0.5 s for next iteration	
@@ -393,7 +393,7 @@ try:
 	np.savetxt(target_file , target_list , delimiter=",")
 	np.savetxt(result_file , result_list , delimiter=",")
 	np.savetxt(explore_file, explore_list, delimiter=",")
-	
+	print "Regular shutdown"
 	
 
 except KeyboardInterrupt:
