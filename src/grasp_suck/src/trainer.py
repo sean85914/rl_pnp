@@ -23,7 +23,7 @@ class Trainer(object):
             self.use_cuda = False
         
         # Model
-        self.model = reinforcement_net(self.use_cuda, 5)
+        self.model = reinforcement_net(self.use_cuda, 4)
         if self.use_cuda:
             self.model = self.model.cuda()
         self.suck_rewards = suck_rewards
@@ -107,7 +107,7 @@ class Trainer(object):
         
     def get_label_value(self, primitive, action_success, next_color, next_depth, num_of_items):
         # Compute current reward
-        current_reward = -2
+        current_reward = 0
         if primitive == "grasp":
             if action_success:
                 current_reward = self.grasp_rewards
@@ -115,7 +115,7 @@ class Trainer(object):
             if action_success:
                 current_reward = self.suck_rewards
         if primitive == "invalid":
-            current_reward = -4
+            current_reward = -0.5
         # Compute future reward
         next_suck_predictions, next_grasp_predictions, next_state_feat = self.forward(next_color, next_depth, is_volatile=True)
         future_reward = max(np.max(next_suck_predictions), np.max(next_grasp_predictions))
