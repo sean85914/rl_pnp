@@ -60,6 +60,8 @@ The system is start with <code>item = N</code> and the process stop when <code>i
 | /helper_services_node/robot_go_place | std_srvs/Empty | Place the object with predifined pose |
 
 ## Network <a name="Network"></a>
-### TODO
+**Network Flowchart**
+<img src="img/size_flow.png">
+### TODO： add description
 1. [models.py](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/src/models.py)
-2. [trainer.py](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/src/trainer.py)
+2. [trainer.py](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/src/trainer.py)  
