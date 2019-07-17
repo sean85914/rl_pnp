@@ -21,6 +21,9 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   if(define_home) ROS_INFO("UR5 home joints: %f %f %f %f %f %f", home_joint[0], home_joint[1], home_joint[2], home_joint[3], home_joint[4], home_joint[5]);
   if(define_place) ROS_INFO("UR5 place joints: %f %f %f %f %f %f", place_joint[0], place_joint[1], place_joint[2], place_joint[3], place_joint[4], place_joint[5]);
   ROS_INFO("--------------------------------------");
+  // Publisher
+  pub_marker = pnh_.advertise<visualization_msgs::Marker>("marker", 1);
+  pub_text_marker = pnh_.advertise<visualization_msgs::Marker>("text_marker", 1);
   // Connect to service server
   // goto_joint_pose
   while(!ros::service::waitForService("/ur5_control_server/ur_control/goto_joint_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_joint_pose service...");}
@@ -114,7 +117,7 @@ bool Helper_Services::go_place_service_callback(std_srvs::Empty::Request &req, s
       vacuum_cmd.request.command = 1; // Exhale
       vacuum_control.call(vacuum_cmd); 
       ros::Duration(0.2).sleep();
-    }while(tmp_counter<=REPEAT_TIME);
+    }while(tmp_counter<=REPEAT_TIME-1);
     do{ // Call serveral times to make sure the suction work properly
       ++tmp_counter; 
       vacuum_conveyor_control::vacuum_control vacuum_cmd;
@@ -130,7 +133,7 @@ bool Helper_Services::go_place_service_callback(std_srvs::Empty::Request &req, s
       retract.request.data = false;
       pheumatic_control.call(retract);
       ros::Duration(0.2).sleep();
-    }while(tmp_counter<=REPEAT_TIME);
+    }while(tmp_counter<=REPEAT_TIME-1);
   }
   // Then go home
   for(int i=0; i<6; ++i) myJointReq.request.joint[i] = home_joint[i];
@@ -206,9 +209,26 @@ bool Helper_Services::go_target_service_callback(
   res.result_pose.position.z += OFFSET;
   if(req.primmitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.01f; // Low object, for instance, cuboid lying down
   if(req.primmitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.01f; // Hight object, for instance, standed cylinder
+  // Publish marker
+  visualization_msgs::Marker marker, text_marker;
+  marker.header.frame_id = ori_frame; text_marker.header.frame_id = des_frame;
+  marker.action = visualization_msgs::Marker::ADD; text_marker.action = visualization_msgs::Marker::ADD;
+  marker.type = visualization_msgs::Marker::SPHERE; text_marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+  marker.pose.position = req.point_in_cam; 
+  text_marker.pose.position.x = -0.7;
+  marker.pose.orientation.w = 1.0; 
+  marker.scale.x = marker.scale.y = marker.scale.z = 0.02; text_marker.scale.z = 0.06;
+  if(req.primmitive==GRASP)  marker.color.b = marker.color.a = 1.0; // BLUE for grasping
+  else marker.color.r = marker.color.a = 1.0; // RED for sucking
+  text_marker.color.r = text_marker.color.g = text_marker.color.b = text_marker.color.a = 1.0;
+  int angle = req.yaw * 180 / M_PI;
+  std::string marker_string = (req.primmitive==GRASP?"grasp, "+std::to_string(angle):"suck");
+  text_marker.text = marker_string;
+  pub_marker.publish(marker);
+  pub_text_marker.publish(text_marker);
   arm_operation::target_pose myPoseReq;
   myPoseReq.request.target_pose = res.result_pose;
-  myPoseReq.request.factor = 0.5f;
+  myPoseReq.request.factor = 0.8f;
   ROS_INFO("\nUR5 goto target: \nPosition: [%f, %f, %f]\nOrientation: [%f, %f, %f, %f]",
             res.result_pose.position.x, res.result_pose.position.y, res.result_pose.position.z,
             res.result_pose.orientation.x, res.result_pose.orientation.y, res.result_pose.orientation.z, res.result_pose.orientation.w);

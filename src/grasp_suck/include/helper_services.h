@@ -4,6 +4,7 @@
 #include <tf/transform_listener.h>
 // MSG
 #include <geometry_msgs/Pose.h>
+#include <visualization_msgs/Marker.h>
 // SRV
 // Standard
 #include <std_srvs/Empty.h>
@@ -40,6 +41,8 @@ class Helper_Services{
   std::vector<double> place_joint;
   // Node handle
   ros::NodeHandle nh_, pnh_;
+  // Publisher 
+  ros::Publisher pub_marker, pub_text_marker;
   // Service clients
   // Robot arm control
   ros::ServiceClient robot_arm_goto_joint;
