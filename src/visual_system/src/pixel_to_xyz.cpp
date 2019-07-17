@@ -29,7 +29,7 @@ std::vector<double> intrinsic; // [fx, fy, cx, cy]
 cv::Rect myROI(X_MIN, Y_MIN, LENGTH, LENGTH);
 cv::Mat last_color, last_depth;
 cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
-ros::Publisher pub_pc, pub_color, pub_depth, pub_marker;
+ros::Publisher pub_pc, pub_color, pub_depth;
 
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, \
                   const sensor_msgs::CameraInfoConstPtr& cam_info);
@@ -49,7 +49,6 @@ int main(int argc, char** argv)
     pub_pc = pnh.advertise<sensor_msgs::PointCloud2>("point_cloud", 1);
     pub_color = pnh.advertise<sensor_msgs::Image>("crop_color", 1);
     pub_depth = pnh.advertise<sensor_msgs::Image>("crop_depth", 1);
-    pub_marker = pnh.advertise<visualization_msgs::Marker>("marker", 1);
   }
   else
     ROS_WARN("Not publish pointcloud");
@@ -156,7 +155,6 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_ms
     marker.pose.orientation.w = 1.0;
     marker.scale.x = marker.scale.y = marker.scale.z = 0.02;
     marker.color.b = marker.color.a = 1.0; // BLUE
-    pub_marker.publish(marker);
   }
   ROS_INFO("\nRequest: pixel(%d, %d)\n\
 Response: point(%f, %f, %f)", 
@@ -178,17 +176,6 @@ bool callback_service(visual_system::get_xyz::Request  &req,
     p.y = (pixel_y-intrinsic[3])/intrinsic[1]*p.z; // y = (v-cy)/fy*z
   }
   res.result = p;
-  if(verbose){
-    visualization_msgs::Marker marker;
-    marker.header.frame_id = frame_name;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.type = visualization_msgs::Marker::SPHERE;
-    marker.pose.position = p;
-    marker.pose.orientation.w = 1.0;
-    marker.scale.x = marker.scale.y = marker.scale.z = 0.02;
-    marker.color.b = marker.color.a = 1.0; // BLUE
-    pub_marker.publish(marker);
-  }
   ROS_INFO("\nRequest: pixel(%d, %d)\n\
 Response: point(%f, %f, %f)", 
             req.point[1], req.point[0], p.x, p.y, p.z);
