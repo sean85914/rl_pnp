@@ -16,7 +16,7 @@
  *    dz: z difference in meter
  *    tag_frame: target tag frame
  *    file_name: output file name
- *  Service: /ur3_control_server/ur_control/goto_pose
+ *  Service: /ur5_control_server/ur_control/goto_pose
  *  Frame: base_link, ee_link, tcp_link, tag_frame
  *  Editor: Sean Lu
  *  Last edited: 5/16, 2019
@@ -159,8 +159,8 @@ class calibration{
     }
     fs.open(file_path, std::fstream::out | std::fstream::app); // Write file at the end
     if(!fs.is_open()) {ROS_ERROR("Cannot open file!"); ros::shutdown();}
-    ros::service::waitForService("/ur3_control_server/ur_control/go_straight"); ROS_INFO("Service connect!");
-    client = nh_.serviceClient<arm_operation::target_pose>("/ur3_control_server/ur_control/goto_pose", true);
+    ros::service::waitForService("/ur5_control_server/ur_control/goto_pose"); ROS_INFO("Service connect!");
+    client = nh_.serviceClient<arm_operation::target_pose>("/ur5_control_server/ur_control/goto_pose", true);
     ROS_INFO("Start process");
     tf::StampedTransform transform;
     get_arm_data(transform, "tcp_link");

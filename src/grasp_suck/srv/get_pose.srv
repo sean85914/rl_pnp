@@ -1,4 +1,4 @@
-geometry_msgs/Point point_in_cam
+geometry_msgs/Point point_in_hand
 float64 yaw
 bool primmitive # 0 -> grasp; 1 -> suck
 ---
