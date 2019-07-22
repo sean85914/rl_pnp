@@ -1,6 +1,6 @@
 <launch>
   <node pkg="grasp_suck" type="helper_services" name="helper_services_node" output="screen" clear_params="true">
     <rosparam param="home_joint">[2.834, -2.629, 1.749, -1.482, -1.457, -0.187]</rosparam>
-    <rosparam param="place_joint">[2.082, -1.755, 1.618, -1.807, -1.572, -0.091]</rosparam>
+    <rosparam param="place_joint">[3.718, -1.755, 1.752, -2.167, -1.402, -0.303]</rosparam>
   </node>
 </launch>
