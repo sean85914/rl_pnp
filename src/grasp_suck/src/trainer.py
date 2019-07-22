@@ -23,9 +23,12 @@ class Trainer(object):
             self.use_cuda = False
         
         # Model
-        self.model = reinforcement_net(self.use_cuda, 4)
+        self.model  = reinforcement_net(self.use_cuda, 4)
+        self.target = reinforcement_net(self.use_cuda, 4) 
+		
         if self.use_cuda:
-            self.model = self.model.cuda()
+            self.model  = self.model.cuda()
+            self.target = self.target.cuda()
         self.suck_rewards = suck_rewards
         self.grasp_rewards = grasp_rewards
         self.discount_factor = discount_factor
@@ -36,14 +39,15 @@ class Trainer(object):
             self.criterion = self.criterion.cuda()
         # Set model to train mode
         self.model.train()
+        self.target.train()
         
         # Initialize optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-4, momentum=0.9, weight_decay=2e-5)
         self.iteration = 0
         
     # Forward pass through image, get affordance (Q value) and features
-    def forward(self, color_img, depth_img, is_volatile=False, specific_rotation=-1):
-    
+    def forward(self, color_img, depth_img, is_volatile=False, specific_rotation=-1, network="behavior"):
+    	# Preprocessing
         # Zoom 2X
         color_img_2x = ndimage.zoom(color_img, zoom=[2, 2, 1], order=0)
         depth_img_2x = ndimage.zoom(depth_img, zoom=[2, 2], order=0)
@@ -73,10 +77,10 @@ class Trainer(object):
         image_std =  [0.1, 0.1, 0.1]
         tmp = depth_img_2x.astype(float)
         # Make no-depth pixel as NAN
-        tmp *= 0.001 # To meter
-        tmp = 0.655-tmp # Height from bottom
-        tmp[tmp<0] = 0 
-        tmp[tmp==-0.655] = np.nan
+        #tmp *= 0.001 # To meter
+        #tmp = 0.655-tmp # Height from bottom
+        #tmp[tmp<0] = 0 
+        #tmp[tmp==-0.655] = np.nan
         # Duplicate channel to DDD
         tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
         input_depth_img = np.concatenate((tmp, tmp, tmp), axis=2)
@@ -90,7 +94,10 @@ class Trainer(object):
         input_color_data = torch.from_numpy(input_color_img.astype(np.float32)).permute(3, 2, 0, 1)
         input_depth_data = torch.from_numpy(input_depth_img.astype(np.float32)).permute(3, 2, 0, 1)
         # Pass input data to model
-        output_prob, state_feat = self.model.forward(input_color_data, input_depth_data, is_volatile, specific_rotation)
+        if network == "behavior":
+            output_prob, state_feat = self.model.forward(input_color_data, input_depth_data, is_volatile, specific_rotation)
+        else: # target
+            output_prob, state_feat = self.target.forward(input_color_data, input_depth_data, is_volatile, specific_rotation, clear_grad=True)
         
         # Return affordance and remove extra padding
         suck_predictions = output_prob[0].cpu().detach().numpy()[:, 0, int(padding_width/2):int(color_img_2x.shape[0]/2 - padding_width/2),
@@ -105,7 +112,7 @@ class Trainer(object):
         
         return suck_predictions, grasp_predictions, state_feat
         
-    def get_label_value(self, primitive, action_success, next_color, next_depth, num_of_items):
+    def get_label_value(self, primitive, action_success, next_color, next_depth, is_empty):
         # Compute current reward
         current_reward = 0
         if primitive == "grasp":
@@ -118,12 +125,35 @@ class Trainer(object):
             current_reward = -0.5
         # Compute future reward
         next_suck_predictions, next_grasp_predictions, next_state_feat = self.forward(next_color, next_depth, is_volatile=True)
-        future_reward = max(np.max(next_suck_predictions), np.max(next_grasp_predictions))
+        best_action = None
+        best_next_pixel_index = []
+        if np.max(next_suck_predictions) > np.max(next_grasp_predictions):
+            best_action = "suck"
+            tmp = np.where(next_suck_predictions == np.max(next_suck_predictions))
+            best_next_pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
+        else: 
+            best_action = "grasp"
+            tmp = np.where(next_grasp_predictions == np.max(next_grasp_predictions))
+            best_next_pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
+        del next_suck_predictions, next_grasp_predictions, next_state_feat
+        next_suck_predictions, next_grasp_predictions, next_state_feat = \
+				self.forward(next_color, next_depth, is_volatile=False, specific_rotation = best_next_pixel_index[0], network="target")
+        future_reward = 0
+        if best_action == "suck":
+            future_reward = next_suck_predictions[0, best_next_pixel_index[1], best_next_pixel_index[2]]
+        else:
+            future_reward = next_grasp_predictions[0, best_next_pixel_index[1], best_next_pixel_index[2]]
+        if is_empty == True:
+            future_reward = 0
+        expected_reward = current_reward + self.discount_factor * future_reward
+        del next_suck_predictions, next_grasp_predictions, next_state_feat
+		
+        '''future_reward = max(np.max(next_suck_predictions), np.max(next_grasp_predictions))
         
-        if num_of_items == 0:
+        if is_empty == True:
             future_reward = 0
         # Compute expected reward
-        expected_reward = current_reward + self.discount_factor * future_reward
+        expected_reward = current_reward + self.discount_factor * future_reward'''
         
         # Print information
         print "Current reward: %f" % current_reward
@@ -181,20 +211,6 @@ class Trainer(object):
             loss.backward()
             loss_value = loss.cpu().data.numpy()
             
-            '''# Symmetric
-            opposite_rotate_idx = (best_pix_idx[0] + self.model.num_rotations/2) % self.model.num_rotations
-            suck_predictions, grasp_predicrtions, state_feat = self.forward(color_img, depth_img, is_volatile=False, specific_rotation=opposite_rotate_idx)
-            if self.use_cuda:
-                loss = self.criterion(self.model.output_prob[1].view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda())) * \
-                                                                                   Variable(torch.from_numpy(label_weights).float().cuda(), requires_grad=False)
-            else:
-                loss = self.criterion(self.model.output_prob[1].view(1, 320, 320), Variable(torch.from_numpy(label).float())) * \
-                                                                                   Variable(torch.from_numpy(label_weights).float(), requires_grad=False)
-            loss = loss.sum()
-            loss.backward()
-            loss_value = loss.cpu().data.numpy()
-            
-            loss_value = loss_value/2 '''
         print "Training loss: %f" % loss_value
         self.optimizer.step()
         return loss_value
