@@ -8,6 +8,7 @@ import torch
 import rospy
 import rospkg
 import utils
+from threading import Thread
 from cv_bridge import CvBridge, CvBridgeError
 # Network
 from trainer import Trainer
@@ -15,7 +16,7 @@ from trainer import Trainer
 from std_srvs.srv import Empty, SetBool, SetBoolRequest, SetBoolResponse, \
                          Trigger, TriggerRequest, TriggerResponse
 from grasp_suck.srv import get_pose, get_poseRequest, get_poseResponse
-from visual_system.srv import get_image, get_imageRequest, get_imageResponse, \
+from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
                               get_xyz, get_xyzRequest, get_xyzResponse
 from vacuum_conveyor_control.srv import vacuum_control, vacuum_controlRequest
 
@@ -40,7 +41,7 @@ episode      = args.episode
 suck_reward  = 1
 grasp_reward = 1
 discount     = 0.5
-Z_THRES      = 0.645 # Distance from camera larger than this value will be considered as invalid
+Z_THRES      = 0.005
 num_of_items = args.num_of_items  # Number of items when start
 init_num     = num_of_items
 cnt_invalid  = 0 # Consecutive invalid action counter
@@ -58,8 +59,8 @@ if args.model == "" and testing:# TEST SHOULD PROVIDE MODEL
 # Logger path
 r = rospkg.RosPack()
 package_path = r.get_path('grasp_suck')
-if not testing: logger_dir = '/logger_{}/'.format(episode)
-else: logger_dir = '/test_logger_{}/'.format(episode)
+if not testing: logger_dir = '/training/logger_{}/'.format(episode)
+else: logger_dir = '/test/logger_{}/'.format(episode)
 csv_path   =  package_path + logger_dir
 image_path =  package_path + logger_dir + 'images/'
 mixed_path =  package_path + logger_dir + 'mixed_img/'
@@ -117,8 +118,9 @@ go_home     = rospy.ServiceProxy('/helper_services_node/robot_go_home', Empty)
 go_place    = rospy.ServiceProxy('/helper_services_node/robot_goto_place', Empty)
 
 # pixel_to_xyz
-pixel_to_xyz = rospy.ServiceProxy('/pixel_to_xyz/pixel_to_xyz', get_xyz)
-get_image    = rospy.ServiceProxy('/pixel_to_xyz/get_image', get_image)
+pixel_to_xyz  = rospy.ServiceProxy('/pixel_to_xyz/pixel_to_xyz', get_xyz)
+get_pc        = rospy.ServiceProxy('/pixel_to_xyz/get_pc', get_pc)
+empty_checker = rospy.ServiceProxy('/pixel_to_xyz/empty_state', SetBool)
 
 # Result list
 action_list  = []
@@ -146,14 +148,15 @@ vacuum(vacuum_controlRequest(0))
 total_time = 0.0
 
 try:
-	while num_of_items != 0: # Do until workspace is empty
+	while empty_checker().success is not True:
 		print "\033[0;31;46mIteration: {}\033[0m".format(iteration)
 		if not testing: epsilon_ = max(epsilon * np.power(0.9998, iteration), 0.2)
-		iter_ts = time.time()	
-		# Get color and depth images in ROS format
-		images = get_image()
-		# Convert to cv2 and save
-		color, depth = utils.get_imgs_from_msg(images, image_path, iteration)
+		iter_ts = time.time()
+		# Get color and depth images in ROS format, convert to cv2 and save
+		#images = get_image()
+		#color, depth = utils.get_imgs_from_msg(images, image_path, iteration)
+		msg = get_pc()
+		color, depth, points = utils.get_heightmap(msg.pc, image_path, iteration)
 		ts = time.time()
 		print "[%f]: Forward pass..." %(time.time()), 
 		sys.stdout.write('')
@@ -198,15 +201,6 @@ try:
 		print "[%f]: Take action: \033[0;31m %s\033[0m at \
 \033[0;32m(%d, %d)\033[0m with theta \033[0;33m%f \033[0m" %(time.time(), action_str, pixel_index[1], \
                                                              pixel_index[2], angle)
-		set_prior_img()
-		getXYZ = get_xyzRequest()
-		getXYZ.point[0] = pixel_index[2] # X
-		getXYZ.point[1] = pixel_index[1] # Y
-		getXYZ.color = images.crop_color_img
-		getXYZ.depth = images.crop_depth_img
-		getXYZResult = pixel_to_xyz(getXYZ)
-		
-		is_valid = True
 		# Draw color + heatmap + motion
 		visual_img = None
 		if action: # SUCK
@@ -215,27 +209,45 @@ try:
 			visual_img = utils.draw_image(grasp_mixed[pixel_index[0]], action, pixel_index)
 		vis_name = vis_path + "vis_{:06}.jpg".format(iteration)
 		cv2.imwrite(vis_name, visual_img)
+
+		set_prior_img()
+		'''getXYZ = get_xyzRequest()
+		getXYZ.point[0] = pixel_index[2] # X
+		getXYZ.point[1] = pixel_index[1] # Y
+		getXYZ.color = images.crop_color_img
+		getXYZ.depth = images.crop_depth_img
+		getXYZResult = pixel_to_xyz(getXYZ)'''
+		
+		is_valid = True
 		# Invalid conditions:
 		# 1. NaN point
 		# 2. Point with z too far, which presents the plane of convayor
 		# TODO 3. Gripper collision with object
-		if np.isnan(getXYZResult.result.x):
+		print "###### %f ######" %points[pixel_index[1], pixel_index[2], 2]
+		if np.isnan(points[pixel_index[1], pixel_index[2], 0]) or \
+		   np.isnan(points[pixel_index[1], pixel_index[2], 1]) or \
+		   np.isnan(points[pixel_index[1], pixel_index[2], 2]) or \
+		   points[pixel_index[1], pixel_index[2], 0] == 0.0 or \
+		   points[pixel_index[1], pixel_index[2], 1] == 0.0:
 			print "\033[0;31;44mInvalid pointcloud. Ignore...\033[0m"
 			is_valid = False
 			if testing:
 				cnt_invalid += 1
 			
-		if getXYZResult.result.z >= Z_THRES:
+		#if getXYZResult.result.z >= Z_THRES:
+		if points[pixel_index[1], pixel_index[2], 2] <= Z_THRES:
 			print "\033[0;31;44mTarget on converyor! Ignore...\033[0m"
 			is_valid = False
 			if testing:
 				cnt_invalid += 1
-		
+		# Take action
 		if is_valid:
 			cnt_invalid = 0 # Reset cnt
 			action_list.append(action)
 			gotoTarget = get_poseRequest()
-			gotoTarget.point_in_cam = getXYZResult.result
+			gotoTarget.point_in_hand.x = points[pixel_index[1], pixel_index[2], 0]
+			gotoTarget.point_in_hand.y = points[pixel_index[1], pixel_index[2], 1]
+			gotoTarget.point_in_hand.z = points[pixel_index[1], pixel_index[2], 2]
 			gotoTarget.yaw = angle
 			gotoTarget.primmitive = action
 		
@@ -246,7 +258,7 @@ try:
 		else: # INVALID
 			action_list.append(-1)
 		target_list.append(pixel_index)
-		
+		# Get action result
 		if is_valid:
 			if not action: # GRASP
 				action_success = grasp_state().success #and get_result(SetBoolRequest()).success 
@@ -271,14 +283,14 @@ try:
 					pheumatic(SetBoolRequest(False))
 					time.sleep(0.3)
 		# Get images after action and save
-		images = get_image()
-		next_color, next_depth = utils.get_imgs_from_msg(images, image_path + "next_", iteration)
+		#next_color, next_depth = utils.get_imgs_from_msg(get_image(), image_path + "next_", iteration)
+		next_color, next_depth, next_points = utils.get_heightmap(get_pc().pc, image_path + "next_", iteration)
 		ts = time.time()
 		if is_valid:
 			label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
-		                                                         next_color, next_depth, num_of_items)
+		                                                         next_color, next_depth, empty_checker().success)
 		else: # invalid
-			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, num_of_items)
+			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, empty_checker().success)
 		print "Get label: {} seconds".format(time.time()-ts)
 		return_ += prev_reward_value * np.power(discount, iteration)
 		ts = time.time()
@@ -332,9 +344,8 @@ try:
 	
 
 except KeyboardInterrupt:
-	print "Force terminate"
-	model_name = model_path + "force_terminate_{}.pth".format(iteration)
 	if not testing:
+		model_name = model_path + "force_terminate.pth"
 		torch.save(trainer.model.state_dict(), model_name)
 		print "Model: %s saved" % model_name
 	num_of_invalid = np.where(np.array(action_list) == -1)[0].size
@@ -359,3 +370,4 @@ except KeyboardInterrupt:
 	np.savetxt(target_file , target_list , delimiter=",")
 	np.savetxt(result_file , result_list , delimiter=",")
 	np.savetxt(explore_file, explore_list, delimiter=",")
+	print "Force terminate"
