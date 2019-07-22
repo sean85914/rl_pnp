@@ -10,7 +10,7 @@ fz = []
 lock = True
 last_force = 0.0
 has_last = False
-wait_time = 0.1
+wait_time = 0.5
 G = 9.806650000000272
 
 def set_prior(req):
