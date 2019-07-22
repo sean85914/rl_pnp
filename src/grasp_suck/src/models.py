@@ -58,7 +58,7 @@ class reinforcement_net(nn.Module):
         self.output_prob = []
 
 
-    def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1):
+    def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, clear_grad = False):
         if is_volatile:
             output_prob = []
             interm_feat = []
@@ -133,6 +133,9 @@ class reinforcement_net(nn.Module):
             # Suck is undirectional, so don't have to rotate
             interm_suck_color_feat = self.suck_color_trunk.features(input_color_data)
             interm_suck_depth_feat = self.suck_depth_trunk.features(input_depth_data)
+            if clear_grad:
+                interm_suck_color_feat = interm_suck_color_feat.detach()
+                interm_suck_depth_feat = interm_suck_depth_feat.detach()
             interm_suck_feat = torch.cat((interm_suck_color_feat, interm_suck_depth_feat), dim=1)
 
             self.interm_feat.append(interm_suck_feat)
@@ -164,6 +167,9 @@ class reinforcement_net(nn.Module):
             
             interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
             interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+            if clear_grad:
+                interm_grasp_color_feat = interm_grasp_color_feat.detach()
+                interm_grasp_depth_feat = interm_grasp_depth_feat.detach()
             interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
             self.interm_feat.append(interm_grasp_feat)
             
