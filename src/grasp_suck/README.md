@@ -57,6 +57,7 @@ The system is start with <code>item = N</code> and the process stop when <code>i
 | ~~/pixel_to_xyz/get_image~~ | ~~visual_system/get_image~~ | ~~Return cropped color and depth images~~ |
 | ~~/pixel_to_xyz/pixel_to_xyz~~ | ~~visual_system/get_xyz~~ | ~~Return 3D coordinate with request pixel in color_optical_frame~~ |
 | /pixel_to_xyz/get_pc | visual_system/get_pc | Get pointcloud inside the workspace with coordinate of robot arm |
+| /pixel_to_xyz/empty_state | std_srvs/SetBool | Get if workspace is empty |
 |<tr><td colspan=3><p align="center">**High-level Services**</p></td></tr>|
 | /helper_services_node/goto_target | grasp_suck/get_pose | Make arm contact with request point with specific motion primitive and angle
 | /helper_services_node/robot_go_home | std_srvs/Empty | Return arm to home and set posterior |

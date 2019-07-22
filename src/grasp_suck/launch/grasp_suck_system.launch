@@ -15,10 +15,10 @@
   <include file="$(find arm_operation)/launch/tcp_publisher.launch"/>
   <!-- Vacuum -->
   <node pkg="vacuum_conveyor_control" type="arduino_control" name="arduino_control" output="screen" clear_params="true" required="true">
-    <param name="port" value="/dev/ttyUSB0"/>
+    <param name="port" value="/dev/ttyArduino"/>
   </node>
   <!-- robotiq 2-finger gripper -->
-  <node pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" name="robotiq2FGripper" args="/dev/ttyUSB1" required="true"/>
+  <node pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" name="robotiq2FGripper" args="/dev/ttyGripper" required="true"/>
   <!-- robotiq gripper control -->
   <node pkg="grasp_suck" type="robotiq_gripper_control" name="robotiq_finger_control_node" output="screen" required="true"/>
   <!-- Visual System -->
@@ -28,6 +28,9 @@
     <remap from="camera/color/image_raw" to="/camera1/color/image_raw"/>
     <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
     <remap from="camera/color/camera_info" to="/camera1/color/camera_info"/>
+    <!-- Output remapping -->
+    <remap from="~marker" to="/helper_services_node/marker"/>
+    <remap from="~text_marker" to="/helper_services_node/text_marker"/>
   </node>
   <!-- Get reward based on consecutive depth images -->
   <node pkg="grasp_suck" type="get_reward" name="get_reward" output="screen" required="true">
@@ -36,4 +39,9 @@
   </node> 
   <!-- High-level Control -->
   <include file="$(find grasp_suck)/launch/helper_services.launch"/> 
+  <!-- Visualize workspace -->
+  <node pkg="visualization" type="viz_boundary.py" name="viz_boundary_node"/>
+  <node pkg="robotiq_ft_sensor" type="rq_sensor" name="rq_sensor" output="screen">
+    <param name="serial_id" value="ttyFT"/>
+  </node>
 </launch>
