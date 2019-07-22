@@ -1,6 +1,8 @@
 <launch>
+  <!--node pkg="tf" type="static_transform_publisher" name="fake_tcp_publisher" 
+    args="-0.023 0.0 0.0431 0.0 0.0 0.0 1.0 ee_link fake_tcp 100"/-->
   <node pkg="tf" type="static_transform_publisher" name="fake_tcp_publisher" 
-    args="-0.023 0.0 0.0431 0.0 0.0 0.0 1.0 ee_link fake_tcp 100"/>
+    args="0.0145 0.0 0.0431 0.0 0.0 0.0 1.0 ee_link fake_tcp 100"/>
   <node pkg="tf" type="static_transform_publisher" name="tcp_publisher" 
     args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 ee_link tcp_link 100"/>
 </launch>
