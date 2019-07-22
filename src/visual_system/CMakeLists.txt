@@ -26,7 +26,7 @@ add_service_files(
   target_pose.srv
   barcode_detect.srv
   get_xyz.srv
-  get_image.srv
+  get_pc.srv
 )
 
 generate_messages(
