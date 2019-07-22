@@ -164,7 +164,7 @@ bool Helper_Services::go_target_service_callback(
   if(req.primmitive==GRASP){ // Grasp
     last_motion = GRASP;
     printf("Motion primmitive: \033[1;32mgrasp\033[0m\n");
-    printf("Position in camera frame: (%f, %f, %f)\n", req.point_in_cam.x, req.point_in_cam.y, req.point_in_cam.z);
+    printf("Position in hand frame: (%f, %f, %f)\n", req.point_in_hand.x, req.point_in_hand.y, req.point_in_hand.z);
     printf("Yaw: \n[radian] %f\n[Degree] %f\n", req.yaw, req.yaw*180.0/M_PI);
   } else{ // Suck
     last_motion = SUCK;
@@ -172,9 +172,9 @@ bool Helper_Services::go_target_service_callback(
     std_srvs::SetBool extend_cmd; extend_cmd.request.data = true;
     pheumatic_control.call(extend_cmd);
     printf("Motion primmitive: \033[1;32msuck\033[0m\n");
-    printf("Position in camera frame: (%f, %f, %f)\n", req.point_in_cam.x, req.point_in_cam.y, req.point_in_cam.z);
+    printf("Position in hand frame: (%f, %f, %f)\n", req.point_in_hand.x, req.point_in_hand.y, req.point_in_hand.z);
   }
-  std::string des_frame = (arm_prefix==""?"base_link":arm_prefix+"_base_link");
+  /*std::string des_frame = (arm_prefix==""?"base_link":arm_prefix+"_base_link");
   std::string ori_frame = cam_prefix+"_color_optical_frame";
   tf::StampedTransform st;
   try{
@@ -184,6 +184,8 @@ bool Helper_Services::go_target_service_callback(
   tf::Transform tf(st.getRotation(), st.getOrigin());
   tf::Vector3 point_in_cam(req.point_in_cam.x, req.point_in_cam.y, req.point_in_cam.z),
               point_in_arm = tf*point_in_cam;
+  */
+  tf::Vector3 point_in_arm(req.point_in_hand.x, req.point_in_hand.y, req.point_in_hand.z);
   tf::Matrix3x3 rotm(0.0f, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f);
   tf::Quaternion q, q_gripper; 
   rotm.getRotation(q); 
@@ -211,10 +213,10 @@ bool Helper_Services::go_target_service_callback(
   if(req.primmitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.01f; // Hight object, for instance, standed cylinder
   // Publish marker
   visualization_msgs::Marker marker, text_marker;
-  marker.header.frame_id = ori_frame; text_marker.header.frame_id = des_frame;
+  marker.header.frame_id = (arm_prefix==""?"base_link":arm_prefix+"_base_link"); text_marker.header.frame_id = (arm_prefix==""?"base_link":arm_prefix+"_base_link");
   marker.action = visualization_msgs::Marker::ADD; text_marker.action = visualization_msgs::Marker::ADD;
   marker.type = visualization_msgs::Marker::SPHERE; text_marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-  marker.pose.position = req.point_in_cam; 
+  marker.pose.position = req.point_in_hand; 
   text_marker.pose.position.x = -0.7;
   marker.pose.orientation.w = 1.0; 
   marker.scale.x = marker.scale.y = marker.scale.z = 0.02; text_marker.scale.z = 0.06;
