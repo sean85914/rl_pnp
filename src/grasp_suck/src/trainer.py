@@ -73,14 +73,9 @@ class Trainer(object):
         for c in range(3):
             input_color_img[:, :, c] = (input_color_img[:, :, c] - image_mean[c]) / image_std[c]
         # Normalize depth image
-        image_mean = [0.003, 0.003, 0.003]
-        image_std =  [0.1, 0.1, 0.1]
+        image_mean = [0.01, 0.01, 0.01]
+        image_std =  [0.005, 0.005, 0.005]
         tmp = depth_img_2x.astype(float)
-        # Make no-depth pixel as NAN
-        #tmp *= 0.001 # To meter
-        #tmp = 0.655-tmp # Height from bottom
-        #tmp[tmp<0] = 0 
-        #tmp[tmp==-0.655] = np.nan
         # Duplicate channel to DDD
         tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
         input_depth_img = np.concatenate((tmp, tmp, tmp), axis=2)
@@ -124,6 +119,7 @@ class Trainer(object):
         if primitive == "invalid":
             current_reward = -0.5
         # Compute future reward
+        ''' Double DQN '''
         next_suck_predictions, next_grasp_predictions, next_state_feat = self.forward(next_color, next_depth, is_volatile=True)
         best_action = None
         best_next_pixel_index = []
@@ -139,16 +135,19 @@ class Trainer(object):
         next_suck_predictions, next_grasp_predictions, next_state_feat = \
 				self.forward(next_color, next_depth, is_volatile=False, specific_rotation = best_next_pixel_index[0], network="target")
         future_reward = 0
-        if best_action == "suck":
+        if is_empty == True:
+            future_reward = 0
+        elif best_action == "suck":
             future_reward = next_suck_predictions[0, best_next_pixel_index[1], best_next_pixel_index[2]]
         else:
             future_reward = next_grasp_predictions[0, best_next_pixel_index[1], best_next_pixel_index[2]]
-        if is_empty == True:
-            future_reward = 0
+        
         expected_reward = current_reward + self.discount_factor * future_reward
         del next_suck_predictions, next_grasp_predictions, next_state_feat
 		
-        '''future_reward = max(np.max(next_suck_predictions), np.max(next_grasp_predictions))
+        '''
+        DQN
+        future_reward = max(np.max(next_suck_predictions), np.max(next_grasp_predictions))
         
         if is_empty == True:
             future_reward = 0
