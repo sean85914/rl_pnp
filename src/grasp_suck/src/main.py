@@ -21,13 +21,14 @@ from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
 from vacuum_conveyor_control.srv import vacuum_control, vacuum_controlRequest
 
 parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="pick and place by trial and error using DQN")
-parser.add_argument("--is_testing", action="store_true", default=False, help="True if testing, default is false")
-parser.add_argument("--force_cpu",  action="store_true", default=False, help="True if using CPU, default is false")
-parser.add_argument("--grasp_only", action="store_true", default=False, help="True if using grasp-only policy, default is false")
-parser.add_argument("--model",        type=str,          default="",    help="If provided, continue training the model or using this model for testing, default is empty string")
-parser.add_argument("--episode",      type=int,          default=0,     help="Which episode is this run, default is 0")
-parser.add_argument("--num_of_items", type=int,          default=5,     help="Number of items in the workspace, default is 5")
-parser.add_argument("--epsilon",      type=float,        default=0.7,   help="Probability to do random action, default is 0.7")
+parser.add_argument("--is_testing", action="store_true",  default=False, help="True if testing, default is false")
+parser.add_argument("--force_cpu",  action="store_true",  default=False, help="True if using CPU, default is false")
+parser.add_argument("--grasp_only", action="store_true",  default=False, help="True if using grasp-only policy, default is false")
+parser.add_argument("--model",         type=str,          default="",    help="If provided, continue training the model or using this model for testing, default is empty string")
+parser.add_argument("--episode",       type=int,          default=0,     help="Which episode is this run, default is 0")
+parser.add_argument("--num_of_items",  type=int,          default=5,     help="Number of items in the workspace, default is 5")
+parser.add_argument("--epsilon",       type=float,        default=0.7,   help="Probability to do random action, default is 0.7")
+parser.add_argument("--update_target", type=int,          default=10,    help="After how much iterations should update target network")
 args = parser.parse_args()
 
 # Parameter
@@ -41,10 +42,11 @@ episode      = args.episode
 suck_reward  = 1
 grasp_reward = 1
 discount     = 0.5
-Z_THRES      = 0.005
+Z_THRES      = 0.02
 num_of_items = args.num_of_items  # Number of items when start
 init_num     = num_of_items
 cnt_invalid  = 0 # Consecutive invalid action counter
+update_fre = args.update_target
 
 if testing:
 	print "########TESTING MODE########"
@@ -148,7 +150,8 @@ vacuum(vacuum_controlRequest(0))
 total_time = 0.0
 
 try:
-	while empty_checker().success is not True:
+	#while empty_checker().success is not True:
+	while num_of_items is not 0:
 		print "\033[0;31;46mIteration: {}\033[0m".format(iteration)
 		if not testing: epsilon_ = max(epsilon * np.power(0.9998, iteration), 0.2)
 		iter_ts = time.time()
@@ -235,7 +238,7 @@ try:
 				cnt_invalid += 1
 			
 		#if getXYZResult.result.z >= Z_THRES:
-		if points[pixel_index[1], pixel_index[2], 2] <= Z_THRES:
+		elif points[pixel_index[1], pixel_index[2], 2] <= Z_THRES:
 			print "\033[0;31;44mTarget on converyor! Ignore...\033[0m"
 			is_valid = False
 			if testing:
@@ -286,11 +289,13 @@ try:
 		#next_color, next_depth = utils.get_imgs_from_msg(get_image(), image_path + "next_", iteration)
 		next_color, next_depth, next_points = utils.get_heightmap(get_pc().pc, image_path + "next_", iteration)
 		ts = time.time()
+		#is_empty = empty_checker().success
+		is_empty = (num_of_items == 0)
 		if is_valid:
 			label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
-		                                                         next_color, next_depth, empty_checker().success)
+		                                                         next_color, next_depth, is_empty)
 		else: # invalid
-			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, empty_checker().success)
+			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, is_empty)
 		print "Get label: {} seconds".format(time.time()-ts)
 		return_ += prev_reward_value * np.power(discount, iteration)
 		ts = time.time()
@@ -302,6 +307,10 @@ try:
 		print "[Total time] \033[0;31m{}\033[0m s| [Iter time] \033[0;32m{}\033[0m s".format \
 	                                                                    (total_time, iter_time)
 		iteration += 1
+		# Update target net
+		if iteration % update_fre == 0 or num_of_items == 0:
+			print "Update target network"
+			trainer.target = trainer.model
 		# Pass test checker
 		if testing:
 			if iteration >= 3*init_num:
