@@ -3,6 +3,7 @@
 #include <opencv2/opencv.hpp> // cv
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <tf/transform_listener.h>
 #include <cv_bridge/cv_bridge.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/pcd_io.h> // savePCDFileASCII
@@ -29,13 +30,13 @@ int num_thres;
 const int LENGTH = 224; // deprecated
 const int X_MIN = 246; // deprecated
 const int Y_MIN = 93; // deprecated
-const double X_LOWER = -0.65f;
-const double X_UPPER = -0.30f;
-const double Y_LOWER = -0.23f;
-const double Y_UPPER =  0.12f;
+const double X_LOWER = -0.659f;
+const double X_UPPER = -0.273f;
+const double Y_LOWER = -0.269f;
+const double Y_UPPER =  0.117f;
 const double Z_LOWER = -0.01f;
 const double Z_UPPER =  0.20f;
-const double Z_THRES = 0.645f;
+const double Z_THRES = 0.02f;
 std::string frame_name;
 std::vector<double> intrinsic; // [fx, fy, cx, cy]
 cv::Rect myROI(X_MIN, Y_MIN, LENGTH, LENGTH); // deprecated
@@ -46,6 +47,7 @@ pcl::PointCloud<pcl::PointXYZRGB> pc;
 pcl::PassThrough<pcl::PointXYZRGB> pass_x, pass_y, pass_z;
 ros::Publisher pub_pc, pub_color, pub_depth, pub_marker, pub_text_marker;
 
+Eigen::Matrix4f lookup_transform(void);
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, \
                   const sensor_msgs::CameraInfoConstPtr& cam_info);
 bool callback_service(visual_system::get_xyz::Request &req,
@@ -75,10 +77,7 @@ int main(int argc, char** argv)
   }
   else
     ROS_WARN("Not save pointcloud");
-  arm2cam_tf << 0.03377758, -0.9984761 , -0.04364111, -0.439,
-               -0.99906469, -0.03255353, -0.02846076,  0.017,
-                0.02699672,  0.04456163, -0.9986418 ,  0.652,
-                0.0       ,  0.0       ,  0.0       ,  1.0;
+  arm2cam_tf = lookup_transform();
   pass_x.setFilterFieldName("x");
   pass_x.setFilterLimits(X_LOWER, X_UPPER);
   pass_y.setFilterFieldName("y");
@@ -99,6 +98,24 @@ int main(int argc, char** argv)
   ros::ServiceServer check_empty_service = pnh.advertiseService("empty_state", callback_is_empty);
   ros::spin();
   return 0;
+}
+
+Eigen::Matrix4f lookup_transform(void){
+  Eigen::Matrix4f eigen_mat = Eigen::Matrix4f::Identity();
+  tf::TransformListener listener;
+  tf::StampedTransform stf;
+  try{
+    listener.waitForTransform("base_link", "camera1_color_optical_frame", ros::Time(0), ros::Duration(0.3));
+    listener.lookupTransform("base_link", "camera1_color_optical_frame", ros::Time(0), stf);
+  } catch(tf::TransformException ex){
+    ROS_ERROR("%s", ex.what());
+  }
+  tf::Matrix3x3 tf_mat(stf.getRotation());
+  eigen_mat(0, 0) = tf_mat[0].getX(); eigen_mat(1, 0) = tf_mat[1].getX(); eigen_mat(2, 0) = tf_mat[2].getX(); 
+  eigen_mat(0, 1) = tf_mat[0].getY(); eigen_mat(1, 1) = tf_mat[1].getY(); eigen_mat(2, 1) = tf_mat[2].getY(); 
+  eigen_mat(0, 2) = tf_mat[0].getZ(); eigen_mat(1, 2) = tf_mat[1].getZ(); eigen_mat(2, 2) = tf_mat[2].getZ(); 
+  eigen_mat(0, 3) = stf.getOrigin().getX(); eigen_mat(1, 3) = stf.getOrigin().getY(); eigen_mat(2, 3) = stf.getOrigin().getZ(); 
+  return eigen_mat;
 }
 
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, \
@@ -243,7 +260,7 @@ Response: point(%f, %f, %f)",
   marker.scale.x = marker.scale.y = marker.scale.z = 0.02f; 
   marker.color.g = marker.color.a = 1.0f;
   pub_marker.publish(marker);
-  if(std::isnan(p.x) or p.z>=Z_THRES){
+  if(std::isnan(p.x) or p.z<=Z_THRES){
     visualization_msgs::Marker text_marker;
     text_marker.action = visualization_msgs::Marker::ADD;
     text_marker.header.frame_id = "base_link";
