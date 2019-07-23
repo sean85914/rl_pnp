@@ -216,8 +216,8 @@ bool Helper_Services::go_target_service_callback(
   marker.header.frame_id = (arm_prefix==""?"base_link":arm_prefix+"_base_link"); text_marker.header.frame_id = (arm_prefix==""?"base_link":arm_prefix+"_base_link");
   marker.action = visualization_msgs::Marker::ADD; text_marker.action = visualization_msgs::Marker::ADD;
   marker.type = visualization_msgs::Marker::SPHERE; text_marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-  marker.pose.position = req.point_in_hand; 
-  text_marker.pose.position.x = -0.7;
+  marker.pose.position = res.result_pose.position; 
+  text_marker.pose.position.y = 0.7;
   marker.pose.orientation.w = 1.0; 
   marker.scale.x = marker.scale.y = marker.scale.z = 0.02; text_marker.scale.z = 0.06;
   if(req.primmitive==GRASP)  marker.color.b = marker.color.a = 1.0; // BLUE for grasping
