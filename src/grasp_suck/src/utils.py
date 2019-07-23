@@ -6,9 +6,9 @@ from cv_bridge import CvBridge, CvBridgeError
 import sensor_msgs.point_cloud2 as pc2
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse
 
-workspace_limits = np.asarray([[-0.65, -0.30], [-0.23, 0.12], [-0.01, 0.2]])
-heightmap_resolution = 0.35/224
-angle_map = [np.radians(90), np.radians(45), np.radians(0), np.radians(-45)] # TODO: the angle mapping may not correct, should test!
+workspace_limits = np.asarray([[-0.659, -0.273], [-0.269, 0.117], [-0.01, 0.2]])
+heightmap_resolution = (workspace_limits[0][1]-workspace_limits[0][0])/224
+angle_map = [np.radians(0), np.radians(-45), np.radians(-90), np.radians(45)] # TODO: the angle mapping may not correct, should test!
 
 # cv bridge
 br = CvBridge()
@@ -55,19 +55,17 @@ def get_heightmap(pc, img_path, iteration):
 		color_heightmap[heightmap_y, heightmap_x, 1] = g
 		color_heightmap[heightmap_y, heightmap_x, 2] = r
 		depth_heightmap[heightmap_y, heightmap_x] = p[2]
-		z_bot = workspace_limits[2][0]
-		depth_heightmap = depth_heightmap - z_bot
-		#depth_heightmap[depth_heightmap<0] = 0
-		#depth_heightmap[depth_heightmap == -z_bot] = np.nan
 		points[heightmap_y, heightmap_x] = np.array([p[0], p[1], p[2]])
-	color_name = img_path + "color_{:06}.jpg".format(iteration)
-	depth_name = img_path + "depth_{:06}.png".format(iteration)
-	cv2.imwrite(color_name, color_heightmap)
+	z_bot = workspace_limits[2][0]
+	depth_heightmap = depth_heightmap - z_bot
+	depth_heightmap[depth_heightmap<0] = 0
 	depth_cp = np.copy(depth_heightmap)
-	depth_cp = depth_cp - np.min(depth_heightmap)
-	depth_cp[depth_cp<0] = 0
 	depth_cp = (depth_cp*1000).astype(np.uint16)
-	cv2.imwrite(depth_name, depth_heightmap)
+	#depth_heightmap[depth_heightmap == -z_bot] = np.nan
+	depth_name = img_path + "depth_{:06}.png".format(iteration)
+	cv2.imwrite(depth_name, depth_cp)
+	color_name = img_path + "color_{:06}.jpg".format(iteration)
+	cv2.imwrite(color_name, color_heightmap)
 	return color_heightmap, depth_heightmap, points
 
 # Draw symbols in the color image with different primitive
@@ -170,12 +168,22 @@ def grasp_only_policy(grasp_predictions):
 	angle = angle_map[pixel_index[0]]#np.radians(-90+45*pixel_index[0])
 	return pixel_index, angle
 
+'''
+   ____  _   _                   
+  / __ \| | | |                  
+ | |  | | |_| |__   ___ _ __ ___ 
+ | |  | | __| '_ \ / _ \ '__/ __|
+ | |__| | |_| | | |  __/ |  \__ \
+  \____/ \__|_| |_|\___|_|  |___/
+                                                               
+'''
+
 def standarization(suck_predictions, grasp_predictions):
-	mean = np.mean(suck_predictions)
-	std  = np.std(suck_predictions)
+	mean = np.nanmean(suck_predictions)
+	std  = np.nanstd(suck_predictions)
 	suck_predictions = (suck_predictions-mean)/std
 	for i in range(len(grasp_predictions)):
-		mean = np.mean(grasp_predictions[i])
-		std  = np.std(grasp_predictions[i])
+		mean = np.nanmean(grasp_predictions[i])
+		std  = np.nanstd(grasp_predictions[i])
 		grasp_predictions[i] = (grasp_predictions[i]-mean)/std
 	return suck_predictions, grasp_predictions

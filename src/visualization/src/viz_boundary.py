@@ -7,8 +7,8 @@ def main():
 	rospy.init_node("visual_boundary_node")
 	pub = rospy.Publisher("visual_boundary", Marker, queue_size=1)
 	marker = Marker()
-	p = [Point(-0.65, -0.23, -0.01), Point(-0.65,  0.12, -0.01), \
-		 Point(-0.30,  0.12, -0.01), Point(-0.30, -0.23, -0.01)]
+	p = [Point(-0.659, -0.269, 0.0), Point(-0.659,  0.117, 0.0), \
+		 Point(-0.273,  0.117, 0.0), Point(-0.273, -0.269, 0.0)]
 	marker.header.frame_id = "base_link"
 	marker.type = Marker.LINE_STRIP
 	marker.action = Marker.ADD
