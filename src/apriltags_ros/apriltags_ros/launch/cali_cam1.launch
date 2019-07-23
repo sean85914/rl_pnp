@@ -1,8 +1,8 @@
 <launch>
   <node pkg="apriltags_ros" type="apriltag_detector_node" name="apriltag_detector" output="screen" ns="detection1">
     <!-- Remap topic required by the node to custom topics -->
-    <remap from="image_rect" to="/camera1/color/image_raw" />
-    <remap from="camera_info" to="/camera1/color/camera_info" />
+    <remap from="image_rect" to="/camera/color/image_raw" />
+    <remap from="camera_info" to="/camera/color/camera_info" />
 
     <!-- Optional: Subscribe to the compressed stream-->
     <param name="image_transport" type="str" value="compressed" />
@@ -16,7 +16,7 @@
 
     <!-- Describe the tags -->
     <rosparam param="tag_descriptions">[
-      {id: 0, size: 0.045},
+      {id: 0, size: 0.044},
       {id: 1, size: 0.09}]
     </rosparam>
   </node>
