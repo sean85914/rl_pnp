@@ -55,8 +55,8 @@ class Helper_Services{
   ros::ServiceClient open_gripper;
   //ros::ServiceClient get_grasp_state;
   // Get reward
-  ros::ServiceClient set_prior;
-  ros::ServiceClient set_posterior;
+  //ros::ServiceClient set_prior;
+  //ros::ServiceClient set_posterior;
   ros::ServiceClient get_result;
   // Advertise services
   ros::ServiceServer service_home;
