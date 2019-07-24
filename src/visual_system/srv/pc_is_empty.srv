@@ -1,0 +1,3 @@
+sensor_msgs/PointCloud2 input_pc
+---
+std_msgs/Bool is_empty

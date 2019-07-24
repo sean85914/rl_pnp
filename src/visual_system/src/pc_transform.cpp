@@ -18,6 +18,7 @@
 #include <std_srvs/SetBool.h>
 #include <visual_system/get_xyz.h>
 #include <visual_system/get_pc.h>
+#include <visual_system/pc_is_empty.h>
 // MSG
 #include <geometry_msgs/Point.h>
 #include <sensor_msgs/Image.h>
@@ -36,7 +37,8 @@ const double Y_LOWER = -0.269f;
 const double Y_UPPER =  0.117f;
 const double Z_LOWER = -0.01f;
 const double Z_UPPER =  0.20f;
-const double Z_THRES = 0.02f;
+const double Z_THRES_LOWER = 0.01f;
+const double Z_THRES_UPPER = 0.20f;
 std::string frame_name;
 std::vector<double> intrinsic; // [fx, fy, cx, cy]
 cv::Rect myROI(X_MIN, Y_MIN, LENGTH, LENGTH); // deprecated
@@ -54,7 +56,8 @@ bool callback_service(visual_system::get_xyz::Request &req,
                       visual_system::get_xyz::Response &res);
 bool callback_get_pc(visual_system::get_pc::Request &req,
                      visual_system::get_pc::Response &res);
-bool callback_is_empty(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+//bool callback_is_empty(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res);
+bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::pc_is_empty::Response &res);
 
 int main(int argc, char** argv)
 {
@@ -62,7 +65,7 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "pixel_to_xyz");
   ros::NodeHandle nh, pnh("~");
   if(!pnh.getParam("verbose", verbose)) verbose = false;
-  if(!pnh.getParam("num_thres", num_thres)) num_thres = 120; // Points number greater than this value will be considered as not empty
+  if(!pnh.getParam("num_thres", num_thres)) num_thres = 7000; // Points number greater than this value will be considered as not empty
   if(verbose){
     ROS_WARN("Save pointcloud for debuging");
     std::string package_path = ros::package::getPath("grasp_suck");
@@ -220,6 +223,8 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_ms
   }
 }*/
 
+// FIXME
+/*
 bool callback_is_empty(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res){
   pcl::PassThrough<pcl::PointXYZRGB> pass;
   pcl::PointCloud<pcl::PointXYZRGB> pc_filtered;
@@ -231,6 +236,21 @@ bool callback_is_empty(std_srvs::SetBool::Request &req, std_srvs::SetBool::Respo
   //ROS_INFO("%d points after filtered.", (int)pc_filtered.points.size());
   if(pc_filtered.points.size()>num_thres) res.success = false; // Not empty
   else res.success = true; // Is empty
+  return true;
+}*/
+
+bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::pc_is_empty::Response &res)
+{
+  pcl::PointCloud<pcl::PointXYZRGB> pc, pc_filtered;
+  pcl::fromROSMsg(req.input_pc, pc);
+  pcl::PassThrough<pcl::PointXYZRGB> pass;
+  pass.setInputCloud(pc.makeShared());
+  pass.setFilterFieldName("z");
+  pass.setFilterLimits(Z_THRES_LOWER, Z_THRES_UPPER);
+  pass.filter(pc_filtered);
+  //ROS_INFO("%d -> %d", (int)pc.points.size(), (int)pc_filtered.points.size());
+  if(pc_filtered.points.size()<num_thres) res.is_empty.data = true;
+  else res.is_empty.data = false;
   return true;
 }
 

@@ -27,6 +27,7 @@ add_service_files(
   barcode_detect.srv
   get_xyz.srv
   get_pc.srv
+  pc_is_empty.srv
 )
 
 generate_messages(
@@ -68,6 +69,6 @@ target_link_libraries(take_picture ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 add_executable(save_all src/save_all.cpp)
 target_link_libraries(save_all ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
-add_executable(pixel_to_xyz src/pixel_to_xyz.cpp)
-add_dependencies(get_target_pc visual_system_gencpp)
-target_link_libraries(pixel_to_xyz ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+add_executable(pc_transform src/pc_transform.cpp)
+add_dependencies(pc_transform visual_system_gencpp)
+target_link_libraries(pc_transform ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
