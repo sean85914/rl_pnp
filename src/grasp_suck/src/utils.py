@@ -59,14 +59,15 @@ def get_heightmap(pc, img_path, iteration):
 	z_bot = workspace_limits[2][0]
 	depth_heightmap = depth_heightmap - z_bot
 	depth_heightmap[depth_heightmap<0] = 0
-	depth_cp = np.copy(depth_heightmap)
-	depth_cp = (depth_cp*1000).astype(np.uint16)
+	depth_img = np.copy(depth_heightmap)
+	depth_img = (depth_img*1000).astype(np.uint16)
+	depth_img_msg = br.cv2_to_imgmsg(depth_img)
 	#depth_heightmap[depth_heightmap == -z_bot] = np.nan
 	depth_name = img_path + "depth_{:06}.png".format(iteration)
-	cv2.imwrite(depth_name, depth_cp)
+	cv2.imwrite(depth_name, depth_img)
 	color_name = img_path + "color_{:06}.jpg".format(iteration)
 	cv2.imwrite(color_name, color_heightmap)
-	return color_heightmap, depth_heightmap, points
+	return color_heightmap, depth_heightmap, points, depth_img_msg
 
 # Draw symbols in the color image with different primitive
 def draw_image(image, primitive, pixel_index):

@@ -159,7 +159,7 @@ try:
 		#images = get_image()
 		#color, depth = utils.get_imgs_from_msg(images, image_path, iteration)
 		msg = get_pc()
-		color, depth, points = utils.get_heightmap(msg.pc, image_path, iteration)
+		color, depth, points, depthimg = utils.get_heightmap(msg.pc, image_path, iteration)
 		ts = time.time()
 		print "[%f]: Forward pass..." %(time.time()), 
 		sys.stdout.write('')
@@ -262,11 +262,15 @@ try:
 			action_list.append(-1)
 		target_list.append(pixel_index)
 		# Get action result
+		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc().pc, image_path + "next_", iteration)
+		
 		if is_valid:
 			if not action: # GRASP
-				action_success = grasp_state().success #and get_result(SetBoolRequest()).success 
+				#action_success = grasp_state().success #and get_result(SetBoolRequest()).success
+				# FIXME
 			else: # SUCK
-				action_success = get_result(SetBoolRequest()).success
+				#action_success = get_result(SetBoolRequest()).success
+				# FIXME
 		else:
 			action_success = False
 
@@ -287,7 +291,7 @@ try:
 					time.sleep(0.3)
 		# Get images after action and save
 		#next_color, next_depth = utils.get_imgs_from_msg(get_image(), image_path + "next_", iteration)
-		next_color, next_depth, next_points = utils.get_heightmap(get_pc().pc, image_path + "next_", iteration)
+		#next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc().pc, image_path + "next_", iteration)
 		ts = time.time()
 		#is_empty = empty_checker().success
 		is_empty = (num_of_items == 0)
