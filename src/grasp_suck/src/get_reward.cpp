@@ -1,6 +1,7 @@
 // C++ STL
 #include <iomanip>
 #include <sstream>
+#include <cassert>
 // Boost
 #include <boost/filesystem.hpp>
 // CV
@@ -8,37 +9,48 @@
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <cv_bridge/cv_bridge.h>
+// SRV
 #include <std_srvs/Empty.h>
 #include <std_srvs/SetBool.h>
+#include <grasp_suck/get_result.h>
+// MSG
 #include <sensor_msgs/Image.h>
-
 
 inline bool inRange(const int data, const int upper, const int lower){
   if(data>lower and data <upper) return true;
   else return false;
 }
 
+/*
 bool lock = false;
 bool prior_ready = false;
 bool post_ready  = false;
 int req_cnt = 0;
+*/
 int thres; // Number of huge change pixel greater than this number will be considered as success
+const int LENGTH = 224;
 const int UPPER  = -10; // 1 cm
 const int LOWER  = -100;  // 10 cm
+/*
 const int X_MIN  = 246;
 const int Y_MIN  = 93;
-const int LENGTH = 224;
+*/
 //std::string file_path = ros::package::getPath("grasp_suck") + "/images";
 
+/*
 cv::Mat prior, post;
 cv::Rect myROI(X_MIN, Y_MIN, LENGTH, LENGTH);
 cv_bridge::CvImagePtr cv_color_ptr, cv_depth_ptr;
+*/
 
 //void cb_color_img(const sensor_msgs::ImageConstPtr& msg);
+/*
 void cb_depth_img(const sensor_msgs::ImageConstPtr& msg);
 bool cb_prior(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 bool cb_post(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 bool cb_cal(std_srvs::SetBool::Request&, std_srvs::SetBool::Response&);
+*/
+bool cb_cal(grasp_suck::get_result::Request &req, grasp_suck::get_result::Response &res);
 
 int main(int argc, char** argv)
 {
@@ -47,15 +59,16 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "get_action_state");
   ros::NodeHandle pnh("~");
   if(!pnh.getParam("thres", thres)) thres = 180;
-  ros::ServiceServer setPriorServer = pnh.advertiseService("set_prior", cb_prior);
-  ros::ServiceServer setPosteriorServer = pnh.advertiseService("set_posterior", cb_post);
+  //ros::ServiceServer setPriorServer = pnh.advertiseService("set_prior", cb_prior);
+  //ros::ServiceServer setPosteriorServer = pnh.advertiseService("set_posterior", cb_post);
   ros::ServiceServer get_result = pnh.advertiseService("get_result", cb_cal);
-  ros::Subscriber sub_depth_img = pnh.subscribe("/camera/aligned_depth_to_color/image_raw", 1, cb_depth_img);
+  //ros::Subscriber sub_depth_img = pnh.subscribe("/camera/aligned_depth_to_color/image_raw", 1, cb_depth_img);
   //ros::Subscriber sub_color_img = pnh.subscribe("/camera/color/image_raw", 1, cb_color_img);
   ros::spin();
   return 0;
 }
 
+/*
 void cb_depth_img(const sensor_msgs::ImageConstPtr& msg){
   try{
     cv_depth_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
@@ -64,6 +77,7 @@ void cb_depth_img(const sensor_msgs::ImageConstPtr& msg){
     ROS_ERROR("cv_bridge exception: %s", e.what()); return;
   }
 }
+*/
 
 /*void cb_color_img(const sensor_msgs::ImageConstPtr& msg){
   try{
@@ -73,6 +87,7 @@ void cb_depth_img(const sensor_msgs::ImageConstPtr& msg){
   }
 }*/
 
+/*
 bool cb_prior(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   if(lock){
     prior = cv_depth_ptr->image(myROI);
@@ -81,7 +96,9 @@ bool cb_prior(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
     return true;
   }
 }
+*/
 
+/*
 bool cb_post(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   if(!prior_ready) {ROS_INFO("Prior not ready yet!"); return false;}
   if(lock){
@@ -91,7 +108,9 @@ bool cb_post(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
     return true;
   }
 }
+*/
 
+/*
 bool cb_cal(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res){
   if(prior_ready and post_ready){
     int cnt = 0;
@@ -112,4 +131,26 @@ bool cb_cal(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res){
     ROS_WARN("Image not ready yet!");
     return false;
   }
+}
+*/
+
+bool cb_cal(grasp_suck::get_result::Request &req, grasp_suck::get_result::Response &res)
+{
+  cv_bridge::CvImagePtr prior_depth, post_depth;
+  prior_depth = cv_bridge::toCvCopy(req.prior, sensor_msgs::image_encodings::TYPE_16UC1);
+  post_depth  = cv_bridge::toCvCopy(req.post,  sensor_msgs::image_encodings::TYPE_16UC1);
+  assert(prior_depth->image.cols == LENGTH);
+  int cnt = 0;
+  for(int y=0; y<prior_depth->image.cols; ++y){
+    for(int x=0; x<prior_depth->image.rows; ++x){
+      int prior_val = prior_depth->image.at<unsigned short>(cv::Point(x, y)),
+          post_val  = post_depth->image.at<unsigned short>(cv::Point(x, y)),
+          diff = post_val - prior_val; // Stands `height from plane`
+      if(inRange(diff, UPPER, LOWER)) {++cnt;}
+    }
+  }
+  ROS_INFO("\033[1;33mNumber of difference Pixel: %d\033[0m", cnt);
+  if(cnt>thres) {ROS_INFO("\033[1;32mMOVED\033[0m"); res.result.data = true;}
+  else {ROS_INFO("\033[1;32mNO MOVED\033[0m"); res.result.data=false;}
+  return true;
 }

@@ -1,0 +1,4 @@
+sensor_msgs/Image prior
+sensor_msgs/Image post
+---
+std_msgs/Bool result

@@ -23,12 +23,14 @@ find_package(OpenCV REQUIRED)
 add_service_files(
   FILES
   get_pose.srv
+  get_result.srv
 )
 
 generate_messages(
   DEPENDENCIES
   std_msgs
   geometry_msgs
+  sensor_msgs
 )
 
 catkin_package(
