@@ -92,7 +92,7 @@ int main(int argc, char** argv)
                                    sensor_msgs::CameraInfo> MySyncPolicy;
   message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), color_image_sub, depth_image_sub, info_sub);
   sync.registerCallback(boost::bind(&callback_sub, _1, _2, _3));
-  ros::ServiceServer service = pnh.advertiseService("pixel_to_xyz", callback_service);
+  //ros::ServiceServer service = pnh.advertiseService("pixel_to_xyz", callback_service);
   //ros::ServiceServer image_service = pnh.advertiseService("get_image", callback_get_image);
   ros::ServiceServer pc_service = pnh.advertiseService("get_pc", callback_get_pc);
   ros::ServiceServer check_empty_service = pnh.advertiseService("empty_state", callback_is_empty);
@@ -234,6 +234,7 @@ bool callback_is_empty(std_srvs::SetBool::Request &req, std_srvs::SetBool::Respo
   return true;
 }
 
+/*
 bool callback_service(visual_system::get_xyz::Request  &req,
                       visual_system::get_xyz::Response &res){
   geometry_msgs::Point p;
@@ -273,6 +274,7 @@ Response: point(%f, %f, %f)",
   }
   return true;
 }
+*/
 
 bool callback_get_pc(visual_system::get_pc::Request &req, 
                      visual_system::get_pc::Response &res)
