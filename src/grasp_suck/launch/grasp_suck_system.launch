@@ -23,7 +23,7 @@
   <node pkg="grasp_suck" type="robotiq_gripper_control" name="robotiq_finger_control_node" output="screen" required="true"/>
   <!-- Visual System -->
   <!-- Convert pixel to xyz coord. w.r.t. camera_color_optical_frame -->
-  <node pkg="visual_system" type="pixel_to_xyz" name="pixel_to_xyz" output="screen" required="true">
+  <node pkg="visual_system" type="pc_transform" name="pc_transform" output="screen" required="true">
     <param name="verbose" value="true"/>
     <remap from="camera/color/image_raw" to="/camera1/color/image_raw"/>
     <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
@@ -34,7 +34,7 @@
   </node>
   <!-- Get reward based on consecutive depth images -->
   <node pkg="grasp_suck" type="get_reward" name="get_reward" output="screen" required="true">
-    <param name="thres" value="550"/>
+    <param name="thres" value="250"/>
     <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
   </node> 
   <!-- High-level Control -->
