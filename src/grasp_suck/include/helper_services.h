@@ -1,5 +1,7 @@
 #ifndef HELPER_SERVICES_H_
 #define HELPRR_SERVICES_H_
+// C++ STL
+#include <cassert>
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
 // MSG
@@ -10,6 +12,8 @@
 #include <std_srvs/Empty.h>
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
+// Get result of action
+#include <grasp_suck/get_result.h>
 // Get target pose in robot arm frame
 #include <grasp_suck/get_pose.h>
 // Robot arm control
