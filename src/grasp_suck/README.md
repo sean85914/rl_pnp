@@ -51,9 +51,9 @@ The system is start with <code>item = N</code> and the process stop when <code>i
 | /ur5_control_server/ur_control/goto_joint_pose | arm_operation/joint_pose | Go to user given joint pose |
 | /ur5_control_server/ur_control/goto_pose | arm_operation/target_pose | Go to user given cartesian pose | 
 |<tr><td colspan=3><p align="center">**Visual Related**</p></td></tr>|
-| /get_reward/set_prior | std_srvs/Empty | Set depth image before action |
-| /get_reward/set_posterior | std_srvs/Empty | Set depth image after action |
-| /get_reward/get_result | std_srvs/SetBool | Get result of action |
+| ~~/get_reward/set_prior~~ | ~~std_srvs/Empty~~ | ~~Set depth image before action~~ |
+| ~~/get_reward/set_posterior~~ | ~~std_srvs/Empty~~ | ~~Set depth image after action~~ |
+| /get_reward/get_result | visual_system/get_result | Get result of action |
 | ~~/pixel_to_xyz/get_image~~ | ~~visual_system/get_image~~ | ~~Return cropped color and depth images~~ |
 | ~~/pixel_to_xyz/pixel_to_xyz~~ | ~~visual_system/get_xyz~~ | ~~Return 3D coordinate with request pixel in color_optical_frame~~ |
 | /pixel_to_xyz/get_pc | visual_system/get_pc | Get pointcloud inside the workspace with coordinate of robot arm |
