@@ -120,9 +120,9 @@ go_home     = rospy.ServiceProxy('/helper_services_node/robot_go_home', Empty)
 go_place    = rospy.ServiceProxy('/helper_services_node/robot_goto_place', Empty)
 
 # pixel_to_xyz
-pixel_to_xyz  = rospy.ServiceProxy('/pixel_to_xyz/pixel_to_xyz', get_xyz)
-get_pc        = rospy.ServiceProxy('/pixel_to_xyz/get_pc', get_pc)
-empty_checker = rospy.ServiceProxy('/pixel_to_xyz/empty_state', SetBool)
+#pixel_to_xyz  = rospy.ServiceProxy('/pixel_to_xyz/pixel_to_xyz', get_xyz)
+get_pc_client = rospy.ServiceProxy('/pc_transform/pc_transform', get_pc)
+empty_checker = rospy.ServiceProxy('/pc_transform/empty_state', SetBool)
 
 # Result list
 action_list  = []
@@ -158,7 +158,7 @@ try:
 		# Get color and depth images in ROS format, convert to cv2 and save
 		#images = get_image()
 		#color, depth = utils.get_imgs_from_msg(images, image_path, iteration)
-		msg = get_pc()
+		msg = get_pc_client()
 		color, depth, points, depthimg = utils.get_heightmap(msg.pc, image_path, iteration)
 		ts = time.time()
 		print "[%f]: Forward pass..." %(time.time()), 
@@ -262,7 +262,7 @@ try:
 			action_list.append(-1)
 		target_list.append(pixel_index)
 		# Get action result
-		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc().pc, image_path + "next_", iteration)
+		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc_client().pc, image_path + "next_", iteration)
 		
 		if is_valid:
 			if not action: # GRASP
@@ -291,7 +291,7 @@ try:
 					time.sleep(0.3)
 		# Get images after action and save
 		#next_color, next_depth = utils.get_imgs_from_msg(get_image(), image_path + "next_", iteration)
-		#next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc().pc, image_path + "next_", iteration)
+		#next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc_client().pc, image_path + "next_", iteration)
 		ts = time.time()
 		#is_empty = empty_checker().success
 		is_empty = (num_of_items == 0)
