@@ -47,11 +47,11 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   /*while(!ros::service::waitForService("/robotiq_finger_control_node/get_grasp_state", ros::Duration(3.0))) {ROS_WARN("Try to connect to get_grasp_state service...");}
   get_grasp_state = pnh.serviceClient<std_srvs::Trigger>("/robotiq_finger_control_node/get_grasp_state");*/
   // set_prior
-  while(!ros::service::waitForService("/get_reward/set_prior", ros::Duration(3.0))) {ROS_WARN("Try to connect to set_prior service...");}
-  set_prior = pnh.serviceClient<std_srvs::Empty>("/get_reward/set_prior");
+  //while(!ros::service::waitForService("/get_reward/set_prior", ros::Duration(3.0))) {ROS_WARN("Try to connect to set_prior service...");}
+  //set_prior = pnh.serviceClient<std_srvs::Empty>("/get_reward/set_prior");
   // set_posterior
-  while(!ros::service::waitForService("/get_reward/set_posterior", ros::Duration(3.0))) {ROS_WARN("Try to connect to set_posterior service...");}
-  set_posterior = pnh.serviceClient<std_srvs::Empty>("/get_reward/set_posterior");
+  //while(!ros::service::waitForService("/get_reward/set_posterior", ros::Duration(3.0))) {ROS_WARN("Try to connect to set_posterior service...");}
+  //set_posterior = pnh.serviceClient<std_srvs::Empty>("/get_reward/set_posterior");
   // get_result
   while(!ros::service::waitForService("/get_reward/get_result", ros::Duration(3.0))) {ROS_WARN("Try to connect to get_result service...");}
   get_result = pnh.serviceClient<std_srvs::SetBool>("/get_reward/get_result");
@@ -87,7 +87,7 @@ bool Helper_Services::go_home_service_callback(std_srvs::Empty::Request &req, st
   ROS_INFO("UR5 goto home");
   robot_arm_goto_joint.call(myJointReq);
   std_srvs::Empty empty_req;
-  set_posterior.call(empty_req);
+  //set_posterior.call(empty_req);
   return true;
 }
 
@@ -158,7 +158,7 @@ bool Helper_Services::go_target_service_callback(
 {
   std_srvs::Empty empty_req;
   // Set prior depth image
-  set_prior.call(empty_req);
+  //set_prior.call(empty_req);
   tf::TransformListener listener;
   ROS_INFO("\nReceive new request: ");
   if(req.primmitive==GRASP){ // Grasp
