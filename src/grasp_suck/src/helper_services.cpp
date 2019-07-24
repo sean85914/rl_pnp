@@ -54,21 +54,22 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   //set_posterior = pnh.serviceClient<std_srvs::Empty>("/get_reward/set_posterior");
   // get_result
   while(!ros::service::waitForService("/get_reward/get_result", ros::Duration(3.0))) {ROS_WARN("Try to connect to get_result service...");}
-  get_result = pnh.serviceClient<std_srvs::SetBool>("/get_reward/get_result");
+  get_result = pnh.serviceClient<grasp_suck::get_result>("/get_reward/get_result");
   // Advertise service server
   // go home
-  if(define_home) service_home = pnh.advertiseService("robot_go_home", 
-                                                      &Helper_Services::go_home_service_callback, 
-                                                      this);
+  assert(define_home);
+  service_home = pnh.advertiseService("robot_go_home", 
+                                      &Helper_Services::go_home_service_callback, 
+                                      this);
   // go to placing
-  if(define_place) service_place = pnh.advertiseService("robot_goto_place", 
-                                                        &Helper_Services::go_place_service_callback, 
-                                                        this);
+  assert(define_place);
+  service_place = pnh.advertiseService("robot_goto_place", 
+                                       &Helper_Services::go_place_service_callback, 
+                                       this);
   service_goto_target = pnh.advertiseService("goto_target", 
                                              &Helper_Services::go_target_service_callback, 
                                              this);
   ROS_INFO("\033[1;37mNode ready\033[0m");
-  // TODO: add a service to check if suck succeed
 }
 
 /*
@@ -163,7 +164,7 @@ bool Helper_Services::go_target_service_callback(
   ROS_INFO("\nReceive new request: ");
   if(req.primmitive==GRASP){ // Grasp
     last_motion = GRASP;
-    printf("Motion primmitive: \033[1;32mgrasp\033[0m\n");
+    printf("Motion primitive: \033[1;32mgrasp\033[0m\n");
     printf("Position in hand frame: (%f, %f, %f)\n", req.point_in_hand.x, req.point_in_hand.y, req.point_in_hand.z);
     printf("Yaw: \n[radian] %f\n[Degree] %f\n", req.yaw, req.yaw*180.0/M_PI);
   } else{ // Suck
@@ -171,7 +172,7 @@ bool Helper_Services::go_target_service_callback(
     // Extend the pheumatic first
     std_srvs::SetBool extend_cmd; extend_cmd.request.data = true;
     pheumatic_control.call(extend_cmd);
-    printf("Motion primmitive: \033[1;32msuck\033[0m\n");
+    printf("Motion primitive: \033[1;32msuck\033[0m\n");
     printf("Position in hand frame: (%f, %f, %f)\n", req.point_in_hand.x, req.point_in_hand.y, req.point_in_hand.z);
   }
   /*std::string des_frame = (arm_prefix==""?"base_link":arm_prefix+"_base_link");
