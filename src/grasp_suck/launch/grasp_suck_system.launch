@@ -34,7 +34,7 @@
   </node>
   <!-- Get reward based on consecutive depth images -->
   <node pkg="grasp_suck" type="get_reward" name="get_reward" output="screen" required="true">
-    <param name="thres" value="200"/>
+    <param name="thres" value="550"/>
     <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
   </node> 
   <!-- High-level Control -->
