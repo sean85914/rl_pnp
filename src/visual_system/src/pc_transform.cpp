@@ -47,7 +47,7 @@ cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
 Eigen::Matrix4f arm2cam_tf;
 pcl::PointCloud<pcl::PointXYZRGB> pc;
 pcl::PassThrough<pcl::PointXYZRGB> pass_x, pass_y, pass_z;
-ros::Publisher pub_pc, pub_color, pub_depth, pub_marker, pub_text_marker;
+ros::Publisher pub_pc, pub_color, pub_depth, /*pub_marker, pub_text_marker*/;
 
 Eigen::Matrix4f lookup_transform(void);
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, \
@@ -75,8 +75,8 @@ int main(int argc, char** argv)
     //pub_pc = pnh.advertise<sensor_msgs::PointCloud2>("point_cloud", 1);
     //pub_color = pnh.advertise<sensor_msgs::Image>("crop_color", 1);
     //pub_depth = pnh.advertise<sensor_msgs::Image>("crop_depth", 1);
-    pub_marker = pnh.advertise<visualization_msgs::Marker>("marker", 1);
-    pub_text_marker = pnh.advertise<visualization_msgs::Marker>("text_marker", 1);
+    //pub_marker = pnh.advertise<visualization_msgs::Marker>("marker", 1);
+    //pub_text_marker = pnh.advertise<visualization_msgs::Marker>("text_marker", 1);
   }
   else
     ROS_WARN("Not save pointcloud");
