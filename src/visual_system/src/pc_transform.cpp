@@ -47,7 +47,7 @@ cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
 Eigen::Matrix4f arm2cam_tf;
 pcl::PointCloud<pcl::PointXYZRGB> pc;
 pcl::PassThrough<pcl::PointXYZRGB> pass_x, pass_y, pass_z;
-ros::Publisher pub_pc, pub_color, pub_depth, /*pub_marker, pub_text_marker*/;
+ros::Publisher pub_pc, pub_color, pub_depth/*, pub_marker, pub_text_marker*/;
 
 Eigen::Matrix4f lookup_transform(void);
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, \
