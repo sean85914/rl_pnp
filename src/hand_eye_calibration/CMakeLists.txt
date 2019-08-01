@@ -36,4 +36,7 @@ target_link_libraries(cam_on_hand_calibration ${catkin_LIBRARIES})
 add_executable(get_transform src/get_transform.cpp)
 target_link_libraries(get_transform ${Eigen3_LIBRARIES} ${catkin_LIBRARIES})
 
+add_executable(eyes_calibration src/eyes_calibration.cpp)
+target_link_libraries(eyes_calibration ${catkin_LIBRARIES})
+
 
