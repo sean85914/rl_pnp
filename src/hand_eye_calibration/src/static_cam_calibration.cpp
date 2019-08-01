@@ -64,6 +64,7 @@ class calibration{
       ROS_ERROR("%s", ex.what());
       return 0;
     }
+    ROS_INFO("Eye coord.: %f, %f, %f", t.getOrigin().getX(), t.getOrigin().getY(), t.getOrigin().getZ());
     return 1;
   }
   /*
@@ -74,12 +75,14 @@ class calibration{
    */
   bool get_arm_data(tf::StampedTransform &t, std::string target){
     try{
-      listener.waitForTransform("base_link", target, ros::Time(0), ros::Duration(0.5));
+      listener.waitForTransform("base_link", target, ros::Time(0), ros::Duration(2.0));
       listener.lookupTransform("base_link", target, ros::Time(0), t);
     } catch(tf::TransformException ex){
       ROS_ERROR("%s", ex.what());
       return 0;
     }
+    if(target=="fake_tcp")
+      ROS_INFO("Hand coord.: %f, %f, %f", t.getOrigin().getX(), t.getOrigin().getY(), t.getOrigin().getZ());
     return 1;
   }
   /*
