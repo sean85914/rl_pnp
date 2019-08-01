@@ -109,7 +109,7 @@ class Trainer(object):
         
     def get_label_value(self, primitive, action_success, next_color, next_depth, is_empty):
         # Compute current reward
-        current_reward = 0
+        current_reward = -2.0
         if primitive == "grasp":
             if action_success:
                 current_reward = self.grasp_rewards
@@ -117,7 +117,7 @@ class Trainer(object):
             if action_success:
                 current_reward = self.suck_rewards
         if primitive == "invalid":
-            current_reward = -0.5
+            current_reward = -4.0
         # Compute future reward
         ''' Double DQN '''
         next_suck_predictions, next_grasp_predictions, next_state_feat = self.forward(next_color, next_depth, is_volatile=True)

@@ -15,7 +15,8 @@ from trainer import Trainer
 # SRV
 from std_srvs.srv import Empty, SetBool, SetBoolRequest, SetBoolResponse, \
                          Trigger, TriggerRequest, TriggerResponse
-from grasp_suck.srv import get_pose, get_poseRequest, get_poseResponse
+from grasp_suck.srv import get_pose, get_poseRequest, get_poseResponse, \
+                           get_result, get_resultRequest, get_resultResponse
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
                               get_xyz, get_xyzRequest, get_xyzResponse
 from vacuum_conveyor_control.srv import vacuum_control, vacuum_controlRequest
@@ -26,9 +27,9 @@ parser.add_argument("--force_cpu",  action="store_true",  default=False, help="T
 parser.add_argument("--grasp_only", action="store_true",  default=False, help="True if using grasp-only policy, default is false")
 parser.add_argument("--model",         type=str,          default="",    help="If provided, continue training the model or using this model for testing, default is empty string")
 parser.add_argument("--episode",       type=int,          default=0,     help="Which episode is this run, default is 0")
-parser.add_argument("--num_of_items",  type=int,          default=5,     help="Number of items in the workspace, default is 5")
+parser.add_argument("--num_of_items",  type=int,          default=10,     help="Number of items in the workspace, default is 10")
 parser.add_argument("--epsilon",       type=float,        default=0.7,   help="Probability to do random action, default is 0.7")
-parser.add_argument("--update_target", type=int,          default=10,    help="After how much iterations should update target network")
+parser.add_argument("--update_target", type=int,          default=3,    help="After how much iterations should update target network")
 args = parser.parse_args()
 
 # Parameter
@@ -39,8 +40,8 @@ epsilon      = None
 iteration    = 0
 episode      = args.episode
 # Reward
-suck_reward  = 1
-grasp_reward = 1
+suck_reward  = 2.0
+grasp_reward = 2.0
 discount     = 0.5
 Z_THRES      = 0.02
 num_of_items = args.num_of_items  # Number of items when start
@@ -110,9 +111,10 @@ pheumatic         = rospy.ServiceProxy('/arduino_control/pheumatic_control', Set
 vacuum            = rospy.ServiceProxy('/arduino_control/vacuum_control', vacuum_control)
 
 # Get reward
-set_prior_img     = rospy.ServiceProxy('/get_reward/set_prior', Empty)
-set_posterior_img = rospy.ServiceProxy('/get_reward/set_posterior', Empty)
-get_result        = rospy.ServiceProxy('/get_reward/get_result', SetBool)
+#set_prior_img     = rospy.ServiceProxy('/get_reward/set_prior', Empty)
+#set_posterior_img = rospy.ServiceProxy('/get_reward/set_posterior', Empty)
+#get_result        = rospy.ServiceProxy('/get_reward/get_result', SetBool)
+get_result         = rospy.ServiceProxy('/get_reward/get_result', get_result)
 
 # Helper
 goto_target = rospy.ServiceProxy('/helper_services_node/goto_target', get_pose)
@@ -121,7 +123,7 @@ go_place    = rospy.ServiceProxy('/helper_services_node/robot_goto_place', Empty
 
 # pixel_to_xyz
 #pixel_to_xyz  = rospy.ServiceProxy('/pixel_to_xyz/pixel_to_xyz', get_xyz)
-get_pc_client = rospy.ServiceProxy('/pc_transform/pc_transform', get_pc)
+get_pc_client = rospy.ServiceProxy('/pc_transform/get_pc', get_pc)
 empty_checker = rospy.ServiceProxy('/pc_transform/empty_state', SetBool)
 
 # Result list
@@ -159,7 +161,7 @@ try:
 		#images = get_image()
 		#color, depth = utils.get_imgs_from_msg(images, image_path, iteration)
 		msg = get_pc_client()
-		color, depth, points, depthimg = utils.get_heightmap(msg.pc, image_path, iteration)
+		color, depth, points, depth_img = utils.get_heightmap(msg.pc, image_path, iteration)
 		ts = time.time()
 		print "[%f]: Forward pass..." %(time.time()), 
 		sys.stdout.write('')
@@ -213,7 +215,7 @@ try:
 		vis_name = vis_path + "vis_{:06}.jpg".format(iteration)
 		cv2.imwrite(vis_name, visual_img)
 
-		set_prior_img()
+		#set_prior_img()
 		'''getXYZ = get_xyzRequest()
 		getXYZ.point[0] = pixel_index[2] # X
 		getXYZ.point[1] = pixel_index[1] # Y
@@ -226,7 +228,7 @@ try:
 		# 1. NaN point
 		# 2. Point with z too far, which presents the plane of convayor
 		# TODO 3. Gripper collision with object
-		print "###### %f ######" %points[pixel_index[1], pixel_index[2], 2]
+		print "###### [%f, %f, %f] ######" %(points[pixel_index[1], pixel_index[2], 0], points[pixel_index[1], pixel_index[2], 1], points[pixel_index[1], pixel_index[2], 2])
 		if np.isnan(points[pixel_index[1], pixel_index[2], 0]) or \
 		   np.isnan(points[pixel_index[1], pixel_index[2], 1]) or \
 		   np.isnan(points[pixel_index[1], pixel_index[2], 2]) or \
@@ -263,14 +265,14 @@ try:
 		target_list.append(pixel_index)
 		# Get action result
 		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc_client().pc, image_path + "next_", iteration)
-		
+		action_result_req = get_resultRequest(depth_img, next_depth_img)
 		if is_valid:
 			if not action: # GRASP
 				#action_success = grasp_state().success #and get_result(SetBoolRequest()).success
-				# FIXME
+				action_success = grasp_state().success #or get_result(action_result_req).result.data
 			else: # SUCK
 				#action_success = get_result(SetBoolRequest()).success
-				# FIXME
+				action_success = get_result(action_result_req).result.data
 		else:
 			action_success = False
 
