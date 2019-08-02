@@ -10,7 +10,9 @@ const int MIN_DATA_AMOUNT = 4; // At least 4 data points is required
  *  Get transformation from two point sets in given file using point registration for hand-eye calibration
  *  
  *  Editor: Sean Lu
- *  Last edited: 6/24, 2019
+ *  Last edited: 8/2, 2019
+ *  Changelog:
+ *    2019/8/2: fix matrix multiplication error, ignore empty lines, exist if too few data points
  */
 
 /*
