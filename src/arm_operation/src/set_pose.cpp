@@ -14,7 +14,7 @@
  *   ~file_name: file name with extension
  * Last modify: 7/28, 2019
  * Changelog:
- *  7/28: revise hardcoded service name and add robot choosing parameter, abort invalid files
+ *  7/28: revise hardcoded service name and add robot choosing parameter, abort invalid files, enlarge queue size
  * Editor: Sean
  */
 
@@ -81,7 +81,7 @@ class GoToWP {
   }
  public:
   GoToWP(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
-    sub_index = pnh_.subscribe("index_to_go", 1, &GoToWP::cbCallback, this);
+    sub_index = pnh_.subscribe("index_to_go", 10, &GoToWP::cbCallback, this);
     if(!pnh_.getParam("type", type)) {type=true;}
     ROS_INFO("%s", (type==0?"Use UR3":"Use UR5"));
     service_name = "/ur" + std::to_string((type==0?3:5)) + "_control_server/ur_control/goto_joint_pose";
