@@ -5,8 +5,9 @@
 #include <Eigen/Dense> // Eigen core, SVD
 #include <tf/tf.h> // Transformation
 
+const int MIN_DATA_AMOUNT = 4; // At least 4 data points is required
 /*
- *  Get transformation from two point sets in given file using ICP for hand-eye calibration
+ *  Get transformation from two point sets in given file using point registration for hand-eye calibration
  *  
  *  Editor: Sean Lu
  *  Last edited: 6/24, 2019
@@ -71,7 +72,11 @@ bool parse_file(char *file, Eigen::MatrixXf &target, Eigen::MatrixXf &source){
     printf("\033[1;31mCannot open file! Abort...\n\033[0m");
     return 0;
   }
-  while(std::getline(f, line)) ++count;
+  while(std::getline(f, line)) {if(!line.empty()) ++count; else {printf("\033[1;33mGot empty line, ignore...\033[0m\n");}}
+  if(count<MIN_DATA_AMOUNT) {
+    printf("\033[1;31mNot enough data points, at least four is required! Existing...\033[0m\n"); 
+    return 0;
+  }
   target = Eigen::MatrixXf(count, 3);
   source = Eigen::MatrixXf(count, 3);
   // return the cursor to the begining of the file
@@ -132,29 +137,31 @@ void compute(Eigen::MatrixXf &target, Eigen::MatrixXf &source, tf::Transform &t)
   // Eigen::Matrix4f
   Eigen::Matrix4f homo = Eigen::Matrix4f::Zero();
   homo.block<3, 3>(0, 0) = R; homo.block<3, 1>(0, 3) = trans; homo(3, 3) = 1.0;
-  std::cout << "Homogeneous transformation matrix: \n" << homo << "\n";
-  double err_square = 0.0f;
+  std::cout.setf(std::ios::showpoint); std::cout.setf(std::ios::fixed, std::ios::floatfield);
+  std::cout << "Homogeneous transformation matrix: \n" << std::setprecision(6) << homo << "\n";
+  std::cout << "----------------------------------------------------\n";
+  double sum_err_square = 0.0f;
   Eigen::MatrixXf source_transformed(target.rows(), 3);
   std::cout << "Registration error: \n";
   for(int i=0; i<target.rows(); ++i){
     for(int j=0; j<3; ++j){
-      source_transformed(i, j) = R(j, 0)*source(i, j) + R(j, 1)*source(i, j) + R(j, 2)*source(i, j) + trans(j);
+      source_transformed(i, j) = R(j, 0)*source(i, 0) + R(j, 1)*source(i, 1) + R(j, 2)*source(i, 2) + trans(j);
     }
   }
   for(int i=0; i<target.rows(); ++i){
     std::cout.setf(std::ios::showpoint); std::cout.setf(std::ios::fixed, std::ios::floatfield);
-    std::cout << std::setprecision(3) 
-              << "[" << source(i, 0) << ", " << source(i, 1) << ", " << source(i, 2) << "] -> " 
-              << "[" << source_transformed(i, 0) << ", " << source_transformed(i, 1) << ", " << source_transformed(i, 2) << "]: "
-              << "[" << target(i, 0) << ", " << target(i, 1) << ", " << target(i, 2) << "]" << "  Error: ";
+    std::cout << std::setprecision(6) 
+              << "[" << source(i, 0) << ", " << source(i, 1) << ", " << source(i, 2) << "]\t -> " 
+              << "[" << source_transformed(i, 0) << ", " << source_transformed(i, 1) << ", " << source_transformed(i, 2) << "]: \t"
+              << "[" << target(i, 0) << ", " << target(i, 1) << ", " << target(i, 2) << "]" << " \tError: ";
     double err_x = target(i, 0) - source_transformed(i, 0);
     double err_y = target(i, 1) - source_transformed(i, 1);
     double err_z = target(i, 2) - source_transformed(i, 2);
     double term_err = err_x*err_x + err_y*err_y + err_z*err_z;
     std::cout << term_err << "\n";
-    err_square += term_err;
+    sum_err_square += term_err;
   }
-  std::cout << "Overall error: " << err_square << "\n";
+  std::cout << "\n\nMSE: " << sum_err_square/target.rows() << "\n";
 }
 
 bool get_best_transformation(char* file, tf::Transform& t){
