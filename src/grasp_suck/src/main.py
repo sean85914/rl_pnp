@@ -18,8 +18,10 @@ from std_srvs.srv import Empty, SetBool, SetBoolRequest, SetBoolResponse, \
 from grasp_suck.srv import get_pose, get_poseRequest, get_poseResponse, \
                            get_result, get_resultRequest, get_resultResponse
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
-                              get_xyz, get_xyzRequest, get_xyzResponse
+                              get_xyz, get_xyzRequest, get_xyzResponse, \
+                              pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse
 from vacuum_conveyor_control.srv import vacuum_control, vacuum_controlRequest
+from visualization.srv import viz_marker, viz_markerRequest, viz_markerResponse
 
 parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="pick and place by trial and error using DQN")
 parser.add_argument("--is_testing", action="store_true",  default=False, help="True if testing, default is false")
@@ -32,6 +34,8 @@ parser.add_argument("--epsilon",       type=float,        default=0.7,   help="P
 parser.add_argument("--update_target", type=int,          default=3,    help="After how much iterations should update target network")
 args = parser.parse_args()
 
+utils.show_args(args)
+
 # Parameter
 testing      = args.is_testing
 grasp_only   = args.grasp_only
@@ -43,7 +47,7 @@ episode      = args.episode
 suck_reward  = 2.0
 grasp_reward = 2.0
 discount     = 0.5
-Z_THRES      = 0.02
+Z_THRES      = 0.01
 num_of_items = args.num_of_items  # Number of items when start
 init_num     = num_of_items
 cnt_invalid  = 0 # Consecutive invalid action counter
@@ -68,6 +72,7 @@ csv_path   =  package_path + logger_dir
 image_path =  package_path + logger_dir + 'images/'
 mixed_path =  package_path + logger_dir + 'mixed_img/'
 feat_path  =  package_path + logger_dir + 'feat/'
+pc_path    =  package_path + logger_dir + 'pc/'
 grasp_path = [feat_path + 'rotate_idx_0/',
               feat_path + 'rotate_idx_1/',
               feat_path + 'rotate_idx_2/',
@@ -89,6 +94,8 @@ if not os.path.exists(vis_path):
 for i in range(5):
 	if not os.path.exists(grasp_path[i]):
 		os.makedirs(grasp_path[i])
+if not os.path.exists(pc_path):
+	os.makedirs(pc_path)
 
 # trainer
 trainer = Trainer(suck_reward, grasp_reward, discount, testing, use_cpu)
@@ -107,13 +114,11 @@ if args.model != "":
 # Gripper
 open_gripper      = rospy.ServiceProxy('/robotiq_finger_control_node/open_gripper', Empty)
 grasp_state       = rospy.ServiceProxy('/robotiq_finger_control_node/get_grasp_state', Trigger)
+initial_gripper   = rospy.ServiceProxy('/robotiq_finger_control_node/initial_gripper', Empty)
 pheumatic         = rospy.ServiceProxy('/arduino_control/pheumatic_control', SetBool)
 vacuum            = rospy.ServiceProxy('/arduino_control/vacuum_control', vacuum_control)
 
 # Get reward
-#set_prior_img     = rospy.ServiceProxy('/get_reward/set_prior', Empty)
-#set_posterior_img = rospy.ServiceProxy('/get_reward/set_posterior', Empty)
-#get_result        = rospy.ServiceProxy('/get_reward/get_result', SetBool)
 get_result         = rospy.ServiceProxy('/get_reward/get_result', get_result)
 
 # Helper
@@ -122,9 +127,11 @@ go_home     = rospy.ServiceProxy('/helper_services_node/robot_go_home', Empty)
 go_place    = rospy.ServiceProxy('/helper_services_node/robot_goto_place', Empty)
 
 # pixel_to_xyz
-#pixel_to_xyz  = rospy.ServiceProxy('/pixel_to_xyz/pixel_to_xyz', get_xyz)
 get_pc_client = rospy.ServiceProxy('/pc_transform/get_pc', get_pc)
-empty_checker = rospy.ServiceProxy('/pc_transform/empty_state', SetBool)
+empty_checker = rospy.ServiceProxy('/pc_transform/empty_state', pc_is_empty)
+
+# Visualization
+viz = rospy.ServiceProxy('/viz_marker_node/viz_marker', viz_marker)
 
 # Result list
 action_list  = []
@@ -145,22 +152,23 @@ f = open(curve_file, "w")
 
 print "Initializing..."
 go_home()
+initial_gripper()
 open_gripper()
 pheumatic(SetBoolRequest(False))
 vacuum(vacuum_controlRequest(0))
 
+is_empty = False
 total_time = 0.0
 
 try:
-	#while empty_checker().success is not True:
-	while num_of_items is not 0:
+	while is_empty is not True:
+	#while num_of_items is not 0:
 		print "\033[0;31;46mIteration: {}\033[0m".format(iteration)
 		if not testing: epsilon_ = max(epsilon * np.power(0.9998, iteration), 0.2)
 		iter_ts = time.time()
-		# Get color and depth images in ROS format, convert to cv2 and save
-		#images = get_image()
-		#color, depth = utils.get_imgs_from_msg(images, image_path, iteration)
-		msg = get_pc_client()
+		get_pc_req = get_pcRequest()
+		get_pc_req.file_name = pc_path + "/{}_before.pcd".format(iteration)
+		msg = get_pc_client(get_pc_req)
 		color, depth, points, depth_img = utils.get_heightmap(msg.pc, image_path, iteration)
 		ts = time.time()
 		print "[%f]: Forward pass..." %(time.time()), 
@@ -215,14 +223,6 @@ try:
 		vis_name = vis_path + "vis_{:06}.jpg".format(iteration)
 		cv2.imwrite(vis_name, visual_img)
 
-		#set_prior_img()
-		'''getXYZ = get_xyzRequest()
-		getXYZ.point[0] = pixel_index[2] # X
-		getXYZ.point[1] = pixel_index[1] # Y
-		getXYZ.color = images.crop_color_img
-		getXYZ.depth = images.crop_depth_img
-		getXYZResult = pixel_to_xyz(getXYZ)'''
-		
 		is_valid = True
 		# Invalid conditions:
 		# 1. NaN point
@@ -245,6 +245,15 @@ try:
 			is_valid = False
 			if testing:
 				cnt_invalid += 1
+		# Visualize markers
+		viz_req = viz_markerRequest()
+		viz_req.point.x = points[pixel_index[1], pixel_index[2], 0]
+		viz_req.point.y = points[pixel_index[1], pixel_index[2], 1]
+		viz_req.point.z = points[pixel_index[1], pixel_index[2], 2]
+		viz_req.primitive = action
+		viz_req.angle = angle
+		viz_req.valid = is_valid
+		viz(viz_req)
 		# Take action
 		if is_valid:
 			cnt_invalid = 0 # Reset cnt
@@ -264,7 +273,9 @@ try:
 			action_list.append(-1)
 		target_list.append(pixel_index)
 		# Get action result
-		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc_client().pc, image_path + "next_", iteration)
+		get_pc_req.file_name = pc_path + "/{}_after.pcd".format(iteration)
+		next_pc = get_pc_client(get_pc_req).pc
+		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(next_pc, image_path + "next_", iteration)
 		action_result_req = get_resultRequest(depth_img, next_depth_img)
 		if is_valid:
 			if not action: # GRASP
@@ -291,12 +302,7 @@ try:
 					time.sleep(0.3)
 					pheumatic(SetBoolRequest(False))
 					time.sleep(0.3)
-		# Get images after action and save
-		#next_color, next_depth = utils.get_imgs_from_msg(get_image(), image_path + "next_", iteration)
-		#next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc_client().pc, image_path + "next_", iteration)
 		ts = time.time()
-		#is_empty = empty_checker().success
-		is_empty = (num_of_items == 0)
 		if is_valid:
 			label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
 		                                                         next_color, next_depth, is_empty)
@@ -325,7 +331,11 @@ try:
 			if cnt_invalid >= init_num:
 				print "Fail to pass test since too much invalid target"
 				break
-		time.sleep(0.5) # Sleep 0.5 s for next iteration	
+		time.sleep(0.5) # Sleep 0.5 s for next iteration
+		empty_checker_req = pc_is_emptyRequest()
+		empty_checker_req.input_pc = next_pc
+		#is_empty = (num_of_items == 0)
+		is_empty = empty_checker(empty_checker_req).is_empty
 		
 	# Num of item = 0
 	if not testing:

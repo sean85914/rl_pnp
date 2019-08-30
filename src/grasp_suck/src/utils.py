@@ -7,11 +7,8 @@ import sensor_msgs.point_cloud2 as pc2
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse
 
 workspace_limits = np.asarray([[-0.659, -0.273], [-0.269, 0.117], [-0.01, 0.2]])
+#workspace_limits = np.asarray([[-0.269, 0.117], [0.273, 0.659], [-0.01, 0.2]])
 heightmap_resolution = (workspace_limits[0][1]-workspace_limits[0][0])/224
-#angle_map = [np.radians(0), np.radians(-45), np.radians(-90), np.radians(45)] # TODO: the angle mapping may not correct, should test!
-angle_map = [np.radians(-90), np.radians(-45), np.radians(0), np.radians(45)]
-draw_angle_map = {0: 0, 1: -45, 2: 90, 3: 45}
-
 # cv bridge
 br = CvBridge()
 
@@ -77,8 +74,8 @@ def draw_image(image, primitive, pixel_index):
 	result = cv2.circle(image, center, 7, (0, 0, 0), 2)
 	X = 20
 	Y = 7
-	#theta = angle_map[pixel_index[0]]+90.0#np.radians(-90.0+45.0*pixel_index[0])
-	theta = draw_angle_map[pixel_index[0]]
+	theta = np.radians(-90.0+45.0*pixel_index[0])
+	#theta = draw_angle_map[pixel_index[0]]
 	x_unit = [ np.cos(theta), np.sin(theta)]
 	y_unit = [-np.sin(theta), np.cos(theta)]
 	if not primitive: # GRASP
@@ -133,12 +130,12 @@ def epsilon_greedy_policy(epsilon, suck_predictions, grasp_predictions):
 		else: # GRASP
 			tmp = np.where(grasp_predictions == np.max(grasp_predictions))
 			pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
-			angle = angle_map[pixel_index[0]]#np.radians(-90+45*pixel_index[0])
+			angle = np.radians(-90+45*pixel_index[0])
 	else:
 		if not explore: # GRASP
 			tmp = np.where(grasp_predictions == np.max(grasp_predictions))
 			pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
-			angle = angle_map[pixel_index[0]]#np.radians(-90+45*pixel_index[0])
+			angle = np.radians(-90+45*pixel_index[0])
 		else:
 			action = 1 # SUCK
 			action_str = 'suck'
@@ -160,7 +157,7 @@ def greedy_policy(suck_predictions, grasp_predictions):
 	else: # GRASP
 		tmp = np.where(grasp_predictions == np.max(grasp_predictions))
 		pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
-		angle = angle_map[pixel_index[0]]#np.radians(-90+45*pixel_index[0])
+		angle = np.radians(-90+45*pixel_index[0])
 	return action, action_str, pixel_index, angle
 
 # Policy that only choose grasp
@@ -169,7 +166,7 @@ def grasp_only_policy(grasp_predictions):
 	action_str = 'grasp'
 	tmp = np.where(grasp_predictions == np.max(grasp_predictions))
 	pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
-	angle = angle_map[pixel_index[0]]#np.radians(-90+45*pixel_index[0])
+	angle = np.radians(-90+45*pixel_index[0])
 	return pixel_index, angle
 
 '''
@@ -181,6 +178,14 @@ def grasp_only_policy(grasp_predictions):
   \____/ \__|_| |_|\___|_|  |___/
                                                                
 '''
+
+def show_args(args):
+	args_list = ['episode', 'epsilon', 'force_cpu', 'grasp_only', 'is_testing', 'model', 'num_of_items', 'update_target']
+	d = vars(args)
+	print "================================================"
+	for i in range(len(args_list)):
+		print "{}:\t\t {}".format(args_list[i], d[args_list[i]])
+	print "================================================"
 
 def standarization(suck_predictions, grasp_predictions):
 	mean = np.nanmean(suck_predictions)
