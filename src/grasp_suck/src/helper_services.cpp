@@ -22,8 +22,8 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   if(define_place) ROS_INFO("UR5 place joints: %f %f %f %f %f %f", place_joint[0], place_joint[1], place_joint[2], place_joint[3], place_joint[4], place_joint[5]);
   ROS_INFO("--------------------------------------");
   // Publisher
-  pub_marker = pnh_.advertise<visualization_msgs::Marker>("marker", 1);
-  pub_text_marker = pnh_.advertise<visualization_msgs::Marker>("text_marker", 1);
+  //pub_marker = pnh_.advertise<visualization_msgs::Marker>("marker", 1);
+  //pub_text_marker = pnh_.advertise<visualization_msgs::Marker>("text_marker", 1);
   // Connect to service server
   // goto_joint_pose
   while(!ros::service::waitForService("/ur5_control_server/ur_control/goto_joint_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_joint_pose service...");}
@@ -212,6 +212,7 @@ bool Helper_Services::go_target_service_callback(
   res.result_pose.position.z += OFFSET;
   if(req.primmitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.01f; // Low object, for instance, cuboid lying down
   if(req.primmitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.01f; // Hight object, for instance, standed cylinder
+  /*
   // Publish marker
   visualization_msgs::Marker marker, text_marker;
   marker.header.frame_id = (arm_prefix==""?"base_link":arm_prefix+"_base_link"); text_marker.header.frame_id = (arm_prefix==""?"base_link":arm_prefix+"_base_link");
@@ -229,6 +230,7 @@ bool Helper_Services::go_target_service_callback(
   text_marker.text = marker_string;
   pub_marker.publish(marker);
   pub_text_marker.publish(text_marker);
+  */
   arm_operation::target_pose myPoseReq;
   myPoseReq.request.target_pose = res.result_pose;
   myPoseReq.request.factor = 0.8f;

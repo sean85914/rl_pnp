@@ -173,20 +173,29 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
   pass_y.filter(pc);
   pass_z.setInputCloud(pc.makeShared());
   pass_z.filter(pc);
+  /*
+  for(auto &p: pc){
+    double x = p.x,
+           y = p.y;
+    p.x = y; p.y = -x; 
+  }*/
   sensor_msgs::PointCloud2 pc2;
   pcl::toROSMsg(pc, pc2);
   pc2.header.frame_id = "base_link";
   res.pc = pc2;
-  if(verbose){
-    std::string pc_name = req.file_name + ".pcd";
+  if(verbose and !req.file_name.empty()){
+    std::string pc_name;
+    // Make sure given filename has extension
+    std::size_t pos = req.file_name.find(".pcd");
+    if(pos == std::string::npos)
+      pc_name = req.file_name + ".pcd";
+    else pc_name = req.file_name;
     // Make sure the directory exists
-    size_t pos;
     for(size_t i=0; i<pc_name.length(); ++i)
       if(pc_name[i]=='/') pos = i;
-    boost::filesystem::path p(pc_name.substr(0, i));
+    boost::filesystem::path p(pc_name.substr(0, pos));
     if(!boost::filesystem::exists(p))
       create_directories(p);
-    }
     pcl::io::savePCDFileASCII(pc_name, pc);
   }
   lock = false;
