@@ -35,35 +35,34 @@ The system is start with <code>item = N</code> and the process will stop after <
 | node   | visual_system/pc_transform                            | Transform point cloud from eye coord. to hand coord. <br> Check if workspace is empty </br> |
 | node   | grasp_suck/get_reward                                 | Using consecutive depth images to judge if action succeed |
 | launch | grasp_suck/helper_services.launch                     | High-level services, including homing, picking and placing | 
-| node | robotiq_ft_sensor/rq_sensor | Open force torch sensor | 
-| node | visualization/viz_boundary.py | Visualize the limits of work space |  
+| node | robotiq_ft_sensor/rq_sensor | Open force torch sensor, only do if use_ft set to true | 
+| node | visualization/viz_boundary.py | Visualize the limits of work space |
+| node | visualization/viz_marker.py | Service to visualize the primitive and text markers |
 
 ## Services List <a name="Services"></a>
 
 | Service name                              | Service type | Description |
 | :---:                                     | :---: | :---: |
 |<tr><td colspan=3><p align="center">**Gripper Related**</p></td></tr>|
-| /arduino_control/pheumatic_control | std_srvs/SetBool | Suction cup expansion and contraction |
-| /arduino_control/vacuum_control    | vacuum_conveyor_control/vacuum_control | Suction behavior control | 
-| /robotiq_finger_control_node/intial_gripper | std_srvs/Empty | Initialize gripper |
-| /robotiq_finger_control_node/close_gripper | std_srvs/Empty | Close gripper |
-| /robotiq_finger_control_node/open_gripper  | std_srvs/Empty | Open gripper | 
-| /robotiq_finger_control_node/get_grasp_state | std_srvs/SetBool | Get if grasp success |
+| /arduino_control/pheumatic_control | [std_srvs/SetBool](http://docs.ros.org/melodic/api/std_srvs/html/srv/SetBool.html) | Suction cup expansion and contraction |
+| /arduino_control/vacuum_control    | [vacuum_conveyor_control/vacuum_control](https://github.com/sean85914/flip_object/blob/master/src/vacuum_conveyor_control/srv/vacuum_control.srv) | Suction behavior control | 
+| /robotiq_finger_control_node/intial_gripper | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Initialize gripper |
+| /robotiq_finger_control_node/close_gripper | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Close gripper |
+| /robotiq_finger_control_node/open_gripper  | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Open gripper | 
+| /robotiq_finger_control_node/get_grasp_state | [std_srvs/SetBool](http://docs.ros.org/melodic/api/std_srvs/html/srv/SetBool.html) | Get if grasp success |
 |<tr><td colspan=3><p align="center">**Robot Arm Related**</p></td></tr>|
-| /ur5_control_server/ur_control/goto_joint_pose | arm_operation/joint_pose | Go to user given joint pose |
-| /ur5_control_server/ur_control/goto_pose | arm_operation/target_pose | Go to user given cartesian pose | 
+| /ur5_control_server/ur_control/goto_joint_pose | [arm_operation/joint_pose](https://github.com/sean85914/flip_object/blob/master/src/arm_operation/srv/joint_pose.srv) | Go to user given joint pose |
+| /ur5_control_server/ur_control/goto_pose | [arm_operation/target_pose](https://github.com/sean85914/flip_object/blob/master/src/arm_operation/srv/target_pose.srv) | Go to user given cartesian pose | 
 |<tr><td colspan=3><p align="center">**Visual Related**</p></td></tr>|
-| ~~/get_reward/set_prior~~ | ~~std_srvs/Empty~~ | ~~Set depth image before action~~ |
-| ~~/get_reward/set_posterior~~ | ~~std_srvs/Empty~~ | ~~Set depth image after action~~ |
-| /get_reward/get_result | grasp_suck/get_result | Get result of action |
-| ~~/pixel_to_xyz/get_image~~ | ~~visual_system/get_image~~ | ~~Return cropped color and depth images~~ |
-| ~~/pixel_to_xyz/pixel_to_xyz~~ | ~~visual_system/get_xyz~~ | ~~Return 3D coordinate with request pixel in color_optical_frame~~ |
-| /pc_transform/get_pc | visual_system/get_pc | Get pointcloud inside the workspace with coordinate of robot arm |
-| /pc_transform/empty_state | visual_system/pc_is_empty | Get if workspace is empty |
+| /get_reward/get_result | [grasp_suck/get_result](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/srv/get_result.srv) | Use consecutive depth heightmaps to determine if suck success |
+| /pc_transform/get_pc | [visual_system/get_pc](https://github.com/sean85914/flip_object/blob/master/src/visual_system/srv/get_pc.srv) | Get pointcloud inside the workspace with coordinate of robot arm |
+| /pc_transform/empty_state | [visual_system/pc_is_empty](https://github.com/sean85914/flip_object/blob/master/src/visual_system/srv/pc_is_empty.srv) | Get if workspace is empty |
 |<tr><td colspan=3><p align="center">**High-level Services**</p></td></tr>|
-| /helper_services_node/goto_target | grasp_suck/get_pose | Make arm contact with request point with specific motion primitive and angle
-| /helper_services_node/robot_go_home | std_srvs/Empty | Return arm to home and set posterior |
-| /helper_services_node/robot_go_place | std_srvs/Empty | Place the object with predifined pose |
+| /helper_services_node/goto_target | [grasp_suck/get_pose](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/srv/get_pose.srv) | Make arm contact with request point with specific motion primitive and angle
+| /helper_services_node/robot_go_home | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Return arm to home and set posterior |
+| /helper_services_node/robot_go_place | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Place the object with predifined pose |
+|<tr><td colspan=3><p align="center">**Visualization**</p></td></tr>|
+| /viz_marker_node/viz_marker | [visualization/viz_marker](https://github.com/sean85914/flip_object/blob/master/src/visualiztion/srv/viz_marker.srv) | Visualize primitive and text markers |
 
 ## Network <a name="Network"></a>
 **Network Flowchart**
