@@ -154,8 +154,8 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
   pass.setFilterFieldName("z");
   pass.setFilterLimits(Z_THRES_LOWER, Z_THRES_UPPER);
   pass.filter(pc_filtered);
-  if(pc_filtered.points.size()<num_thres) res.is_empty.data = true;
-  else res.is_empty.data = false;
+  if(pc_filtered.points.size()<num_thres) {res.is_empty.data = true; ROS_INFO("\033[0;33mWorkspace is empty\033[0m");}
+  else {res.is_empty.data = false; ROS_INFO("\033[0;33mWorkspace is not empty\033[0m");}
   return true;
 }
 
