@@ -10,10 +10,21 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   nav_msgs
   visualization_msgs
+  message_generation
+)
+
+add_service_files(
+  FILES
+  viz_marker.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  geometry_msgs
 )
 
 catkin_package(
-  CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs nav_msgs visualization_msgs
+  CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs nav_msgs visualization_msgs message_runtime
 )
 
 include_directories(
