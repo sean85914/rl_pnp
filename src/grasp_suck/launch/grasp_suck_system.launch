@@ -12,6 +12,7 @@
   </include>
   ?>
   <arg name="use_ft" default="false" doc="Whether turn on force torch sensor"/>
+  <arg name="thres" default="700" doc="If difference between two consecutive depth heightmaps is greater than this value, the action(suck) will be consider as success"/>
   <!-- TCP information -->
   <include file="$(find arm_operation)/launch/tcp_publisher.launch"/>
   <!-- Vacuum -->
@@ -29,21 +30,17 @@
     <remap from="camera/color/image_raw" to="/camera1/color/image_raw"/>
     <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
     <remap from="camera/color/camera_info" to="/camera1/color/camera_info"/>
-    <!-- Output remapping -->
-    <!--remap from="~marker" to="/helper_services_node/marker"/-->
-    <!--remap from="~text_marker" to="/helper_services_node/text_marker"/-->
   </node>
   <!-- Get reward based on consecutive depth images -->
   <node pkg="grasp_suck" type="get_reward" name="get_reward" output="screen" required="true">
-    <param name="thres" value="800"/>
-    <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
+    <param name="thres" value="$(arg thres)"/>
   </node> 
   <!-- High-level Control -->
   <include file="$(find grasp_suck)/launch/helper_services.launch"/> 
-  <!-- Visualize workspace -->
-  <node pkg="visualization" type="viz_boundary.py" name="viz_boundary_node"/>
   <node pkg="robotiq_ft_sensor" type="rq_sensor" name="rq_sensor" output="screen" if="$(arg use_ft)">
     <param name="serial_id" value="ttyFT"/>
   </node>
+  <!-- Visualize workspace -->
+  <node pkg="visualization" type="viz_boundary.py" name="viz_boundary_node"/>
   <node pkg="visualization" type="viz_marker.py" name="viz_marker_node"/>
 </launch>
