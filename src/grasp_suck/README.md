@@ -62,7 +62,7 @@ The system is start with <code>item = N</code> and the process will stop after <
 | /helper_services_node/robot_go_home | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Return arm to home and set posterior |
 | /helper_services_node/robot_go_place | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Place the object with predifined pose |
 |<tr><td colspan=3><p align="center">**Visualization**</p></td></tr>|
-| /viz_marker_node/viz_marker | [visualization/viz_marker](https://github.com/sean85914/flip_object/blob/master/src/visualiztion/srv/viz_marker.srv) | Visualize primitive and text markers |
+| /viz_marker_node/viz_marker | [visualization/viz_marker](https://github.com/sean85914/flip_object/blob/master/src/visualization/srv/viz_marker.srv) | Visualize primitive and text markers |
 
 ## Network <a name="Network"></a>
 **Network Flowchart**
