@@ -3,11 +3,9 @@ Panels:
     Help Height: 78
     Name: Displays
     Property Tree Widget:
-      Expanded:
-        - /Global Options1
-        - /Status1
-      Splitter Ratio: 0.432276666
-    Tree Height: 378
+      Expanded: ~
+      Splitter Ratio: 0.49444443
+    Tree Height: 710
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -26,7 +24,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: cam1_points
+    SyncSource: PointCloud2
 Visualization Manager:
   Class: ""
   Displays:
@@ -46,6 +44,13 @@ Visualization Manager:
         Z: 0
       Plane: XY
       Plane Cell Count: 10
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Class: rviz/Axes
+      Enabled: true
+      Length: 0.300000012
+      Name: base_link
+      Radius: 0.0500000007
       Reference Frame: <Fixed Frame>
       Value: true
     - Alpha: 1
@@ -72,16 +77,6 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        camera2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        convayor_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
         ee_link:
           Alpha: 1
           Show Axes: false
@@ -92,69 +87,16 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        gripper_coupler_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        gripper_root_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        robotiq_85_base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        robotiq_85_left_finger_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        robotiq_85_left_finger_tip_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        robotiq_85_left_inner_knuckle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        robotiq_85_left_knuckle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        robotiq_85_right_finger_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        robotiq_85_right_finger_tip_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        robotiq_85_right_inner_knuckle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        robotiq_85_right_knuckle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
         shoulder_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tcp_link:
+        tcp:
           Alpha: 1
           Show Axes: false
           Show Trail: false
+          Value: true
         tool0:
           Alpha: 1
           Show Axes: false
@@ -185,205 +127,6 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
-    - Class: rviz/TF
-      Enabled: true
-      Frame Timeout: 15
-      Frames:
-        All Enabled: false
-        base:
-          Value: false
-        base_link:
-          Value: true
-        camera1_aligned_depth_to_color_frame:
-          Value: true
-        camera1_aligned_depth_to_infra1_frame:
-          Value: true
-        camera1_color_frame:
-          Value: true
-        camera1_color_optical_frame:
-          Value: true
-        camera1_depth_frame:
-          Value: true
-        camera1_depth_optical_frame:
-          Value: true
-        camera1_infra1_frame:
-          Value: true
-        camera1_infra1_optical_frame:
-          Value: true
-        camera1_link:
-          Value: true
-        camera2_aligned_depth_to_color_frame:
-          Value: true
-        camera2_aligned_depth_to_infra1_frame:
-          Value: true
-        camera2_color_frame:
-          Value: true
-        camera2_color_optical_frame:
-          Value: true
-        camera2_depth_frame:
-          Value: true
-        camera2_depth_optical_frame:
-          Value: true
-        camera2_infra1_frame:
-          Value: true
-        camera2_infra1_optical_frame:
-          Value: true
-        camera2_link:
-          Value: true
-        camera_aligned_depth_to_color_frame:
-          Value: false
-        camera_aligned_depth_to_infra1_frame:
-          Value: false
-        camera_color_frame:
-          Value: false
-        camera_color_optical_frame:
-          Value: false
-        camera_depth_frame:
-          Value: false
-        camera_depth_optical_frame:
-          Value: false
-        camera_infra1_frame:
-          Value: false
-        camera_infra1_optical_frame:
-          Value: false
-        camera_link:
-          Value: true
-        convayor_link:
-          Value: false
-        ee_link:
-          Value: false
-        fake_tcp:
-          Value: true
-        forearm_link:
-          Value: false
-        gripper_coupler_link:
-          Value: true
-        gripper_root_link:
-          Value: false
-        robotiq_85_base_link:
-          Value: false
-        robotiq_85_left_finger_link:
-          Value: false
-        robotiq_85_left_finger_tip_link:
-          Value: false
-        robotiq_85_left_inner_knuckle_link:
-          Value: false
-        robotiq_85_left_knuckle_link:
-          Value: false
-        robotiq_85_right_finger_link:
-          Value: false
-        robotiq_85_right_finger_tip_link:
-          Value: false
-        robotiq_85_right_inner_knuckle_link:
-          Value: false
-        robotiq_85_right_knuckle_link:
-          Value: false
-        shoulder_link:
-          Value: false
-        tag_0:
-          Value: true
-        tcp_link:
-          Value: true
-        tool0:
-          Value: false
-        tool0_controller:
-          Value: false
-        upper_arm_link:
-          Value: false
-        ur_camera_aligned_depth_to_color_frame:
-          Value: true
-        ur_camera_aligned_depth_to_infra1_frame:
-          Value: true
-        ur_camera_color_frame:
-          Value: true
-        ur_camera_color_optical_frame:
-          Value: true
-        ur_camera_depth_frame:
-          Value: true
-        ur_camera_depth_optical_frame:
-          Value: true
-        ur_camera_infra1_frame:
-          Value: true
-        ur_camera_infra1_optical_frame:
-          Value: true
-        ur_camera_link:
-          Value: true
-        wrist_1_link:
-          Value: false
-        wrist_2_link:
-          Value: false
-        wrist_3_link:
-          Value: false
-      Marker Scale: 1
-      Name: TF
-      Show Arrows: false
-      Show Axes: true
-      Show Names: true
-      Tree:
-        base_link:
-          base:
-            tool0_controller:
-              {}
-          camera1_link:
-            camera1_aligned_depth_to_color_frame:
-              camera1_color_optical_frame:
-                {}
-            camera1_aligned_depth_to_infra1_frame:
-              camera1_infra1_optical_frame:
-                {}
-            camera1_color_frame:
-              {}
-            camera1_depth_frame:
-              camera1_depth_optical_frame:
-                {}
-            camera1_infra1_frame:
-              {}
-          camera2_link:
-            camera2_aligned_depth_to_color_frame:
-              camera2_color_optical_frame:
-                {}
-            camera2_aligned_depth_to_infra1_frame:
-              camera2_infra1_optical_frame:
-                {}
-            camera2_color_frame:
-              {}
-            camera2_depth_frame:
-              camera2_depth_optical_frame:
-                {}
-            camera2_infra1_frame:
-              {}
-          convayor_link:
-            {}
-          shoulder_link:
-            upper_arm_link:
-              forearm_link:
-                wrist_1_link:
-                  wrist_2_link:
-                    wrist_3_link:
-                      ee_link:
-                        gripper_coupler_link:
-                          {}
-                        gripper_root_link:
-                          robotiq_85_base_link:
-                            robotiq_85_left_inner_knuckle_link:
-                              robotiq_85_left_finger_tip_link:
-                                {}
-                            robotiq_85_left_knuckle_link:
-                              robotiq_85_left_finger_link:
-                                {}
-                            robotiq_85_right_inner_knuckle_link:
-                              robotiq_85_right_finger_tip_link:
-                                {}
-                            robotiq_85_right_knuckle_link:
-                              robotiq_85_right_finger_link:
-                                {}
-                        tcp_link:
-                          fake_tcp:
-                            {}
-                      tool0:
-                        {}
-      Update Interval: 0
-      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -402,11 +145,11 @@ Visualization Manager:
       Max Intensity: 4096
       Min Color: 0; 0; 0
       Min Intensity: 0
-      Name: cam1_points
+      Name: PointCloud2
       Position Transformer: XYZ
       Queue Size: 10
       Selectable: true
-      Size (Pixels): 3
+      Size (Pixels): 2
       Size (m): 0.00999999978
       Style: Points
       Topic: /camera1/depth_registered/points
@@ -414,59 +157,63 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: ""
-      Decay Time: 0
+    - Class: rviz/Marker
       Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 4096
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: cam2_points
-      Position Transformer: ""
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.00999999978
-      Style: Points
-      Topic: /camera2/depth_registered/points
-      Unreliable: false
-      Use Fixed Frame: true
-      Use rainbow: true
+      Marker Topic: /viz_marker_node/marker
+      Name: primitive marker
+      Namespaces:
+        "": true
+      Queue Size: 100
       Value: true
-    - Class: rviz/Image
+    - Class: rviz/Marker
       Enabled: true
-      Image Topic: /camera1/color/image_rect_color
+      Marker Topic: /viz_marker_node/text
+      Name: text marker
+      Namespaces:
+        "": true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: false
+      Marker Topic: /visual_boundary
+      Name: boundary
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: false
+    - Class: rviz/Image
+      Enabled: false
+      Image Topic: /camera1/color/image_raw
       Max Value: 1
       Median window: 5
       Min Value: 0
-      Name: cam1_image
+      Name: Image
       Normalize Range: true
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
-      Value: true
-    - Class: rviz/Image
+      Value: false
+    - Class: rviz/TF
+      Enabled: false
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: false
+      Show Axes: true
+      Show Names: true
+      Tree:
+        {}
+      Update Interval: 0
+      Value: false
+    - Class: rviz/Marker
       Enabled: true
-      Image Topic: /camera2/color/image_rect_color
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: cam2_image
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
+      Marker Topic: /test_marker
+      Name: test_marker
+      Namespaces:
+        {}
+      Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
@@ -493,33 +240,35 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1.68288231
+      Distance: 1.66350174
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.0424303375
-        Y: 0.30721879
-        Z: 0.315892965
+        X: -0.299113333
+        Y: 0.17156899
+        Z: 0.117470406
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.579797089
+      Pitch: 1.56979632
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.32175386
+      Yaw: 0.0805046186
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1026
+  Height: 998
   Hide Left Dock: false
-  Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000016a00000378fc0200000012fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006100fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002800000209000000d700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d00610067006502000003eb000000e3000001a2000001bbfb0000000a0049006d00610067006500000001bc000000760000000000000000fb0000000a0049006d00610067006500000001fe000000b30000000000000000fb0000000a0049006d0061006700650000000279000001270000000000000000fb0000000a0049006d00610067006500000001bc000000760000000000000000fb0000000a0049006d00610067006500000001fe000000b30000000000000000fb0000000a0049006d0061006700650000000279000001270000000000000000fb0000001400630061006d0031005f0069006d00610067006501000002370000009a0000001600fffffffb0000000a0049006d00610067006501000002d7000000c90000000000000000fb0000001400630061006d0032005f0069006d00610067006501000002d7000000c90000001600ffffff000000010000010f00000378fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000002800000378000000ad00fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073f0000003efc0100000002fb0000000800540069006d006501000000000000073f0000030000fffffffb0000000800540069006d00650100000000000004500000000000000000000004ba0000037800000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Hide Right Dock: true
+  Image:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd00000004000000000000016a00000355fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006100fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000002800000355000000d700fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d00610067006502000001e8000000e7000001a2000001bbfb0000000a0049006d006100670065020000020a000001680000016a000000c3000000010000010f00000378fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000002800000378000000ad00fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000003a000000045fc0100000002fb0000000800540069006d00650100000000000003a00000030000fffffffb0000000800540069006d00650100000000000004500000000000000000000002300000035500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -527,11 +276,7 @@ Window Geometry:
   Tool Properties:
     collapsed: false
   Views:
-    collapsed: false
-  Width: 1855
-  X: 65
+    collapsed: true
+  Width: 928
+  X: 992
   Y: 24
-  cam1_image:
-    collapsed: false
-  cam2_image:
-    collapsed: false
