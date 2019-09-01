@@ -34,8 +34,8 @@ double y_lower; // Y lower bound, in hand coord.
 double y_upper; // Y upper bound, in hand coord.
 double z_lower; // Z lower bound, in hand coord.
 double z_upper; // Z upper bound, in hand coord.
-const double Z_THRES_LOWER = 0.01f; // Z lower bound to check if workspace were empty
-const double Z_THRES_UPPER = 0.20f; // Z upper bound to check if workspace were empty
+double z_thres_lower; // Z lower bound to check if workspace were empty
+double z_thres_upper; // Z upper bound to check if workspace were empty
 std::vector<double> intrinsic; // [fx, fy, cx, cy]
 cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
 Eigen::Matrix4f arm2cam_tf;
@@ -61,6 +61,8 @@ int main(int argc, char** argv)
   if(!pnh.getParam("y_upper", y_upper)) y_upper =  0.114f;
   if(!pnh.getParam("z_lower", z_lower)) z_lower = -0.100f;
   if(!pnh.getParam("z_upper", z_upper)) z_upper =  0.200f;
+  if(!pnh.getParam("z_thres_lower", z_thres_lower)) z_thres_lower = 0.02f;
+  if(!pnh.getParam("z_thres_upper", z_thres_upper)) z_thres_upper = 0.20f;
   if(!pnh.getParam("verbose", verbose)) verbose = false;
   if(!pnh.getParam("num_thres", num_thres)) num_thres = 7000; // Points number greater than this value will be considered as not empty
   if(verbose)
@@ -152,9 +154,10 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
   pcl::PassThrough<pcl::PointXYZRGB> pass;
   pass.setInputCloud(pc.makeShared());
   pass.setFilterFieldName("z");
-  pass.setFilterLimits(Z_THRES_LOWER, Z_THRES_UPPER);
+  pass.setFilterLimits(z_thres_lower, z_thres_upper);
   pass.filter(pc_filtered);
-  if(pc_filtered.points.size()<num_thres) {res.is_empty.data = true; ROS_INFO("\033[0;33mWorkspace is empty\033[0m");}
+  ROS_INFO("[%s] Points in range: %d", ros::this_node::getName().c_str(), (int)pc_filtered.size());
+  if(pc_filtered.points.size()<=num_thres) {res.is_empty.data = true; ROS_INFO("\033[0;33mWorkspace is empty\033[0m");}
   else {res.is_empty.data = false; ROS_INFO("\033[0;33mWorkspace is not empty\033[0m");}
   return true;
 }
