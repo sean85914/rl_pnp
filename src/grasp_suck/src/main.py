@@ -47,7 +47,7 @@ episode      = args.episode
 suck_reward  = 2.0
 grasp_reward = 2.0
 discount     = 0.5
-Z_THRES      = 0.01
+Z_THRES      = 0.015 # z value less than this value will be considered as invalid
 num_of_items = args.num_of_items  # Number of items when start
 init_num     = num_of_items
 cnt_invalid  = 0 # Consecutive invalid action counter
@@ -335,7 +335,7 @@ try:
 		empty_checker_req = pc_is_emptyRequest()
 		empty_checker_req.input_pc = next_pc
 		#is_empty = (num_of_items == 0)
-		is_empty = empty_checker(empty_checker_req).is_empty
+		is_empty = empty_checker(empty_checker_req).is_empty.data
 		
 	# Num of item = 0
 	if not testing:
