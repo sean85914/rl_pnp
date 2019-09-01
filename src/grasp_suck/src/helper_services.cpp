@@ -210,27 +210,9 @@ bool Helper_Services::go_target_service_callback(
   // Correction
   res.result_pose.position.x += X_OFFSET; 
   res.result_pose.position.z += OFFSET;
-  if(req.primmitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.01f; // Low object, for instance, cuboid lying down
-  if(req.primmitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.01f; // Hight object, for instance, standed cylinder
-  /*
-  // Publish marker
-  visualization_msgs::Marker marker, text_marker;
-  marker.header.frame_id = (arm_prefix==""?"base_link":arm_prefix+"_base_link"); text_marker.header.frame_id = (arm_prefix==""?"base_link":arm_prefix+"_base_link");
-  marker.action = visualization_msgs::Marker::ADD; text_marker.action = visualization_msgs::Marker::ADD;
-  marker.type = visualization_msgs::Marker::SPHERE; text_marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-  marker.pose.position = req.point_in_hand; 
-  text_marker.pose.position.y = 0.4;
-  marker.pose.orientation.w = 1.0; 
-  marker.scale.x = marker.scale.y = marker.scale.z = 0.02; text_marker.scale.z = 0.06;
-  if(req.primmitive==GRASP)  marker.color.b = marker.color.a = 1.0; // BLUE for grasping
-  else marker.color.r = marker.color.a = 1.0; // RED for sucking
-  text_marker.color.r = text_marker.color.g = text_marker.color.b = text_marker.color.a = 1.0;
-  int angle = req.yaw * 180 / M_PI;
-  std::string marker_string = (req.primmitive==GRASP?"grasp, "+std::to_string(angle):"suck");
-  text_marker.text = marker_string;
-  pub_marker.publish(marker);
-  pub_text_marker.publish(text_marker);
-  */
+  if(req.primmitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.014f; // Low object, for instance, cuboid lying down
+  if(req.primmitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.014f; // Hight object, for instance, standed cylinder
+  if(req.primmitive==SUCK  and res.result_pose.position.z<=0.23f) res.result_pose.position.z = 0.23f;
   arm_operation::target_pose myPoseReq;
   myPoseReq.request.target_pose = res.result_pose;
   myPoseReq.request.factor = 0.8f;
