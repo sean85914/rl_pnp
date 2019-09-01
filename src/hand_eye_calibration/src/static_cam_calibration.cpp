@@ -128,7 +128,7 @@ class calibration{
           break;
       }
       client.call(req);
-      ros::Duration(1.0).sleep();
+      ros::Duration(2.0).sleep();
       tf::StampedTransform st;
       get_tag_data(st);
       geometry_msgs::Pose p_tag = transform2Pose(st);
