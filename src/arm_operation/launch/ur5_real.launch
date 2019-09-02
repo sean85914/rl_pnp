@@ -13,8 +13,8 @@
     <param name="wrist1_lower_bound" value="-3.14"/>
     <param name="wrist2_upper_bound" value="3.14"/>
     <param name="wrist2_lower_bound" value="-3.14"/>
-    <param name="wrist3_upper_bound" value="1.74"/>
-    <param name="wrist3_lower_bound" value="-2.1"/>
+    <param name="wrist3_upper_bound" value="1.9"/>
+    <param name="wrist3_lower_bound" value="-2.2"/>
     <remap from="~joint_states" to="/joint_states"/>
   </node>
 </launch>
