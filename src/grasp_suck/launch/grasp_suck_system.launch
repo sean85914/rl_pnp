@@ -18,6 +18,7 @@
   <!-- Vacuum -->
   <node pkg="vacuum_conveyor_control" type="arduino_control" name="arduino_control" output="screen" clear_params="true" required="true">
     <param name="port" value="/dev/ttyArduino"/>
+    <param name="vacuum_thres" value="880"/>
   </node>
   <!-- robotiq 2-finger gripper -->
   <node pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" name="robotiq2FGripper" args="/dev/ttyGripper" required="true"/>

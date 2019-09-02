@@ -52,9 +52,6 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   // set_posterior
   //while(!ros::service::waitForService("/get_reward/set_posterior", ros::Duration(3.0))) {ROS_WARN("Try to connect to set_posterior service...");}
   //set_posterior = pnh.serviceClient<std_srvs::Empty>("/get_reward/set_posterior");
-  // get_result
-  while(!ros::service::waitForService("/get_reward/get_result", ros::Duration(3.0))) {ROS_WARN("Try to connect to get_result service...");}
-  get_result = pnh.serviceClient<grasp_suck::get_result>("/get_reward/get_result");
   // Advertise service server
   // go home
   assert(define_home);

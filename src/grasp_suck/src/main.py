@@ -15,8 +15,7 @@ from trainer import Trainer
 # SRV
 from std_srvs.srv import Empty, SetBool, SetBoolRequest, SetBoolResponse, \
                          Trigger, TriggerRequest, TriggerResponse
-from grasp_suck.srv import get_pose, get_poseRequest, get_poseResponse, '''\
-                           get_result, get_resultRequest, get_resultResponse'''
+from grasp_suck.srv import get_pose, get_poseRequest, get_poseResponse
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
                               get_xyz, get_xyzRequest, get_xyzResponse, \
                               pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse
