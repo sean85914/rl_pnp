@@ -19,7 +19,7 @@ $ source devel/setup.bash # DO THIS IN EACH NEW TERMINAL
 ```
 For testing, run
 ```
-[Terminal 4] $ python main.py --is_testing [--force_cpu] [--grasp_only] [--episode EPISODE] [--model PATH_TO_YOUR_MODEL] [--num_of_items NUM_OF_ITEMS] [--update_target UPDATE_TARGET]
+[Terminal 5] $ python main.py --is_testing [--force_cpu] [--grasp_only] [--episode EPISODE] [--model PATH_TO_YOUR_MODEL] [--num_of_items NUM_OF_ITEMS] [--update_target UPDATE_TARGET]
 ```
 ## System Pipeline <a name="Pipeline"></a>
 <img src="img/dqn_grasp_and_suck.png" height=640px align="center"/>
