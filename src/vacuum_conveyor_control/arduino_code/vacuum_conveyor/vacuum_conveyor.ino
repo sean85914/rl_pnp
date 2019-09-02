@@ -118,8 +118,11 @@ void loop() {
       digitalWrite(CONVRYOR_CONTROL, LOW);
     }
     else if(command_type='s'){
-      Serial.println(analogRead(PRESSURE_TRANSMITTER));
-      delay(1);
+      int tmp=0, times=10;
+      for(int i=0; i<times; ++i){
+        tmp += analogRead(PRESSURE_TRANSMITTER);
+        delay(1);
+      } Serial.println(tmp/times);
     }
   }
   delay(10);
