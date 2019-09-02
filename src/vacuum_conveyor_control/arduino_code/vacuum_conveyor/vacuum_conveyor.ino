@@ -7,10 +7,11 @@
  *      3                 1               1
  */
 
-#define VACUUM_GENERATOR  12
-#define VACUUM_BREAKER     8
-#define CONVRYOR_CONTROL   4
-#define PNEUMATIC_CYLINDER 7 
+#define VACUUM_GENERATOR     12
+#define VACUUM_BREAKER        8
+#define CONVRYOR_CONTROL      4
+#define PNEUMATIC_CYLINDER    7
+#define PRESSURE_TRANSMITTER A5
 
 void setup() {
   // put your setup code here, to run once:
@@ -115,6 +116,10 @@ void loop() {
       digitalWrite(CONVRYOR_CONTROL, HIGH);
       delay(100);
       digitalWrite(CONVRYOR_CONTROL, LOW);
+    }
+    else if(command_type='s'){
+      Serial.println(analogRead(PRESSURE_TRANSMITTER));
+      delay(1);
     }
   }
   delay(10);

@@ -9,15 +9,18 @@ class ArduinoControl{
  private:
   int baudrate;
   const int TO = 50; // Serial timeout, not sure what this really are
+  int vacuum_thres; // Volotage from sensor higher than this value will consider as fail
   std::string port;
   serial::Serial mySerial;
   ros::NodeHandle nh_, pnh_;
   ros::ServiceServer vacuum_srv;
   ros::ServiceServer conveyor_srv;
   ros::ServiceServer pheumatic_srv;
+  ros::ServiceServer check_success_srv;
   bool vacuum_control_cb(vacuum_conveyor_control::vacuum_control::Request&, vacuum_conveyor_control::vacuum_control::Response&);
   bool conveyor_control_cb(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
   bool pheumatic_control_cb(std_srvs::SetBool::Request&, std_srvs::SetBool::Response&);
+  bool check_suck_success(std_srvs::SetBool::Request&, std_srvs::SetBool::Response&);
  public:
   ArduinoControl(ros::NodeHandle, ros::NodeHandle);
   ~ArduinoControl(){mySerial.close();}
@@ -26,6 +29,7 @@ class ArduinoControl{
 ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
   if(!pnh_.getParam("baudrate", baudrate)) baudrate = 115200; ROS_INFO("baudrate: %d", baudrate);
   if(!pnh_.getParam("port", port)) port = "/dev/ttyACM0"; ROS_INFO("port: %s", port.c_str());
+  if(!pnh_.getParam("vacuum_thres", vacuum_thres)) vacuum_thres = 800; ROS_INFO("vacuum_thres: %d", vacuum_thres);
   // Open serial
   mySerial.setPort(port);
   mySerial.setBaudrate(baudrate);
@@ -40,6 +44,7 @@ ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh)
   vacuum_srv = pnh_.advertiseService("vacuum_control", &ArduinoControl::vacuum_control_cb, this);
   conveyor_srv = pnh_.advertiseService("conveyor_control", &ArduinoControl::conveyor_control_cb, this);
   pheumatic_srv = pnh_.advertiseService("pheumatic_control", &ArduinoControl::pheumatic_control_cb, this);
+  check_success_srv = pnh_.advertiseService("check_suck_success", &ArduinoControl::check_suck_success, this);
 }
 
 bool ArduinoControl::vacuum_control_cb(vacuum_conveyor_control::vacuum_control::Request &req, 
@@ -69,6 +74,18 @@ bool ArduinoControl::pheumatic_control_cb(std_srvs::SetBool::Request &req, std_s
   }
   ROS_INFO("Receive pheumatic command");
   mySerial.write(command);
+  return true;
+}
+
+bool ArduinoControl::check_suck_success(std_srvs::SetBool::Request &req, std_srvs::SetBool::Response &res){
+  mySerial.write("s");
+  ros::Duration(0.1).sleep();
+  auto result = mySerial.readline();
+  int voltage = atoi(result.c_str());
+  ROS_INFO("Voltage received: %d", voltage);
+  if(voltage >= vacuum_thres)
+    res.success = false;
+  else res.success = true;
   return true;
 }
 

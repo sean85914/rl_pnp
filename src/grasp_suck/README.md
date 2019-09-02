@@ -33,7 +33,7 @@ The system is start with <code>item = N</code> and the process will stop after <
 | node   | robotiq_2f_gripper_control/Robotiq2FGripperRtuNode.py | Turn on robotiq 2-finger gripper |
 | node   | grasp_suck/robotiq_gripper_control                    | Trun on robotiq gripper control services |
 | node   | visual_system/pc_transform                            | Transform point cloud from eye coord. to hand coord. <br> Check if workspace is empty </br> |
-| node   | grasp_suck/get_reward                                 | Using consecutive depth images to judge if action succeed <br>TODO: use air pressure sensor to check if suck success</br> |
+| ~~node~~   | ~~grasp_suck/get_reward~~                                 | ~~Using consecutive depth images to judge if action succeed <br>TODO: use air pressure sensor to check if suck success</br>~~ |
 | launch | grasp_suck/helper_services.launch                     | High-level services, including homing, picking and placing | 
 | node | robotiq_ft_sensor/rq_sensor | Open force torch sensor, only do if use_ft set to true | 
 | node | visualization/viz_boundary.py | Visualize the limits of work space |
@@ -46,6 +46,7 @@ The system is start with <code>item = N</code> and the process will stop after <
 |<tr><td colspan=3><p align="center">**Gripper Related**</p></td></tr>|
 | /arduino_control/pheumatic_control | [std_srvs/SetBool](http://docs.ros.org/melodic/api/std_srvs/html/srv/SetBool.html) | Suction cup expansion and contraction |
 | /arduino_control/vacuum_control    | [vacuum_conveyor_control/vacuum_control](https://github.com/sean85914/flip_object/blob/master/src/vacuum_conveyor_control/srv/vacuum_control.srv) | Suction behavior control | 
+| /arduino_control/check_suck_success | [std_srvs/SetBool](http://docs.ros.org/melodic/api/std_srvs/html/srv/SetBool.html) | Check if suck success |
 | /robotiq_finger_control_node/intial_gripper | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Initialize gripper |
 | /robotiq_finger_control_node/close_gripper | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Close gripper |
 | /robotiq_finger_control_node/open_gripper  | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Open gripper | 

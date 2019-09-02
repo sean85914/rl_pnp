@@ -34,9 +34,9 @@
     <remap from="camera/color/camera_info" to="/camera1/color/camera_info"/>
   </node>
   <!-- Get reward based on consecutive depth images -->
-  <node pkg="grasp_suck" type="get_reward" name="get_reward" output="screen" required="true">
+  <!--node pkg="grasp_suck" type="get_reward" name="get_reward" output="screen" required="true">
     <param name="thres" value="$(arg move_thres)"/>
-  </node> 
+  </node--> 
   <!-- High-level Control -->
   <include file="$(find grasp_suck)/launch/helper_services.launch"/> 
   <node pkg="robotiq_ft_sensor" type="rq_sensor" name="rq_sensor" output="screen" if="$(arg use_ft)">

@@ -15,8 +15,8 @@ from trainer import Trainer
 # SRV
 from std_srvs.srv import Empty, SetBool, SetBoolRequest, SetBoolResponse, \
                          Trigger, TriggerRequest, TriggerResponse
-from grasp_suck.srv import get_pose, get_poseRequest, get_poseResponse, \
-                           get_result, get_resultRequest, get_resultResponse
+from grasp_suck.srv import get_pose, get_poseRequest, get_poseResponse, '''\
+                           get_result, get_resultRequest, get_resultResponse'''
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
                               get_xyz, get_xyzRequest, get_xyzResponse, \
                               pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse
@@ -117,9 +117,10 @@ grasp_state       = rospy.ServiceProxy('/robotiq_finger_control_node/get_grasp_s
 initial_gripper   = rospy.ServiceProxy('/robotiq_finger_control_node/initial_gripper', Empty)
 pheumatic         = rospy.ServiceProxy('/arduino_control/pheumatic_control', SetBool)
 vacuum            = rospy.ServiceProxy('/arduino_control/vacuum_control', vacuum_control)
+suck_state        = rospy.ServiceProxy('/arduino_control/check_suck_success', SetBool)
 
 # Get reward
-get_result         = rospy.ServiceProxy('/get_reward/get_result', get_result)
+#get_result         = rospy.ServiceProxy('/get_reward/get_result', get_result)
 
 # Helper
 goto_target = rospy.ServiceProxy('/helper_services_node/goto_target', get_pose)
@@ -276,14 +277,12 @@ try:
 		get_pc_req.file_name = pc_path + "/{}_after.pcd".format(iteration)
 		next_pc = get_pc_client(get_pc_req).pc
 		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(next_pc, image_path + "next_", iteration)
-		action_result_req = get_resultRequest(depth_img, next_depth_img)
+		#action_result_req = get_resultRequest(depth_img, next_depth_img)
 		if is_valid:
 			if not action: # GRASP
-				#action_success = grasp_state().success #and get_result(SetBoolRequest()).success
-				action_success = grasp_state().success #or get_result(action_result_req).result.data
+				action_success = grasp_state().success
 			else: # SUCK
-				#action_success = get_result(SetBoolRequest()).success
-				action_success = get_result(action_result_req).result.data
+				action_success = suck_state().success
 		else:
 			action_success = False
 
