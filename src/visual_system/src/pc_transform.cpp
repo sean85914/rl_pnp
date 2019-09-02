@@ -168,24 +168,21 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
   lock = true;
   ros::Time ts = ros::Time::now();
   // Transform points to hand coordinate
-  pcl::transformPointCloud(pc, pc, arm2cam_tf);
+  pcl::PointCloud<pcl::PointXYZRGB> pc_in_range;
+  pcl::transformPointCloud(pc, pc_in_range, arm2cam_tf);
   // Pass through XYZ
-  pass_x.setInputCloud(pc.makeShared());
-  pass_x.filter(pc);
-  pass_y.setInputCloud(pc.makeShared());
-  pass_y.filter(pc);
-  pass_z.setInputCloud(pc.makeShared());
-  pass_z.filter(pc);
-  /*
-  for(auto &p: pc){
-    double x = p.x,
-           y = p.y;
-    p.x = y; p.y = -x; 
-  }*/
+  pass_x.setInputCloud(pc_in_range.makeShared());
+  pass_x.filter(pc_in_range);
+  pass_y.setInputCloud(pc_in_range.makeShared());
+  pass_y.filter(pc_in_range);
+  pass_z.setInputCloud(pc_in_range.makeShared());
+  pass_z.filter(pc_in_range);
+  ROS_INFO("%d points in range", (int)pc_in_range.size());
   sensor_msgs::PointCloud2 pc2;
-  pcl::toROSMsg(pc, pc2);
+  pcl::toROSMsg(pc_in_range, pc2);
   pc2.header.frame_id = "base_link";
   res.pc = pc2;
+  std::cout << req.file_name.empty() << "\n";
   if(verbose and !req.file_name.empty()){
     std::string pc_name;
     // Make sure given filename has extension
@@ -199,7 +196,7 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
     boost::filesystem::path p(pc_name.substr(0, pos));
     if(!boost::filesystem::exists(p))
       create_directories(p);
-    pcl::io::savePCDFileASCII(pc_name, pc);
+    pcl::io::savePCDFileASCII(pc_name, pc_in_range);
   }
   lock = false;
   return true;
