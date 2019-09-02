@@ -26,7 +26,6 @@
 #include <visualization_msgs/Marker.h>
 
 bool verbose; // If save point cloud as pcd
-bool lock = false; // If lock data
 int num_thres; // Points less than this threshold will be considered as empty workspace
 double x_lower; // X lower bound, in hand coord.
 double x_upper; // X upper bound, in hand coord.
@@ -116,7 +115,6 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image,
                   const sensor_msgs::ImageConstPtr& depth_image, 
                   const sensor_msgs::CameraInfoConstPtr& cam_info)
 {
-  if(lock) return;
   intrinsic[0] = cam_info->K[0]; // fx
   intrinsic[1] = cam_info->K[4]; // fy
   intrinsic[2] = cam_info->K[2]; // cx
@@ -165,7 +163,6 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
 bool callback_get_pc(visual_system::get_pc::Request  &req, 
                      visual_system::get_pc::Response &res)
 {
-  lock = true;
   ros::Time ts = ros::Time::now();
   // Transform points to hand coordinate
   pcl::PointCloud<pcl::PointXYZRGB> pc_in_range;
@@ -198,6 +195,5 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
       create_directories(p);
     pcl::io::savePCDFileASCII(pc_name, pc_in_range);
   }
-  lock = false;
   return true;
 }
