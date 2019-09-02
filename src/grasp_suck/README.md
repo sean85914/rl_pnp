@@ -55,7 +55,7 @@ The system is start with <code>item = N</code> and the process will stop after <
 | /ur5_control_server/ur_control/goto_joint_pose | [arm_operation/joint_pose](https://github.com/sean85914/flip_object/blob/master/src/arm_operation/srv/joint_pose.srv) | Go to user given joint pose |
 | /ur5_control_server/ur_control/goto_pose | [arm_operation/target_pose](https://github.com/sean85914/flip_object/blob/master/src/arm_operation/srv/target_pose.srv) | Go to user given cartesian pose | 
 |<tr><td colspan=3><p align="center">**Visual Related**</p></td></tr>|
-| /get_reward/get_result | [grasp_suck/get_result](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/srv/get_result.srv) | Use consecutive depth heightmaps to determine if suck success |
+| ~~/get_reward/get_result~~ | ~~[grasp_suck/get_result](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/srv/get_result.srv)~~ | ~~Use consecutive depth heightmaps to determine if suck success~~ |
 | /pc_transform/get_pc | [visual_system/get_pc](https://github.com/sean85914/flip_object/blob/master/src/visual_system/srv/get_pc.srv) | Get pointcloud inside the workspace with coordinate of robot arm |
 | /pc_transform/empty_state | [visual_system/pc_is_empty](https://github.com/sean85914/flip_object/blob/master/src/visual_system/srv/pc_is_empty.srv) | Get if workspace is empty |
 |<tr><td colspan=3><p align="center">**High-level Services**</p></td></tr>|

@@ -13,7 +13,6 @@
   ?>
   <arg name="use_ft" default="false" doc="Whether turn on force torch sensor"/>
   <arg name="empty_thres" default="0" doc="If points in given range is greater than this threshold, the workspace will be considered as non-empty"/>
-  <arg name="move_thres" default="300" doc="If difference between two consecutive depth heightmaps is greater than this value, the action(suck) will be consider as success"/>
   <!-- TCP information -->
   <include file="$(find arm_operation)/launch/tcp_publisher.launch"/>
   <!-- Vacuum -->
