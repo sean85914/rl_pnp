@@ -14,11 +14,12 @@ $ source devel/setup.bash # DO THIS IN EACH NEW TERMINAL
 [Terminal 1] $ roslaunch arm_operation ur5_real.launch robot_ip:=192.168.50.11 tool_length:=0.0
 [Terminal 2] $ roslaunch realsense2_camera rs_rgbd.launch camera:=camera1
 [Terminal 3] $ roslaunch grasp_suck grasp_suck_system.launch
-[Terminal 4] $ cd src/grasp_suck/src && python main.py [--force_cpu] [--model PATH_TO_YOUR_MODEL] [--epidode EPISODE] [--epsilon epsilon]
+[Terminal 4] $ rosrun rviz rviz -d src/visualization/config/system.rviz
+[Terminal 5] $ cd src/grasp_suck/src && python main.py [--force_cpu] [--model PATH_TO_YOUR_MODEL] [--epidode EPISODE] [--epsilon epsilon] [--num_of_items NUM_OF_ITEMS] [--update_target UPDATE_TARGET]
 ```
 For testing, run
 ```
-[Terminal 4] $ python main.py --is_testing [--force_cpu] [--episode EPISODE] [--model PATH_TO_YOUR_MODEL] [--num_of_items NUM_OF_ITEMS] 
+[Terminal 4] $ python main.py --is_testing [--force_cpu] [--grasp_only] [--episode EPISODE] [--model PATH_TO_YOUR_MODEL] [--num_of_items NUM_OF_ITEMS] [--update_target UPDATE_TARGET]
 ```
 ## System Pipeline <a name="Pipeline"></a>
 <img src="img/dqn_grasp_and_suck.png" height=640px align="center"/>
