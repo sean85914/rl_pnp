@@ -168,8 +168,8 @@ try:
 		iter_ts = time.time()
 		get_pc_req = get_pcRequest()
 		get_pc_req.file_name = pc_path + "/{}_before.pcd".format(iteration)
-		msg = get_pc_client(get_pc_req)
-		color, depth, points, depth_img = utils.get_heightmap(msg.pc, image_path, iteration)
+		pc_response = get_pc_client(get_pc_req)
+		color, depth, points, depth_img = utils.get_heightmap(pc_response.pc, image_path, iteration)
 		ts = time.time()
 		print "[%f]: Forward pass..." %(time.time()), 
 		sys.stdout.write('')
@@ -300,6 +300,7 @@ try:
 					pheumatic(SetBoolRequest(False))
 					time.sleep(0.3)
 		ts = time.time()
+		is_empty = empty_checker(empty_checker_req).is_empty.data
 		if is_valid:
 			label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
 		                                                         next_color, next_depth, is_empty)
