@@ -104,6 +104,7 @@ bool Helper_Services::go_place_service_callback(std_srvs::Empty::Request &req, s
   if(last_motion==false){ // Grasp
     std_srvs::Empty empty;
     open_gripper.call(empty);
+    ros::Duration(0.3).sleep();
   } else{ // Suck
     int tmp_counter = 0;
     do{ // Call serveral times to make sure the suction work properly
@@ -217,6 +218,7 @@ bool Helper_Services::go_target_service_callback(
   if(req.primmitive==GRASP){ // Grasp
     std_srvs::Empty empty;
     close_gripper.call(empty); // Close gripper
+    ros::Duration(0.5).sleep();
   } else{ // Suck
     int tmp_counter=0;
     do{ // Call twice to make sure the suction work properly
