@@ -74,7 +74,7 @@ def draw_image(image, primitive, pixel_index):
 	result = cv2.circle(image, center, 7, (0, 0, 0), 2)
 	X = 20
 	Y = 7
-	theta = angle_map[pixel_index[0]]
+	theta = np.radians(-90+45*pixel_index[0])
 	x_unit = [ np.cos(theta), np.sin(theta)]
 	y_unit = [-np.sin(theta), np.cos(theta)]
 	if not primitive: # GRASP

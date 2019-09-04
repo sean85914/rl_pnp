@@ -274,7 +274,8 @@ try:
 		target_list.append(pixel_index)
 		# Get action result
 		get_pc_req.file_name = pc_path + "/{}_after.pcd".format(iteration)
-		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc_client(get_pc_req).pc, image_path + "next_", iteration)
+		next_pc = get_pc_client(get_pc_req).pc
+		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(next_pc, image_path + "next_", iteration)
 		#action_result_req = get_resultRequest(depth_img, next_depth_img)
 		if is_valid:
 			if not action: # GRASP
@@ -300,6 +301,8 @@ try:
 					pheumatic(SetBoolRequest(False))
 					time.sleep(0.3)
 		ts = time.time()
+		empty_checker_req = pc_is_emptyRequest()
+		empty_checker_req.input_pc = next_pc
 		is_empty = empty_checker(empty_checker_req).is_empty.data
 		if is_valid:
 			label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
@@ -330,7 +333,6 @@ try:
 				print "Fail to pass test since too much invalid target"
 				break
 		time.sleep(0.5) # Sleep 0.5 s for next iteration
-		empty_checker_req = pc_is_emptyRequest()
 		get_pc_req.file_name = str()
 		empty_checker_req.input_pc = get_pc_client(get_pc_req).pc
 		#is_empty = (num_of_items == 0)

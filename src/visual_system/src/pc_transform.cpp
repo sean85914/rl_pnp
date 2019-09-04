@@ -179,7 +179,6 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
   pcl::toROSMsg(pc_in_range, pc2);
   pc2.header.frame_id = "base_link";
   res.pc = pc2;
-  std::cout << req.file_name.empty() << "\n";
   if(verbose and !req.file_name.empty()){
     std::string pc_name;
     // Make sure given filename has extension
