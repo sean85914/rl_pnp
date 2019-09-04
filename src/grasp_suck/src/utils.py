@@ -112,7 +112,25 @@ def vis_affordance(predictions):
                        __/ |                                 
                       |___/                                  
 '''
-
+# Choose action using grasp-only epsilon-greedy policy
+def grasp_epsilon_greedy_policy(epsilon, grasp_predictions):
+	explore = np.random.uniform() < epsilon
+	action = 0
+	action_str = 'grasp'
+	angle = 0
+	pixel_index = [] # rotate_idx, y, x
+	if not explore:
+		tmp = np.where(grasp_predictions == np.max(grasp_predictions))
+		pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
+		angle = angle_map[pixel_index[0]]
+	else: # explore, use second best
+		flat = grasp_predictions.flatten()
+		flat = flat.sort()
+		tmp = np.where(grasp_predictions == flat[-2])
+		pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
+		angle = angle_map[pixel_index[0]]
+	return explore, action, action_str, pixel_index, angle
+		
 # Choose action using epsilon-greedy policy
 def epsilon_greedy_policy(epsilon, suck_predictions, grasp_predictions):
 	explore = np.random.uniform() < epsilon

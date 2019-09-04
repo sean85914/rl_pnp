@@ -199,8 +199,12 @@ try:
 		explore = -1 # None
 		# Policy decider
 		if not testing: # Train
-			explore, action, action_str, pixel_index, angle = \
-				utils.epsilon_greedy_policy(epsilon_, suck_predictions, grasp_predictions)
+			if not grasp_only:
+				explore, action, action_str, pixel_index, angle = \
+					utils.epsilon_greedy_policy(epsilon_, suck_predictions, grasp_predictions)
+			else:
+				explore, action, action_str, pixel_index, angle = \
+					utils.epsilon_greedy_policy(epsilon_, grasp_predictions)
 		if testing: # Test
 			if not grasp_only:
 				action, action_str, pixel_index, angle = utils.greedy_policy(suck_predictions, grasp_predictions)
