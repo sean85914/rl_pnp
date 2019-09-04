@@ -27,7 +27,7 @@
 #define SUCK  true
 
 const int    REPEAT_TIME = 2;
-const double OFFSET = -0.022f; // Lower 1 centimeter to make sure have contract with object
+const double OFFSET = -0.027f; // Lower 1 centimeter to make sure have contract with object
 const double X_OFFSET = 0.0f; // Seems error from hand-eye calibration
 
 class Helper_Services{
