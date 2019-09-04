@@ -6,6 +6,7 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   // Initialize vector size
   suction_tcp.resize(3); gripper_tcp.resize(3); home_joint.resize(6); place_joint.resize(6);
   // Get parameters
+  if(!pnh.getParam("has_vacuum", has_vacuum)) has_vacuum = false;
   if(!pnh.getParam("cam_prefix", cam_prefix)) cam_prefix = "camera1";
   if(!pnh.getParam("arn_prefix", arm_prefix)) arm_prefix = "";
   if(!pnh.getParam("/tcp_transformation_publisher/suction", suction_tcp)) {suction_tcp[0] = suction_tcp[1] = suction_tcp[2] = 0.0f;}
@@ -14,6 +15,7 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   if(!pnh.getParam("place_joint", place_joint)) {define_place = false; ROS_WARN("No predefined place joint received!");}
   // Show parameters
   ROS_INFO("--------------------------------------");
+  ROS_INFO("has_vacuum: %s", (has_vacuum==true?"true":"false"));
   ROS_INFO("Camera prefix: %s", cam_prefix.c_str());
   ROS_INFO("Arm prefix: %s", arm_prefix.c_str());
   ROS_INFO("Suction translation: %f %f %f", suction_tcp[0], suction_tcp[1], suction_tcp[2]);
@@ -32,26 +34,21 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   while(!ros::service::waitForService("/ur5_control_server/ur_control/goto_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_pose service...");}
   robot_arm_goto_pose = pnh.serviceClient<arm_operation::target_pose>("/ur5_control_server/ur_control/goto_pose");
   // vacuum_control
-  while(!ros::service::waitForService("/arduino_control/vacuum_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to vacuum_control service...");}
-  vacuum_control = pnh.serviceClient<vacuum_conveyor_control::vacuum_control>("/arduino_control/vacuum_control");
+  if(has_vacuum){
+    while(!ros::service::waitForService("/arduino_control/vacuum_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to vacuum_control service...");}
+    vacuum_control = pnh.serviceClient<vacuum_conveyor_control::vacuum_control>("/arduino_control/vacuum_control");
+  }
   // pheumatic_control
-  while(!ros::service::waitForService("/arduino_control/pheumatic_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to pheumatic_control service...");}
-  pheumatic_control = pnh.serviceClient<std_srvs::SetBool>("/arduino_control/pheumatic_control");
+  if(has_vacuum){
+    while(!ros::service::waitForService("/arduino_control/pheumatic_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to pheumatic_control service...");}
+    pheumatic_control = pnh.serviceClient<std_srvs::SetBool>("/arduino_control/pheumatic_control");
+  }
   // close_gripper
   while(!ros::service::waitForService("/robotiq_finger_control_node/close_gripper", ros::Duration(3.0))) {ROS_WARN("Try to connect to close_gripper service...");}
   close_gripper = pnh.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/close_gripper");
   // open_gripper
   while(!ros::service::waitForService("/robotiq_finger_control_node/open_gripper", ros::Duration(3.0))) {ROS_WARN("Try to connect to open_gripper service...");}
   open_gripper = pnh.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/open_gripper");
-  // get_grasp_state
-  /*while(!ros::service::waitForService("/robotiq_finger_control_node/get_grasp_state", ros::Duration(3.0))) {ROS_WARN("Try to connect to get_grasp_state service...");}
-  get_grasp_state = pnh.serviceClient<std_srvs::Trigger>("/robotiq_finger_control_node/get_grasp_state");*/
-  // set_prior
-  //while(!ros::service::waitForService("/get_reward/set_prior", ros::Duration(3.0))) {ROS_WARN("Try to connect to set_prior service...");}
-  //set_prior = pnh.serviceClient<std_srvs::Empty>("/get_reward/set_prior");
-  // set_posterior
-  //while(!ros::service::waitForService("/get_reward/set_posterior", ros::Duration(3.0))) {ROS_WARN("Try to connect to set_posterior service...");}
-  //set_posterior = pnh.serviceClient<std_srvs::Empty>("/get_reward/set_posterior");
   // Advertise service server
   // go home
   assert(define_home);
@@ -207,7 +204,7 @@ bool Helper_Services::go_target_service_callback(
   // Correction
   res.result_pose.position.x += X_OFFSET; 
   res.result_pose.position.z += OFFSET;
-  if(req.primmitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.014f; // Low object, for instance, cuboid lying down
+  if(req.primmitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.02f; // Low object, for instance, cuboid lying down
   if(req.primmitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.014f; // Hight object, for instance, standed cylinder
   if(req.primmitive==SUCK  and res.result_pose.position.z<=0.23f) res.result_pose.position.z = 0.23f;
   arm_operation::target_pose myPoseReq;

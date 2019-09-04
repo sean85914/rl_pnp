@@ -30,9 +30,18 @@
       <material name="black"/>
     </visual>
   </link>
+  <!-- For original version
   <joint name="arm2cam1_joint" type="fixed">
     <origin xyz="-0.673540 -0.035113 0.726538"
             rpy="0.049012 1.178053 0.051708"/>
+    <parent link="base_link"/>
+    <child link="camera1_link"/>
+  </joint>
+  !-->
+  <!-- For ICT demo -->
+  <joint name="arm2cam1_joint" type="fixed">
+    <origin xyz="-0.756954 -0.049132 0.930176"
+            rpy="0.018308 1.142433 0.030754"/>
     <parent link="base_link"/>
     <child link="camera1_link"/>
   </joint>

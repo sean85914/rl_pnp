@@ -1,6 +1,11 @@
 <launch>
+  <arg name="has_vacuum" default="true"/>
   <node pkg="grasp_suck" type="helper_services" name="helper_services_node" output="screen" clear_params="true">
+    <param name="has_vacuum" value="$(arg has_vacuum)"/>
     <rosparam param="home_joint">[2.834, -2.629, 1.749, -1.482, -1.457, -0.187]</rosparam>
+    <!--
     <rosparam param="place_joint">[3.776, -1.559, 1.602, -2.152, -1.211, -0.447]</rosparam>
+    -->
+    <rosparam param="place_joint">[2.514, -1.737, 1.677, -2.070, -1.758, 0.177]</rosparam>
   </node>
 </launch>

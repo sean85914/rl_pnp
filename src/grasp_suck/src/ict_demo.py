@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import numpy as np
 import argparse
@@ -7,15 +8,14 @@ import rospkg
 import torch
 import utils
 from trainer import Trainer
-from std_srvs.srv import Empty, SetBool, SetBoolRequest, SetBoolResponse
+from std_srvs.srv import Empty, SetBool, SetBoolRequest, SetBoolResponse, Trigger
 from grasp_suck.srv import get_pose, get_poseRequest, get_poseResponse
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
                               pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse
-from vacuum_conveyor_control.srv import vacuum_contol, vacuum_controlRequest
 from visualization.srv import viz_marker, viz_markerRequest, viz_markerResponse
 
 parser = argparse.ArgumentParser(prog="ict_demo", description="For ICT demo")
-parser.add_argument("--model", type=str, help="Network model")
+parser.add_argument("--model", type=str, help="Network model", required=True)
 parser.add_argument("--update_target", type=int, default=5, help="Freuqency to update target network")
 args = parser.parse_args()
 
@@ -24,13 +24,13 @@ run          = 0
 suck_reward  = 2.0
 grasp_reward = 2.0
 discount     = 0.5
-Z_THRES      = 0.015 # z value less than this value will be considered as invalid FIXME
+Z_THRES      = 0.028 # z value less than this value will be considered as invalid
 update_fre = args.update_target
 
 # Directory
 r = rospkg.RosPack()
 package_path = r.get_path('grasp_suck')
-logger_dir = package_path + "ict_demo/"
+logger_dir = package_path + "/ict_demo/"
 image_dir = logger_dir + "images/"
 pc_path    = logger_dir + "pc/"
 
@@ -55,8 +55,6 @@ trainer.model.load_state_dict(torch.load(args.model))
 open_gripper      = rospy.ServiceProxy('/robotiq_finger_control_node/open_gripper', Empty)
 grasp_state       = rospy.ServiceProxy('/robotiq_finger_control_node/get_grasp_state', Trigger)
 initial_gripper   = rospy.ServiceProxy('/robotiq_finger_control_node/initial_gripper', Empty)
-pheumatic         = rospy.ServiceProxy('/arduino_control/pheumatic_control', SetBool)
-vacuum            = rospy.ServiceProxy('/arduino_control/vacuum_control', vacuum_control)
 suck_state        = rospy.ServiceProxy('/arduino_control/check_suck_success', SetBool)
 
 # Helper
@@ -71,15 +69,13 @@ empty_checker = rospy.ServiceProxy('/pc_transform/empty_state', pc_is_empty)
 # Visualization
 viz = rospy.ServiceProxy('/viz_marker_node/viz_marker', viz_marker)
 
-print "[%f] Initializing..." %(time.time)
+print "[%f] Initializing..." %(time.time())
 go_home()
 initial_gripper()
 open_gripper()
-pheumatic(SetBoolRequest(False))
-vacuum(vacuum_controlRequest(0))
 
 while 1:
-	command = raw_input("Press 's' to start, 'e' to exit:")
+	command = raw_input("\n\nPress 's' to start, 'e' to exit:\n\n")
 	if command == 'e':
 		break
 	elif command == 's':
@@ -94,7 +90,7 @@ while 1:
 		while not is_empty:
 			iter_ts = time.time()
 			get_pc_req = get_pcRequest()
-			get_pc_req.file_name = pc_path + "/{}_{}_before.pcd".format(iteration)
+			get_pc_req.file_name = pc_path + "/{}_{}_before.pcd".format(run, iteration)
 			pc_response = get_pc_client(get_pc_req)
 			color, depth, points, depth_img = utils.get_heightmap(pc_response.pc, image_path, iteration)
 			ts = time.time()
@@ -151,11 +147,15 @@ while 1:
 				go_home()
 			# Get action result
 			get_pc_req.file_name = pc_path + "/{}_after.pcd".format(iteration)
-			next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(get_pc_client(get_pc_req).pc, image_path + "next_", iteration)
+			next_pc = get_pc_client(get_pc_req).pc
+			next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(next_pc, image_path + "next_", iteration)
 			if is_valid: action_success = grasp_state().success
+			else: action_success = False
 			if action_success: go_place()
 			else: open_gripper()
 			ts = time.time()
+			empty_checker_req = pc_is_emptyRequest()
+			empty_checker_req.input_pc = next_pc
 			is_empty = empty_checker(empty_checker_req).is_empty.data
 			if is_valid:
 				label_value, prev_reward_value = trainer.get_label_value(action_str, action_success, \
@@ -176,7 +176,6 @@ while 1:
 				print "Update target network"
 				trainer.target = trainer.model
 			time.sleep(0.5) # Sleep 0.5 s for next iteration
-			empty_checker_req = pc_is_emptyRequest()
 			get_pc_req.file_name = str()
 			empty_checker_req.input_pc = get_pc_client(get_pc_req).pc
 			is_empty = empty_checker(empty_checker_req).is_empty.data
