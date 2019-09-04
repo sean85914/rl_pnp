@@ -22,7 +22,7 @@
   <!-- Convert pointcloud from eye coord. to hand coord. -->
   <node pkg="visual_system" type="pc_transform" name="pc_transform" output="screen" required="true">
     <param name="verbose" value="true"/>
-    <param name="z_thres_lower" value="0.03"/>
+    <param name="z_thres_lower" value="0.02"/>
     <param name="num_thres" value="$(arg empty_thres)"/>
     <remap from="camera/color/image_raw" to="/camera1/color/image_raw"/>
     <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>

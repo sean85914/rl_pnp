@@ -24,7 +24,7 @@ run          = 0
 suck_reward  = 2.0
 grasp_reward = 2.0
 discount     = 0.5
-Z_THRES      = 0.028 # z value less than this value will be considered as invalid
+Z_THRES      = 0.016 # z value less than this value will be considered as invalid
 update_fre = args.update_target
 
 # Directory

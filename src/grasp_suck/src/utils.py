@@ -125,7 +125,7 @@ def grasp_epsilon_greedy_policy(epsilon, grasp_predictions):
 		angle = angle_map[pixel_index[0]]
 	else: # explore, use second best
 		flat = grasp_predictions.flatten()
-		flat = flat.sort()
+		flat = np.sort(flat)
 		tmp = np.where(grasp_predictions == flat[-2])
 		pixel_index = [tmp[0][0], tmp[1][0], tmp[2][0]]
 		angle = angle_map[pixel_index[0]]

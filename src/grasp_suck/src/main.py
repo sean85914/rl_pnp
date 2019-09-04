@@ -46,11 +46,13 @@ episode      = args.episode
 suck_reward  = 2.0
 grasp_reward = 2.0
 discount     = 0.5
-Z_THRES      = 0.015 # z value less than this value will be considered as invalid
+Z_THRES      = 0.016 # z value less than this value will be considered as invalid, CHANGE HERE
 num_of_items = args.num_of_items  # Number of items when start
 init_num     = num_of_items
 cnt_invalid  = 0 # Consecutive invalid action counter
 update_fre = args.update_target
+
+grasp_only_training = not testing and grasp_only
 
 if testing:
 	print "########TESTING MODE########"
@@ -154,8 +156,9 @@ print "Initializing..."
 go_home()
 initial_gripper()
 open_gripper()
-pheumatic(SetBoolRequest(False))
-vacuum(vacuum_controlRequest(0))
+if not grasp_only_training:
+	pheumatic(SetBoolRequest(False))
+	vacuum(vacuum_controlRequest(0))
 
 is_empty = False
 total_time = 0.0
@@ -204,7 +207,7 @@ try:
 					utils.epsilon_greedy_policy(epsilon_, suck_predictions, grasp_predictions)
 			else:
 				explore, action, action_str, pixel_index, angle = \
-					utils.epsilon_greedy_policy(epsilon_, grasp_predictions)
+					utils.grasp_epsilon_greedy_policy(epsilon_, grasp_predictions)
 		if testing: # Test
 			if not grasp_only:
 				action, action_str, pixel_index, angle = utils.greedy_policy(suck_predictions, grasp_predictions)
