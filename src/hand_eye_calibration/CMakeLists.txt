@@ -25,6 +25,8 @@ include_directories(
   ${Eigen3_INCLUDE_DIRS}
 )
 
+message(STATUS "${Eigen3_INCLUDE_DIRS}")
+
 add_executable(static_hand_eye_calibration src/static_cam_calibration.cpp)
 add_dependencies(static_hand_eye_calibration ${catkin_EXPORTED_TARGETS})
 target_link_libraries(static_hand_eye_calibration ${catkin_LIBRARIES})
@@ -39,4 +41,5 @@ target_link_libraries(get_transform ${Eigen3_LIBRARIES} ${catkin_LIBRARIES})
 add_executable(eyes_calibration src/eyes_calibration.cpp)
 target_link_libraries(eyes_calibration ${catkin_LIBRARIES})
 
-
+add_executable(cam_on_hand_navy src/cam_on_hand_navy.cpp)
+target_link_libraries(cam_on_hand_navy ${catkin_LIBRARIES})
