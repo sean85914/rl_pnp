@@ -56,12 +56,12 @@ int main(int argc, char** argv)
   T.getBasis().getRPY(r, p, y);
   std::cout << "----------------------------------------------------\n";
   std::cout << "Translation: ["
-            << T.getOrigin().getX() << ", " << T.getOrigin().getY() << ", " << T.getOrigin().getZ() << "]\n"
+            << T.getOrigin().getX() << " " << T.getOrigin().getY() << " " << T.getOrigin().getZ() << "]\n"
             << "Orientation: (Quaternion) ["  
-            << T.getRotation().getX() << ", " << T.getRotation().getY() << ", "
-            << T.getRotation().getZ() << ", " << T.getRotation().getW() << "]\n"
+            << T.getRotation().getX() << " " << T.getRotation().getY() << " "
+            << T.getRotation().getZ() << " " << T.getRotation().getW() << "]\n"
             << "Orientation: (Euler) [" 
-            << r << ", " << p << ", " << y << "]\n";
+            << r << " " << p << " " << y << "]\n";
   return 0;
 }
 
