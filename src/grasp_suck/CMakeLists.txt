@@ -54,5 +54,5 @@ add_executable(robotiq_gripper_control src/robotiq_gripper_control.cpp)
 add_dependencies(robotiq_gripper_control ${catkin_EXPORTED_TARGETS})
 target_link_libraries(robotiq_gripper_control ${catkin_LIBRARIES})
 
-add_executable(get_reward src/get_reward.cpp)
-target_link_libraries(get_reward ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+#add_executable(get_reward src/get_reward.cpp)
+#target_link_libraries(get_reward ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
