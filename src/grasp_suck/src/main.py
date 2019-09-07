@@ -8,7 +8,6 @@ import torch
 import rospy
 import rospkg
 import utils
-from threading import Thread
 from cv_bridge import CvBridge, CvBridgeError
 # Network
 from trainer import Trainer
@@ -22,7 +21,7 @@ from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
 from vacuum_conveyor_control.srv import vacuum_control, vacuum_controlRequest
 from visualization.srv import viz_marker, viz_markerRequest, viz_markerResponse
 
-parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="pick and place by trial and error using DQN")
+parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="learning pick and place by trial and error using DQN")
 parser.add_argument("--is_testing", action="store_true",  default=False, help="True if testing, default is false")
 parser.add_argument("--force_cpu",  action="store_true",  default=False, help="True if using CPU, default is false")
 parser.add_argument("--grasp_only", action="store_true",  default=False, help="True if using grasp-only policy, default is false")
