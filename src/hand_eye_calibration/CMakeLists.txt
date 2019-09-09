@@ -31,6 +31,9 @@ add_executable(static_hand_eye_calibration src/static_cam_calibration.cpp)
 add_dependencies(static_hand_eye_calibration ${catkin_EXPORTED_TARGETS})
 target_link_libraries(static_hand_eye_calibration ${catkin_LIBRARIES})
 
+add_executable(static_cam_by_on_hand src/static_cam_by_on_hand.cpp)
+target_link_libraries(static_cam_by_on_hand ${catkin_LIBRARIES})
+
 add_executable(cam_on_hand_calibration src/cam_on_hand_calibration.cpp)
 add_dependencies(cam_on_hand_calibration ${catkin_EXPORTED_TARGETS})
 target_link_libraries(cam_on_hand_calibration ${catkin_LIBRARIES})
