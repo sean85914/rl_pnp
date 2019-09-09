@@ -35,13 +35,14 @@ double z_lower; // Z lower bound, in hand coord.
 double z_upper; // Z upper bound, in hand coord.
 double z_thres_lower; // Z lower bound to check if workspace were empty
 double z_thres_upper; // Z upper bound to check if workspace were empty
-std::vector<double> intrinsic; // [fx, fy, cx, cy]
-cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
-Eigen::Matrix4f arm2cam_tf;
-pcl::PointCloud<pcl::PointXYZRGB> pc;
+std::string cam_name, on_hand_cam_name;
+std::vector<double> cam_intrinsic, on_hand_cam_intrinsic; // [fx, fy, cx, cy]
+cv_bridge::CvImagePtr cam_color_img_ptr, cam_depth_img_ptr, on_hand_cam_color_img_ptr, on_hand_cam_depth_img_ptr;
+Eigen::Matrix4f arm2cam_tf, arm2on_hand_cam;
+pcl::PointCloud<pcl::PointXYZRGB> pc_cam, pc_on_hand_cam;
 pcl::PassThrough<pcl::PointXYZRGB> pass_x, pass_y, pass_z;
 
-Eigen::Matrix4f lookup_transform(void);
+Eigen::Matrix4f lookup_transform(std::string target_frame);
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, 
                   const sensor_msgs::ImageConstPtr& depth_image,
                   const sensor_msgs::CameraInfoConstPtr& cam_info);
@@ -51,7 +52,7 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
 
 int main(int argc, char** argv)
 {
-  intrinsic.resize(4);
+  cam_intrinsic.resize(4); on_hand_cam_intrinsic.resize(4);
   ros::init(argc, argv, "pixel_to_xyz");
   ros::NodeHandle nh, pnh("~");
   if(!pnh.getParam("x_lower", x_lower)) x_lower = -0.659f;
@@ -68,7 +69,9 @@ int main(int argc, char** argv)
     ROS_WARN("Save pointcloud for debuging");
   else
     ROS_WARN("Not save pointcloud");
-  arm2cam_tf = lookup_transform();
+  if(!pnh.getParam("cam_name", cam_name)) cam_name = "camera1";
+  if(!pnh.getParam("on_hand_cam_name", on_hand_cam_name)) on_hand_cam_name = "on_hand_cam";
+  arm2cam_tf = lookup_transform(cam_name+"_color_optical_frame");
   pass_x.setFilterFieldName("x");
   pass_x.setFilterLimits(x_lower, x_upper);
   pass_y.setFilterFieldName("y");
@@ -76,28 +79,33 @@ int main(int argc, char** argv)
   pass_z.setFilterFieldName("z");
   pass_z.setFilterLimits(z_lower, z_upper);
   // Message filter: color image, depth image, color camera info
-  message_filters::Subscriber<sensor_msgs::Image> color_image_sub(nh, "camera/color/image_raw", 1);
-  message_filters::Subscriber<sensor_msgs::Image> depth_image_sub(nh, "camera/aligned_depth_to_color/image_raw", 1);
-  message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub(nh, "camera/color/camera_info", 1);
+  message_filters::Subscriber<sensor_msgs::Image> cam_color_image_sub(nh, cam_name+"/color/image_raw", 1);
+  message_filters::Subscriber<sensor_msgs::Image> cam_depth_image_sub(nh, cam_name+"/aligned_depth_to_color/image_raw", 1);
+  message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub(nh, cam_name+"/color/camera_info", 1);
+  message_filters::Subscriber<sensor_msgs::Image> on_hane_cam_color_image_sub(nh, on_hand_cam_name+"/color/image_raw", 1);
+  message_filters::Subscriber<sensor_msgs::Image> on_hand_cam_depth_image_sub(nh, on_hand_cam_name+"/aligned_depth_to_color/image_raw", 1);
+  message_filters::Subscriber<sensor_msgs::CameraInfo> on_hand_cam_info_sub(nh, on_hand_cam_name+"/color/camera_info", 1);
   typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, 
                                                     sensor_msgs::Image,
                                                     sensor_msgs::CameraInfo> \
                                                     MySyncPolicy;
-  message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), color_image_sub, depth_image_sub, info_sub);
-  sync.registerCallback(boost::bind(&callback_sub, _1, _2, _3));
+  message_filters::Synchronizer<MySyncPolicy> sync_cam(MySyncPolicy(10), cam_color_image_sub, cam_depth_image_sub, cam_info_sub);
+  message_filters::Synchronizer<MySyncPolicy> sync_on_hand_cam(MySyncPolicy(10), on_hane_cam_color_image_sub, on_hand_cam_depth_image_sub, on_hand_cam_info_sub);
+  sync_cam.registerCallback(boost::bind(&callback_sub, _1, _2, _3));
+  sync_on_hand_cam.registerCallback(boost::bind(&callback_sub, _1, _2, _3));
   ros::ServiceServer pc_service = pnh.advertiseService("get_pc", callback_get_pc);
   ros::ServiceServer check_empty_service = pnh.advertiseService("empty_state", callback_is_empty);
   ros::spin();
   return 0;
 }
 
-Eigen::Matrix4f lookup_transform(void){
+Eigen::Matrix4f lookup_transform(std::string target_frame){
   Eigen::Matrix4f eigen_mat = Eigen::Matrix4f::Identity();
   tf::TransformListener listener;
   tf::StampedTransform stf;
   try{
-    listener.waitForTransform("base_link", "camera1_color_optical_frame", ros::Time(0), ros::Duration(0.3));
-    listener.lookupTransform("base_link", "camera1_color_optical_frame", ros::Time(0), stf);
+    listener.waitForTransform("base_link", target_frame, ros::Time(0), ros::Duration(0.3));
+    listener.lookupTransform("base_link", target_frame, ros::Time(0), stf);
   } catch(tf::TransformException ex){
     ROS_ERROR("%s", ex.what());
     ROS_ERROR("Can't get transformation, shutdown...");
@@ -115,32 +123,63 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image,
                   const sensor_msgs::ImageConstPtr& depth_image, 
                   const sensor_msgs::CameraInfoConstPtr& cam_info)
 {
-  intrinsic[0] = cam_info->K[0]; // fx
-  intrinsic[1] = cam_info->K[4]; // fy
-  intrinsic[2] = cam_info->K[2]; // cx
-  intrinsic[3] = cam_info->K[5]; // cy
-  try{
-    color_img_ptr = cv_bridge::toCvCopy(color_image, sensor_msgs::image_encodings::BGR8);
-  } catch(cv_bridge::Exception &e) {
-    ROS_ERROR("cv_bridge exception: %s", e.what()); return;
-  }  
-  try{
-    depth_img_ptr = cv_bridge::toCvCopy(depth_image, sensor_msgs::image_encodings::TYPE_16UC1);
-  } catch(cv_bridge::Exception &e) {
-    ROS_ERROR("cv_bridge exception: %s", e.what()); return;
-  }
-  pc.clear();
-  for(int x=0; x<color_img_ptr->image.cols; ++x){ // 0~639
-    for(int y=0; y<color_img_ptr->image.rows; ++y){ // 0~479
-      auto depth = depth_img_ptr->image.at<unsigned short>(cv::Point(x, y));
-      pcl::PointXYZRGB p;
-      p.z = depth*0.001; // mm to m
-      p.x = (x-intrinsic[2])/intrinsic[0]*p.z; // x = (u-cx)/fx*z
-      p.y = (y-intrinsic[3])/intrinsic[1]*p.z; // y = (v-cy)/fy*z
-      p.r = color_img_ptr->image.at<cv::Vec3b>(y, x)[2];
-      p.g = color_img_ptr->image.at<cv::Vec3b>(y, x)[1];
-      p.b = color_img_ptr->image.at<cv::Vec3b>(y, x)[0];
-      pc.points.push_back(p);
+  if(cam_info->header.frame_id == cam_name+"_color_optical_frame"){
+    cam_intrinsic[0] = cam_info->K[0]; // fx
+    cam_intrinsic[1] = cam_info->K[4]; // fy
+    cam_intrinsic[2] = cam_info->K[2]; // cx
+    cam_intrinsic[3] = cam_info->K[5]; // cy
+    try{
+      cam_color_img_ptr = cv_bridge::toCvCopy(color_image, sensor_msgs::image_encodings::BGR8);
+    } catch(cv_bridge::Exception &e) {
+      ROS_ERROR("cv_bridge exception: %s", e.what()); return;
+    }  
+    try{
+      cam_depth_img_ptr = cv_bridge::toCvCopy(depth_image, sensor_msgs::image_encodings::TYPE_16UC1);
+    } catch(cv_bridge::Exception &e) {
+      ROS_ERROR("cv_bridge exception: %s", e.what()); return;
+    }
+    pc_cam.clear();
+    for(int x=0; x<cam_color_img_ptr->image.cols; ++x){ // 0~639
+      for(int y=0; y<cam_color_img_ptr->image.rows; ++y){ // 0~479
+        auto depth = cam_depth_img_ptr->image.at<unsigned short>(cv::Point(x, y));
+        pcl::PointXYZRGB p;
+        p.z = depth*0.001; // mm to m
+        p.x = (x-cam_intrinsic[2])/cam_intrinsic[0]*p.z; // x = (u-cx)/fx*z
+        p.y = (y-cam_intrinsic[3])/cam_intrinsic[1]*p.z; // y = (v-cy)/fy*z
+        p.r = cam_color_img_ptr->image.at<cv::Vec3b>(y, x)[2];
+        p.g = cam_color_img_ptr->image.at<cv::Vec3b>(y, x)[1];
+        p.b = cam_color_img_ptr->image.at<cv::Vec3b>(y, x)[0];
+        pc_cam.points.push_back(p);
+      }
+    }
+  }else if(cam_info->header.frame_id == on_hand_cam_name+"_color_optical_frame"){
+    on_hand_cam_intrinsic[0] = cam_info->K[0]; // fx
+    on_hand_cam_intrinsic[1] = cam_info->K[4]; // fy
+    on_hand_cam_intrinsic[2] = cam_info->K[2]; // cx
+    on_hand_cam_intrinsic[3] = cam_info->K[5]; // cy
+    try{
+      on_hand_cam_color_img_ptr = cv_bridge::toCvCopy(color_image, sensor_msgs::image_encodings::BGR8);
+    } catch(cv_bridge::Exception &e) {
+      ROS_ERROR("cv_bridge exception: %s", e.what()); return;
+    }  
+    try{
+      on_hand_cam_depth_img_ptr = cv_bridge::toCvCopy(depth_image, sensor_msgs::image_encodings::TYPE_16UC1);
+    } catch(cv_bridge::Exception &e) {
+      ROS_ERROR("cv_bridge exception: %s", e.what()); return;
+    }
+    pc_on_hand_cam.clear();
+    for(int x=0; x<on_hand_cam_color_img_ptr->image.cols; ++x){ // 0~639
+      for(int y=0; y<on_hand_cam_color_img_ptr->image.rows; ++y){ // 0~479
+        auto depth = on_hand_cam_depth_img_ptr->image.at<unsigned short>(cv::Point(x, y));
+        pcl::PointXYZRGB p;
+        p.z = depth*0.001; // mm to m
+        p.x = (x-on_hand_cam_intrinsic[2])/on_hand_cam_intrinsic[0]*p.z; // x = (u-cx)/fx*z
+        p.y = (y-on_hand_cam_intrinsic[3])/on_hand_cam_intrinsic[1]*p.z; // y = (v-cy)/fy*z
+        p.r = on_hand_cam_color_img_ptr->image.at<cv::Vec3b>(y, x)[2];
+        p.g = on_hand_cam_color_img_ptr->image.at<cv::Vec3b>(y, x)[1];
+        p.b = on_hand_cam_color_img_ptr->image.at<cv::Vec3b>(y, x)[0];
+        pc_on_hand_cam.points.push_back(p);
+      }
     }
   }
 }
@@ -164,9 +203,13 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
                      visual_system::get_pc::Response &res)
 {
   ros::Time ts = ros::Time::now();
+  // Get transformation from base_link to on_hand_cam
+  arm2on_hand_cam = lookup_transform(on_hand_cam_name+"_color_optical_frame");
   // Transform points to hand coordinate
-  pcl::PointCloud<pcl::PointXYZRGB> pc_in_range;
-  pcl::transformPointCloud(pc, pc_in_range, arm2cam_tf);
+  pcl::PointCloud<pcl::PointXYZRGB> pc_in_range, pc_cam_transformed, pc_on_hand_cam_transformed;
+  pcl::transformPointCloud(pc_cam, pc_cam_transformed, arm2cam_tf);
+  pcl::transformPointCloud(pc_on_hand_cam, pc_on_hand_cam_transformed, arm2on_hand_cam);
+  pc_in_range = pc_cam_transformed + pc_on_hand_cam_transformed;
   // Pass through XYZ
   pass_x.setInputCloud(pc_in_range.makeShared());
   pass_x.filter(pc_in_range);
