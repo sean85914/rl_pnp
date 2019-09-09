@@ -22,9 +22,9 @@ inline Eigen::Matrix4f tf2eigen(const tf::Transform t){
 }
 inline void print_tf(const tf::Transform t){
   std::cout << std::setw(10) \
-<< t.getBasis()[0].getX() << ", " << t.getBasis()[0].getY() << ", " << t.getBasis()[0].getZ() << ", " << t.getOrigin().getX() << ", " \
-<< t.getBasis()[1].getX() << ", " << t.getBasis()[1].getY() << ", " << t.getBasis()[1].getZ() << ", " << t.getOrigin().getY() << ", " \
-<< t.getBasis()[2].getX() << ", " << t.getBasis()[2].getY() << ", " << t.getBasis()[2].getZ() << ", " << t.getOrigin().getZ() << ", " \
+<< t.getBasis()[0].getX() << ", " << t.getBasis()[0].getY() << ", " << t.getBasis()[0].getZ() << ", " << t.getOrigin().getX() << "\n" \
+<< t.getBasis()[1].getX() << ", " << t.getBasis()[1].getY() << ", " << t.getBasis()[1].getZ() << ", " << t.getOrigin().getY() << "\n" \
+<< t.getBasis()[2].getX() << ", " << t.getBasis()[2].getY() << ", " << t.getBasis()[2].getZ() << ", " << t.getOrigin().getZ() << "\n" \
 <<                    0.0 << ", " <<                    0.0 << ", " <<                    0.0 << ", " <<                  1.0
 << "\n";
 }
@@ -94,12 +94,17 @@ class calibration{
     // Get parameters and show
     if(!pnh_.getParam("camera_name", camera_name)) camera_name = "camera";
     if(!pnh_.getParam("tag_name", tag_name)) tag_name = "tag_0";
-    ROS_INFO("\n \
+    ROS_INFO("\n\
 *************************\n\
 camera_name: %s\n\
 tag_name: %s\n\
 *************************", camera_name.c_str(), tag_name.c_str());
   matrix_M = Eigen::Matrix3f::Zero();
+  ROS_INFO("\n================== Cam-on-hand calibration process ==================\n \
+After this process, you will get the transformation from ee_link to camera_link\n \
+Manually moving the arm is recommended, or the result will be weird\n \
+The more data you collect, the more precise the result is\n \
+=====================================================================");
   }
   void printInfo(void){
     ROS_INFO("At least %d data points required, you have: %d data points now\n\
@@ -115,23 +120,23 @@ Press 'r' to record data, 'c' to compute: ", REQUIRED_DATA, num_data);
         tf::Transform t(stf.getRotation(), stf.getOrigin());
         base2ee.push_back(t);
         ROS_INFO("ee_link index: %d", num_data+1); print_tf(t);
-        if(num_data!=0){
-          ROS_INFO("ee_link relative to last one: \n");
-          print_tf(t.inverse()*base2ee[num_data]);
-        }
+        /*if(num_data!=0){
+          ROS_INFO("ee_link relative to last one:");
+          print_tf(t.inverse()*base2ee[num_data-1]);
+        }*/
       } catch(tf::TransformException ex){
         ROS_WARN("%s", ex.what()); return;
       }
       try{
-        listener.waitForTransform(camera_name+"_link", tag_name, ros::Time(0), ros::Duration(0.5));
+        listener.waitForTransform(camera_name+"_link", tag_name, ros::Time(0), ros::Duration(1.0));
         listener.lookupTransform(camera_name+"_link", tag_name, ros::Time(0), stf);
         tf::Transform t(stf.getRotation(), stf.getOrigin());
         cam2tag.push_back(t);
         ROS_INFO("camera_link index: %d", num_data+1); print_tf(t);
-        if(num_data!=0){
-          ROS_INFO("camera_link relative to last one: \n");
-          print_tf(t*cam2tag[num_data]);
-        }
+        /*if(num_data!=0){
+          ROS_INFO("camera_link relative to last one:");
+          print_tf(t*cam2tag[num_data-1].inverse());
+        }*/
       } catch(tf::TransformException ex){
         ROS_WARN("%s", ex.what()); return;
       } ++num_data; ROS_INFO("Data logged.");
