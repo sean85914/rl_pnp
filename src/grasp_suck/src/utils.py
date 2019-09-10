@@ -213,3 +213,18 @@ def standarization(suck_predictions, grasp_predictions):
 		std  = np.nanstd(grasp_predictions[i])
 		grasp_predictions[i] = (grasp_predictions[i]-mean)/std
 	return suck_predictions, grasp_predictions
+
+def get_file_path(color_img_path_str):
+	idx = color_img_path_str[-16:]; idx = idx.replace("color_", ""); idx = idx.replace(".jpg", "")
+	idx = int(idx)
+	depth_image_path_str = color_img_path_str.replace("color", "depth")
+	depth_image_path_str = depth_image_path_str.replace("jpg", "png")
+	next_color_image_path_str = color_img_path_str.replace("color", "next_color")
+	next_depth_image_path_str = color_img_path_str.replace("color", "depth")
+	next_depth_image_path_str = next_depth_image_path_str.replace("jpg", "png")
+	sub = color_img_path_str.split("images")[0]
+	primitive_csv = sub+"/action_primitive.csv"
+	result_csv = sub+"/action_result.csv"
+	target_csv = sub+"/action_target.csv"
+	return idx, depth_image_path_str, next_color_image_path_str, next_depth_image_path_str, \
+			primitive_csv, result_csv, target_csv

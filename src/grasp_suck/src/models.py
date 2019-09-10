@@ -28,19 +28,23 @@ class reinforcement_net(nn.Module):
         self.sucknet = nn.Sequential(OrderedDict([
             ('suck-norm0', nn.BatchNorm2d(2048)),
             ('suck-relu0', nn.ReLU(inplace=True)),
-            ('suck-conv0', nn.Conv2d(2048, 64, kernel_size=1, stride=1, bias=False)),
+            ('suck-conv0', nn.Conv2d(2048, 64, kernel_size=1, stride=1, bias=True)),
             ('suck-norm1', nn.BatchNorm2d(64)),
             ('suck-relu1', nn.ReLU(inplace=True)),
-            ('suck-conv1', nn.Conv2d(64, 1, kernel_size=1, stride=1, bias=False))
+            ('suck-conv1', nn.Conv2d(64, 1, kernel_size=1, stride=1, bias=True)),
+            ('suck-norm2', nn.BatchNorm2d(1)),
+            ('suck-relu2', nn.ReLU(inplace=True))
             # ('suck-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
         ]))
         self.graspnet = nn.Sequential(OrderedDict([
             ('grasp-norm0', nn.BatchNorm2d(2048)),
             ('grasp-relu0', nn.ReLU(inplace=True)),
-            ('grasp-conv0', nn.Conv2d(2048, 64, kernel_size=1, stride=1, bias=False)),
+            ('grasp-conv0', nn.Conv2d(2048, 64, kernel_size=1, stride=1, bias=True)),
             ('grasp-norm1', nn.BatchNorm2d(64)),
             ('grasp-relu1', nn.ReLU(inplace=True)),
-            ('grasp-conv1', nn.Conv2d(64, 1, kernel_size=1, stride=1, bias=False))
+            ('grasp-conv1', nn.Conv2d(64, 1, kernel_size=1, stride=1, bias=True)),
+            ('grasp-norm2', nn.BatchNorm2d(1)),
+            ('grasp-relu2', nn.ReLU(inplace=True))
             # ('grasp-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
         ]))
 
