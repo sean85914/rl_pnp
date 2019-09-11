@@ -12,23 +12,22 @@
   </include>
   ?>
   <arg name="use_ft" default="false" doc="Whether turn on force torch sensor"/>
-  <arg name="empty_thres" default="0" doc="If points in given range is greater than this threshold, the workspace will be considered as non-empty"/>
   <!-- TCP information -->
   <include file="$(find arm_operation)/launch/tcp_publisher.launch"/>
   <!-- Vacuum -->
   <node pkg="vacuum_conveyor_control" type="arduino_control" name="arduino_control" output="screen" clear_params="true" required="true">
     <param name="port" value="/dev/ttyArduino"/>
-    <param name="vacuum_thres" value="880"/>
+    <param name="vacuum_thres" value="50"/>
   </node>
   <!-- robotiq 2-finger gripper -->
-  <node pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" name="robotiq2FGripper" args="/dev/ttyGripper" required="true"/>
+  <node pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" name="robotiq2FGripper" args="/dev/ttyGripper" />
   <!-- robotiq gripper control -->
   <node pkg="grasp_suck" type="robotiq_gripper_control" name="robotiq_finger_control_node" output="screen" required="true"/>
   <!-- Visual System -->
   <!-- Convert pointcloud from eye coord. to hand coord. -->
   <node pkg="visual_system" type="pc_transform" name="pc_transform" output="screen" required="true">
     <param name="verbose" value="true"/>
-    <param name="num_thres" value="$(arg empty_thres)"/>
+    <param name="z_lower" value="-0.01"/>
     <remap from="camera/color/image_raw" to="/camera1/color/image_raw"/>
     <remap from="camera/aligned_depth_to_color/image_raw" to="/camera1/aligned_depth_to_color/image_raw"/>
     <remap from="camera/color/camera_info" to="/camera1/color/camera_info"/>
