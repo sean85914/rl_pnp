@@ -1,0 +1,4 @@
+sensor_msgs/PointCloud2 pc
+geometry_msgs/Point p
+---
+bool is_valid

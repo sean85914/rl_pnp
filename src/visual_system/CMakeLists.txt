@@ -28,6 +28,7 @@ add_service_files(
   get_xyz.srv
   get_pc.srv
   pc_is_empty.srv
+  check_valid.srv
 )
 
 generate_messages(
@@ -40,9 +41,11 @@ generate_messages(
 catkin_package(
   LIBRARIES visual_system
   CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs tf message_runtime
+  INCLUDE_DIRS include
 )
 
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
 )
@@ -52,6 +55,9 @@ install(DIRECTORY include/${PROJECT_NAME}/
   FILES_MATCHING PATTERN "*.h"
   PATTERN ".svn" EXCLUDE
 )
+
+add_library(helper src/helper.cpp)
+target_link_libraries(helper ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(get_click_position src/get_click_position.cpp)
 target_link_libraries(get_click_position ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
@@ -71,4 +77,4 @@ target_link_libraries(save_all ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(pc_transform src/pc_transform.cpp)
 add_dependencies(pc_transform visual_system_gencpp)
-target_link_libraries(pc_transform ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+target_link_libraries(pc_transform ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} helper)

@@ -13,6 +13,7 @@
 #include <pcl/sample_consensus/method_types.h> // pcl::SAC_RANSAC
 #include <pcl/sample_consensus/model_types.h> // pcl::SACMODEL_PLANE
 #include <pcl/segmentation/sac_segmentation.h> // pcl::SACSegmentation
+#include "helper.h"
 // message filters
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
@@ -22,6 +23,7 @@
 #include <visual_system/get_xyz.h>
 #include <visual_system/get_pc.h>
 #include <visual_system/pc_is_empty.h>
+#include <visual_system/check_valid.h>
 // MSG
 #include <geometry_msgs/Point.h>
 #include <sensor_msgs/Image.h>
@@ -30,6 +32,7 @@
 #include <visualization_msgs/Marker.h>
 
 bool verbose; // If save point cloud as pcd
+const int KERNEL_SIZE = 3;
 double factor; // If ratio of plane over total points higher than this value, the workspace will be considered as empty
 double x_lower; // X lower bound, in hand coord.
 double x_upper; // X upper bound, in hand coord.
@@ -133,10 +136,11 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image,
   } catch(cv_bridge::Exception &e) {
     ROS_ERROR("cv_bridge exception: %s", e.what()); return;
   }
+  cv::Mat depth_mean = applyMeanFilter(depth_img_ptr->image, KERNEL_SIZE);
   pc.clear();
   for(int x=0; x<color_img_ptr->image.cols; ++x){ // 0~639
     for(int y=0; y<color_img_ptr->image.rows; ++y){ // 0~479
-      auto depth = depth_img_ptr->image.at<unsigned short>(cv::Point(x, y));
+      auto depth = depth_mean.at<unsigned short>(cv::Point(x, y));
       pcl::PointXYZRGB p;
       p.z = depth*0.001; // mm to m
       p.x = (x-intrinsic[2])/intrinsic[0]*p.z; // x = (u-cx)/fx*z
@@ -151,7 +155,9 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image,
 
 bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::pc_is_empty::Response &res)
 {
-  /*pcl::PointCloud<pcl::PointXYZRGB> pc, pc_filtered;
+  /*
+  // Old method
+  pcl::PointCloud<pcl::PointXYZRGB> pc, pc_filtered;
   pcl::fromROSMsg(req.input_pc, pc);
   pcl::PassThrough<pcl::PointXYZRGB> pass;
   pass.setInputCloud(pc.makeShared());
@@ -183,7 +189,6 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
 bool callback_get_pc(visual_system::get_pc::Request  &req, 
                      visual_system::get_pc::Response &res)
 {
-  ros::Time ts = ros::Time::now();
   // Transform points to hand coordinate
   pcl::PointCloud<pcl::PointXYZRGB> pc_in_range;
   pcl::transformPointCloud(pc, pc_in_range, arm2cam_tf);
@@ -214,5 +219,15 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
       create_directories(p);
     pcl::io::savePCDFileASCII(pc_name, pc_in_range);
   }
+  return true;
+}
+
+bool callback_check_valid(visual_system::check_valid::Request  &req,
+                          visual_system::check_valid::Response &res)
+{
+  pcl::PointCloud<pcl::PointXYZ> pc;
+  pcl::fromROSMsg(req.pc, pc);
+  pcl::PointXYZ p(req.p.x, req.p.y, req.p.z);
+  res.is_valid = !isPointInCloud(pc, p);
   return true;
 }
