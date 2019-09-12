@@ -50,23 +50,27 @@ suck_predictions, grasp_predictions, state_feat = \
 suck_predictions, grasp_predictions = utils.standarization(suck_predictions, grasp_predictions)
 suck_heatmap = utils.vis_affordance(suck_predictions[0])
 suck_mixed = cv2.addWeighted(color, 1.0, suck_heatmap, 0.4, 0)
-#cv2.imwrite("suck.jpg", suck_heatmap)
-cv2.imwrite("suck_mixed.jpg", suck_mixed)
+tmp = np.where(suck_predictions == np.max(suck_predictions))
+best_pixel = [tmp[0][0], tmp[1][0], tmp[2][0]]
+suck_img = utils.draw_image(suck_mixed, 1, best_pixel)
+cv2.imwrite("suck.jpg", suck_img)
 grasp_mixed = []
 for i in range(len(grasp_predictions)):
 	grasp_heatmap = utils.vis_affordance(grasp_predictions[i])
 	name = "grasp_{}.jpg".format(i)
-	#cv2.imwrite(name, grasp_heatmap)
 	grasp_mixed_idx = cv2.addWeighted(color, 1.0, grasp_heatmap, 0.4, 0)
-	cv2.imwrite("grasp_mixed_{}.jpg".format(i), grasp_mixed_idx)
+	tmp = np.where(grasp_predictions == np.max(grasp_predictions[i]))
+	best_pixel = [tmp[0][0], tmp[1][0], tmp[2][0]]
+	grasp_img = utils.draw_image(grasp_mixed_idx, 0, best_pixel)
+	cv2.imwrite("grasp_{}.jpg".format(i), grasp_img)
 	grasp_mixed.append(grasp_mixed_idx)
 
-action, action_str, pixel_index, angle = utils.greedy_policy(suck_predictions, grasp_predictions)
-visual_img = None
-if action:
-	visual_img = utils.draw_image(suck_mixed, action, pixel_index)
-else:
-	visual_img = utils.draw_image(grasp_mixed[pixel_index[0]], action, pixel_index)
+#action, action_str, pixel_index, angle = utils.greedy_policy(suck_predictions, grasp_predictions)
+#visual_img = None
+#if action:
+#	visual_img = utils.draw_image(suck_mixed, action, pixel_index)
+#else:
+#	visual_img = utils.draw_image(grasp_mixed[pixel_index[0]], action, pixel_index)
+
 print "Grasp max: %f" % np.max(grasp_predictions)
 print "Suck max:  %f" % np.max(suck_predictions)
-cv2.imwrite("vis_0.jpg", visual_img)
