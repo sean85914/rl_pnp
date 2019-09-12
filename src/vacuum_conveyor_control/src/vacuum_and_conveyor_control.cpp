@@ -84,8 +84,8 @@ bool ArduinoControl::check_suck_success(std_srvs::SetBool::Request &req, std_srv
   int voltage = atoi(result.c_str());
   ROS_INFO("Voltage received: %d", voltage);
   if(voltage >= vacuum_thres)
-    res.success = false;
-  else res.success = true;
+    res.success = true;
+  else res.success = false;
   return true;
 }
 

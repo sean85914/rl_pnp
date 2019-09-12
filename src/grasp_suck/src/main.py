@@ -17,7 +17,8 @@ from std_srvs.srv import Empty, SetBool, SetBoolRequest, SetBoolResponse, \
 from grasp_suck.srv import get_pose, get_poseRequest, get_poseResponse
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
                               get_xyz, get_xyzRequest, get_xyzResponse, \
-                              pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse
+                              pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse, \
+                              check_valid, check_validRequest, check_validResponse
 from vacuum_conveyor_control.srv import vacuum_control, vacuum_controlRequest
 from visualization.srv import viz_marker, viz_markerRequest, viz_markerResponse
 
@@ -127,9 +128,10 @@ goto_target = rospy.ServiceProxy('/helper_services_node/goto_target', get_pose)
 go_home     = rospy.ServiceProxy('/helper_services_node/robot_go_home', Empty)
 go_place    = rospy.ServiceProxy('/helper_services_node/robot_goto_place', Empty)
 
-# pixel_to_xyz
+# pc_transform
 get_pc_client = rospy.ServiceProxy('/pc_transform/get_pc', get_pc)
 empty_checker = rospy.ServiceProxy('/pc_transform/empty_state', pc_is_empty)
+valid_checker = rospy.ServiceProxy('/pc_transform/check_valid', check_valid)
 
 # Visualization
 viz = rospy.ServiceProxy('/viz_marker_node/viz_marker', viz_marker)
@@ -164,7 +166,6 @@ total_time = 0.0
 
 try:
 	while is_empty is not True:
-	#while num_of_items is not 0:
 		print "\033[0;31;46mIteration: {}\033[0m".format(iteration)
 		if not testing: epsilon_ = max(epsilon * np.power(0.9998, iteration), 0.2)
 		iter_ts = time.time()
@@ -229,28 +230,32 @@ try:
 		vis_name = vis_path + "vis_{:06}.jpg".format(iteration)
 		cv2.imwrite(vis_name, visual_img)
 
-		is_valid = True
 		# Invalid conditions:
-		# 1. NaN point
+		# 1. NaN or origin point
 		# 2. Point with z too far, which presents the plane of convayor
 		# TODO 3. Gripper collision with object
 		print "###### [%f, %f, %f] ######" %(points[pixel_index[1], pixel_index[2], 0], points[pixel_index[1], pixel_index[2], 1], points[pixel_index[1], pixel_index[2], 2])
-		if np.isnan(points[pixel_index[1], pixel_index[2], 0]) or \
-		   np.isnan(points[pixel_index[1], pixel_index[2], 1]) or \
-		   np.isnan(points[pixel_index[1], pixel_index[2], 2]) or \
-		   points[pixel_index[1], pixel_index[2], 0] == 0.0 or \
-		   points[pixel_index[1], pixel_index[2], 1] == 0.0:
-			print "\033[0;31;44mInvalid pointcloud. Ignore...\033[0m"
-			is_valid = False
-			if testing:
-				cnt_invalid += 1
-			
+		#if np.isnan(points[pixel_index[1], pixel_index[2], 0]) or \
+		#   np.isnan(points[pixel_index[1], pixel_index[2], 1]) or \
+		#   np.isnan(points[pixel_index[1], pixel_index[2], 2]) or \
+		#   points[pixel_index[1], pixel_index[2], 0] == 0.0 or \
+		#   points[pixel_index[1], pixel_index[2], 1] == 0.0:
+		#	print "\033[0;31;44mInvalid pointcloud. Ignore...\033[0m"
+		#	is_valid = False
+		#	if testing:
+		#		cnt_invalid += 1
 		#if getXYZResult.result.z >= Z_THRES:
-		elif points[pixel_index[1], pixel_index[2], 2] <= Z_THRES:
-			print "\033[0;31;44mTarget on converyor! Ignore...\033[0m"
-			is_valid = False
-			if testing:
-				cnt_invalid += 1
+		#elif points[pixel_index[1], pixel_index[2], 2] <= Z_THRES:
+		#	print "\033[0;31;44mTarget on converyor! Ignore...\033[0m"
+		#	is_valid = False
+		#	if testing:
+		#		cnt_invalid += 1
+		check_valid_req = check_validRequest()
+		check_valid_req.pc = pc_response.pc
+		check_valid_req.p.x = points[pixel_index[1], pixel_index[2], 0]
+		check_valid_req.p.y = points[pixel_index[1], pixel_index[2], 1]
+		check_valid_req.p.z = points[pixel_index[1], pixel_index[2], 2]
+		is_valid = valid_checker(check_valid_req).is_valid
 		# Visualize markers
 		viz_req = viz_markerRequest()
 		viz_req.point.x = points[pixel_index[1], pixel_index[2], 0]

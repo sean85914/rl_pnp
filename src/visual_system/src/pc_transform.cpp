@@ -32,7 +32,7 @@
 #include <visualization_msgs/Marker.h>
 
 bool verbose; // If save point cloud as pcd
-const int KERNEL_SIZE = 3;
+const int KERNEL_SIZE = 7;
 double factor; // If ratio of plane over total points higher than this value, the workspace will be considered as empty
 double x_lower; // X lower bound, in hand coord.
 double x_upper; // X upper bound, in hand coord.
@@ -55,6 +55,8 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image,
 bool callback_get_pc(visual_system::get_pc::Request &req,
                      visual_system::get_pc::Response &res);
 bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::pc_is_empty::Response &res);
+bool callback_check_valid(visual_system::check_valid::Request  &req,
+                          visual_system::check_valid::Response &res);
 
 int main(int argc, char** argv)
 {
@@ -94,6 +96,7 @@ int main(int argc, char** argv)
   sync.registerCallback(boost::bind(&callback_sub, _1, _2, _3));
   ros::ServiceServer pc_service = pnh.advertiseService("get_pc", callback_get_pc);
   ros::ServiceServer check_empty_service = pnh.advertiseService("empty_state", callback_is_empty);
+  ros::ServiceServer check_valid_service = pnh.advertiseService("check_valid", callback_check_valid);
   ros::spin();
   return 0;
 }
@@ -225,9 +228,21 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
 bool callback_check_valid(visual_system::check_valid::Request  &req,
                           visual_system::check_valid::Response &res)
 {
+  if(req.p.x==0 and req.p.y==0 and req.p.z==0) {res.is_valid = false; return true;}
   pcl::PointCloud<pcl::PointXYZ> pc;
   pcl::fromROSMsg(req.pc, pc);
+  // RANSAC 
+  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients ());
+  pcl::PointIndices::Ptr inliers(new pcl::PointIndices ());
+  pcl::SACSegmentation<pcl::PointXYZ> seg;
+  seg.setOptimizeCoefficients(true);
+  seg.setModelType(pcl::SACMODEL_PLANE);
+  seg.setMethodType(pcl::SAC_RANSAC);
+  seg.setDistanceThreshold(0.01);
+  seg.setInputCloud(pc.makeShared());
+  seg.segment(*inliers, *coefficients);
+  pcl::PointCloud<pcl::PointXYZ> pc_plane(pc, inliers->indices);
   pcl::PointXYZ p(req.p.x, req.p.y, req.p.z);
-  res.is_valid = !isPointInCloud(pc, p);
+  res.is_valid = !isPointInCloud(pc_plane, p);
   return true;
 }

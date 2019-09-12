@@ -25,54 +25,6 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  /*if(Serial.available()){
-    char command_type = Serial.read();
-    if(command_type == 'v'){
-      if(Serial.available()){
-        int command = Serial.read() - '0';
-        switch(command){
-          case 0:
-            digitalWrite(VACUUM_GENERATOR, LOW);
-            delay(1);
-            digitalWrite(VACUUM_BREAKER, LOW);
-            break;
-          case 1:
-            digitalWrite(VACUUM_GENERATOR, LOW);
-            delay(1);
-            digitalWrite(VACUUM_BREAKER, HIGH);
-            break;
-          case 2:
-            digitalWrite(VACUUM_GENERATOR, HIGH);
-            delay(1);
-            digitalWrite(VACUUM_BREAKER, LOW);
-            break;
-          case 3:
-            digitalWrite(VACUUM_GENERATOR, HIGH);
-            delay(1);
-            digitalWrite(VACUUM_BREAKER, HIGH);
-            break;
-        }
-      }
-    }
-    else if(command_type == 'c'){
-      digitalWrite(CONVRYOR_CONTROL, HIGH);
-      delay(100);
-      digitalWrite(CONVRYOR_CONTROL, LOW);
-    }
-    else if(command_type == 'p'){
-      if(Serial.available()){
-        int command = Serial.read() - '0';
-        switch(command){
-          case 0:
-            digitalWrite(PNEUMATIC_CYLINDER, LOW);
-            break;
-          case 1:
-            digitalWrite(PNEUMATIC_CYLINDER, HIGH);
-            break;
-        }
-      }
-    }
-  }*/
   if(Serial.available()){
     String command_str = Serial.readString();
     char command_type = command_str[0];
