@@ -7,6 +7,7 @@
 
 class ArduinoControl{
  private:
+  bool is_upper; // Deciding type, true means that if suck success, the value reported from the sensor will be higher than the threshold, false otherwise
   int baudrate;
   const int TO = 50; // Serial timeout, not sure what this really are
   int vacuum_thres; // Volotage from sensor higher than this value will consider as fail
@@ -27,6 +28,7 @@ class ArduinoControl{
 };
 
 ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
+  if(!pnh_.getParam("is_upper", is_upper)) is_upper = true; ROS_INFO("is_upper: %s", is_upper?"True":"False");
   if(!pnh_.getParam("baudrate", baudrate)) baudrate = 115200; ROS_INFO("baudrate: %d", baudrate);
   if(!pnh_.getParam("port", port)) port = "/dev/ttyACM0"; ROS_INFO("port: %s", port.c_str());
   if(!pnh_.getParam("vacuum_thres", vacuum_thres)) vacuum_thres = 800; ROS_INFO("vacuum_thres: %d", vacuum_thres);
@@ -83,9 +85,15 @@ bool ArduinoControl::check_suck_success(std_srvs::SetBool::Request &req, std_srv
   auto result = mySerial.readline();
   int voltage = atoi(result.c_str());
   ROS_INFO("Voltage received: %d", voltage);
-  if(voltage >= vacuum_thres)
-    res.success = true;
-  else res.success = false;
+  if(is_upper){
+    if(voltage >= vacuum_thres)
+      res.success = true;
+    else res.success = false;
+  }else{ // lower
+    if(voltage <= vacuum_thres)
+      res.success = true;
+    else res.success = false;
+  }
   return true;
 }
 
