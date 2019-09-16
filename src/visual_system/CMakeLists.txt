@@ -29,6 +29,7 @@ add_service_files(
   get_pc.srv
   pc_is_empty.srv
   check_valid.srv
+  get_surface_feature.srv
 )
 
 generate_messages(

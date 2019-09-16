@@ -153,8 +153,6 @@ bool Helper_Services::go_target_service_callback(
     grasp_suck::get_pose::Response &res)
 {
   std_srvs::Empty empty_req;
-  // Set prior depth image
-  //set_prior.call(empty_req);
   tf::TransformListener listener;
   ROS_INFO("\nReceive new request: ");
   if(req.primmitive==GRASP){ // Grasp

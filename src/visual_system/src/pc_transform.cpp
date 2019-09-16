@@ -24,6 +24,7 @@
 #include <visual_system/get_pc.h>
 #include <visual_system/pc_is_empty.h>
 #include <visual_system/check_valid.h>
+#include <visual_system/get_surface_feature.h>
 // MSG
 #include <geometry_msgs/Point.h>
 #include <sensor_msgs/Image.h>
@@ -47,6 +48,7 @@ cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
 Eigen::Matrix4f arm2cam_tf;
 pcl::PointCloud<pcl::PointXYZRGB> pc;
 pcl::PassThrough<pcl::PointXYZRGB> pass_x, pass_y, pass_z;
+ros::Publisher pub_sphere, pub_vector;
 
 Eigen::Matrix4f lookup_transform(void);
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, 
@@ -57,6 +59,8 @@ bool callback_get_pc(visual_system::get_pc::Request &req,
 bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::pc_is_empty::Response &res);
 bool callback_check_valid(visual_system::check_valid::Request  &req,
                           visual_system::check_valid::Response &res);
+bool callback_get_surface_feature(visual_system::get_surface_feature::Request  &req,
+                                  visual_system::get_surface_feature::Response &res);
 
 int main(int argc, char** argv)
 {
@@ -97,6 +101,9 @@ int main(int argc, char** argv)
   ros::ServiceServer pc_service = pnh.advertiseService("get_pc", callback_get_pc);
   ros::ServiceServer check_empty_service = pnh.advertiseService("empty_state", callback_is_empty);
   ros::ServiceServer check_valid_service = pnh.advertiseService("check_valid", callback_check_valid);
+  ros::ServiceServer get_surface_feature_service = pnh.advertiseService("get_surface_feature", callback_get_surface_feature);
+  pub_sphere = pnh.advertise<visualization_msgs::Marker>("centroid", 1);
+  pub_vector = pnh.advertise<visualization_msgs::Marker>("surface_normal", 1);
   ros::spin();
   return 0;
 }
@@ -245,4 +252,39 @@ bool callback_check_valid(visual_system::check_valid::Request  &req,
   pcl::PointXYZ p(req.p.x, req.p.y, req.p.z);
   res.is_valid = !isPointInCloud(pc_plane, p);
   return true;
+}
+
+bool callback_get_surface_feature(visual_system::get_surface_feature::Request  &req,
+                                  visual_system::get_surface_feature::Response &res){
+  pcl::PointCloud<pcl::PointXYZ> pc;
+  pcl::fromROSMsg(req.pc, pc);
+  pcl::PointXYZ p(req.p.x, req.p.y, req.p.z);
+  auto centroid = getCentroidPoint(req.radius, pc, p);
+  res.c_p.x = centroid(0); res.c_p.y = centroid(1); res.c_p.z = centroid(2); 
+  visualization_msgs::Marker sphere_marker;
+  sphere_marker.header.frame_id = "base_link";
+  sphere_marker.type = visualization_msgs::Marker::SPHERE;
+  sphere_marker.action = visualization_msgs::Marker::ADD;
+  sphere_marker.pose.position.x = centroid(0); 
+  sphere_marker.pose.position.y = centroid(1); 
+  sphere_marker.pose.position.z = centroid(2); 
+  sphere_marker.pose.orientation.w = 1.0f;
+  sphere_marker.scale.x = sphere_marker.scale.y = sphere_marker.scale.z = 0.02;
+  sphere_marker.color.g = sphere_marker.color.a = 1.0f; 
+  pub_sphere.publish(sphere_marker);
+  if(req.type==1){
+    auto normal = getSurfaceNormal(req.radius, pc, p);
+    res.normal.x = normal(0); res.normal.y = normal(1); res.normal.z = normal(2); 
+    visualization_msgs::Marker vector_marker;
+    vector_marker.header.frame_id = "base_link";
+    vector_marker.type = visualization_msgs::Marker::ARROW;
+    vector_marker.action = visualization_msgs::Marker::ADD;
+    geometry_msgs::Point p_for_marker = sphere_marker.pose.position;
+    vector_marker.points.push_back(p_for_marker);
+    p_for_marker.x += normal(0)*0.02; p_for_marker.y += normal(1)*0.02; p_for_marker.z += normal(2)*0.02;
+    vector_marker.points.push_back(p_for_marker);
+    vector_marker.scale.x = 0.01; vector_marker.scale.y = 0.012; 
+    vector_marker.color.r = vector_marker.color.a = 1.0f; 
+    pub_vector.publish(vector_marker);
+  } return true;
 }
