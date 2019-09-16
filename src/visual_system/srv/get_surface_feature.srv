@@ -1,0 +1,7 @@
+bool type # 0: only gets centroid; 1: also gets surface normal
+float64 radius
+sensor_msgs/PointCloud2 pc
+geometry_msgs/Point p
+---
+geometry_msgs/Point c_p
+geometry_msgs/Vector3 normal
