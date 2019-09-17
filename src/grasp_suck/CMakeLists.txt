@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
   actionlib_msgs
   message_generation
   cv_bridge
+  arm_operation
 )
 
 find_package(OpenCV REQUIRED)
@@ -47,11 +48,11 @@ include_directories(
 )
 
 add_executable(helper_services src/helper_services.cpp)
-add_dependencies(helper_services ${catkin_EXPORTED_TARGETS} grasp_suck_gencpp)
+add_dependencies(helper_services ${catkin_EXPORTED_TARGETS} grasp_suck_gencpp arm_operation_gencpp)
 target_link_libraries(helper_services ${catkin_LIBRARIES})
 
 add_executable(robotiq_gripper_control src/robotiq_gripper_control.cpp)
-add_dependencies(robotiq_gripper_control ${catkin_EXPORTED_TARGETS})
+add_dependencies(robotiq_gripper_control ${catkin_EXPORTED_TARGETS} robotiq_2f_gripper_control_gencpp)
 target_link_libraries(robotiq_gripper_control ${catkin_LIBRARIES})
 
 #add_executable(get_reward src/get_reward.cpp)
