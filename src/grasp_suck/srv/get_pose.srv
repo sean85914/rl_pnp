@@ -1,5 +1,6 @@
+bool primitive # 0 -> grasp; 1 -> suck
 geometry_msgs/Point point_in_hand
 float64 yaw
-bool primmitive # 0 -> grasp; 1 -> suck
+geometry_msgs/Vector3 x_axis
 ---
 geometry_msgs/Pose result_pose

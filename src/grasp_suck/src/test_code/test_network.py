@@ -13,7 +13,7 @@ from visual_system.srv import get_pc, get_pcRequest, get_pcResponse
 from trainer import Trainer
 
 parser = argparse.ArgumentParser(prog="visual_suck_and_grasp", description="Testing trained model")
-parser.add_argument("--model", type=str, help="Model to test")
+parser.add_argument("--model", type=str, default="", help="Model to test")
 parser.add_argument("--online", action="store_true", default=False)
 parser.add_argument("--color_img_path", type=str)
 args = parser.parse_args()
@@ -73,5 +73,5 @@ for i in range(len(grasp_predictions)):
 #else:
 #	visual_img = utils.draw_image(grasp_mixed[pixel_index[0]], action, pixel_index)
 
-print "Grasp max: %f" % np.max(grasp_predictions)
+print "Grasp max: %f %f %f %f" % (np.max(grasp_predictions[0]), np.max(grasp_predictions[1]), np.max(grasp_predictions[2]), np.max(grasp_predictions[3]))
 print "Suck max:  %f" % np.max(suck_predictions)
