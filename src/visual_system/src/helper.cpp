@@ -43,12 +43,13 @@ bool isPointInCloud(const pcl::PointCloud<pcl::PointXYZ> pc, const pcl::PointXYZ
   } return false;
 }
 
-Eigen::Vector4f getCentroidPoint(double radius,
+Eigen::Vector4f getCentroidPoint(const double radius,
                                  const pcl::PointCloud<pcl::PointXYZ> pc, 
                                  const pcl::PointXYZ p){
   pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
   std::vector<int> pointIdxRadiusSearch;
   std::vector<float> pointRadiusSquaredDistance;
+  kdtree.setInputCloud(pc.makeShared());
   kdtree.radiusSearch(p, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
   pcl::PointCloud<pcl::PointXYZ> pc_in_radius(pc, pointIdxRadiusSearch);
   Eigen::Vector4f centroid;
@@ -56,7 +57,7 @@ Eigen::Vector4f getCentroidPoint(double radius,
   return centroid;
 }
 
-Eigen::Vector3f getSurfaceNormal(double radius, 
+Eigen::Vector3f getSurfaceNormal(const double radius, 
                                  const pcl::PointCloud<pcl::PointXYZ> pc,
                                  const pcl::PointXYZ p){
   pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::Normal> ne;
@@ -71,12 +72,29 @@ Eigen::Vector3f getSurfaceNormal(double radius,
     if(pc.points[i].x == p.x and pc.points[i].y == p.y and pc.points[i].z == p.z) idx = i;
   }
   Eigen::Vector3f normal;
-  if(idx == -1){
+  normal(0) = normal(1) = normal(2) = 0.0f;
+  // Use the specific point normal
+  /*if(idx == -1){
     std::cout << "\033[1;31mNot found specific point in the point cloud set\033[0m\n";
     return normal;
   }
   normal(0) = cloud_normals->points[idx].normal_x;
   normal(1) = cloud_normals->points[idx].normal_y;
-  normal(2) = cloud_normals->points[idx].normal_z;
+  normal(2) = cloud_normals->points[idx].normal_z;*/
+  // Use all points in the disk
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+  std::vector<int> pointIdxRadiusSearch;
+  std::vector<float> pointRadiusSquaredDistance;
+  kdtree.setInputCloud(pc.makeShared());
+  kdtree.radiusSearch(p, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+  int num = pointIdxRadiusSearch.size();
+  for(auto idx: pointIdxRadiusSearch){
+    if(std::isnan(cloud_normals->points[idx].normal_x) or std::isnan(cloud_normals->points[idx].normal_y) or std::isnan(cloud_normals->points[idx].normal_z)) {--num; continue;}
+    normal(0) += cloud_normals->points[idx].normal_x;
+    normal(1) += cloud_normals->points[idx].normal_y;
+    normal(2) += cloud_normals->points[idx].normal_z;
+  } normal = normal / (double)num;
+  normal.normalize();
+  if(normal(2)>0.0f) normal *= -1.0f; // Makes it down toward the table
   return normal;
 } 

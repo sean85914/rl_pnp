@@ -3,5 +3,6 @@ float64 radius
 sensor_msgs/PointCloud2 pc
 geometry_msgs/Point p
 ---
+bool result # 1: success; 0: fail
 geometry_msgs/Point c_p
 geometry_msgs/Vector3 normal

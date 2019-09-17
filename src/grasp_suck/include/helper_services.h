@@ -27,7 +27,7 @@
 #define SUCK  true
 
 const int    REPEAT_TIME = 2;
-const double OFFSET = -0.027f; // Lower 1 centimeter to make sure have contract with object
+const double OFFSET = -0.025f; // Lower 1 centimeter to make sure have contract with object
 const double X_OFFSET = 0.0f; // Seems error from hand-eye calibration
 
 class Helper_Services{
@@ -57,11 +57,6 @@ class Helper_Services{
   // 2-finger gripper control
   ros::ServiceClient close_gripper;
   ros::ServiceClient open_gripper;
-  //ros::ServiceClient get_grasp_state;
-  // Get reward
-  //ros::ServiceClient set_prior;
-  //ros::ServiceClient set_posterior;
-  ros::ServiceClient get_result;
   // Advertise services
   ros::ServiceServer service_home;
   ros::ServiceServer service_place;

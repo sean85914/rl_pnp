@@ -256,10 +256,15 @@ bool callback_check_valid(visual_system::check_valid::Request  &req,
 
 bool callback_get_surface_feature(visual_system::get_surface_feature::Request  &req,
                                   visual_system::get_surface_feature::Response &res){
+  ROS_INFO("\nReceive new request:\nType: %d\nRadius: %f\nPoint: [%f, %f, %f]", req.type, req.radius, req.p.x, req.p.y, req.p.z);
   pcl::PointCloud<pcl::PointXYZ> pc;
   pcl::fromROSMsg(req.pc, pc);
   pcl::PointXYZ p(req.p.x, req.p.y, req.p.z);
+  if(!isPointInCloud(pc, p)) {
+    ROS_WARN("Given point not in cloud set, aborted..."); res.result = false; return true;
+  }
   auto centroid = getCentroidPoint(req.radius, pc, p);
+  ROS_INFO("Centroid: [%f, %f, %f]", centroid(0), centroid(1), centroid(2));
   res.c_p.x = centroid(0); res.c_p.y = centroid(1); res.c_p.z = centroid(2); 
   visualization_msgs::Marker sphere_marker;
   sphere_marker.header.frame_id = "base_link";
@@ -274,6 +279,7 @@ bool callback_get_surface_feature(visual_system::get_surface_feature::Request  &
   pub_sphere.publish(sphere_marker);
   if(req.type==1){
     auto normal = getSurfaceNormal(req.radius, pc, p);
+    ROS_INFO("Normal: [%f, %f, %f]", normal(0), normal(1), normal(2));
     res.normal.x = normal(0); res.normal.y = normal(1); res.normal.z = normal(2); 
     visualization_msgs::Marker vector_marker;
     vector_marker.header.frame_id = "base_link";
@@ -281,10 +287,11 @@ bool callback_get_surface_feature(visual_system::get_surface_feature::Request  &
     vector_marker.action = visualization_msgs::Marker::ADD;
     geometry_msgs::Point p_for_marker = sphere_marker.pose.position;
     vector_marker.points.push_back(p_for_marker);
-    p_for_marker.x += normal(0)*0.02; p_for_marker.y += normal(1)*0.02; p_for_marker.z += normal(2)*0.02;
+    p_for_marker.x += normal(0)*0.1f; p_for_marker.y += normal(1)*0.1f; p_for_marker.z += normal(2)*0.1f;
     vector_marker.points.push_back(p_for_marker);
     vector_marker.scale.x = 0.01; vector_marker.scale.y = 0.012; 
     vector_marker.color.r = vector_marker.color.a = 1.0f; 
     pub_vector.publish(vector_marker);
-  } return true;
+  } 
+  res.result = true; return true;
 }

@@ -155,7 +155,7 @@ bool Helper_Services::go_target_service_callback(
   std_srvs::Empty empty_req;
   tf::TransformListener listener;
   ROS_INFO("\nReceive new request: ");
-  if(req.primmitive==GRASP){ // Grasp
+  if(req.primitive==GRASP){ // Grasp
     last_motion = GRASP;
     printf("Motion primitive: \033[1;32mgrasp\033[0m\n");
     printf("Position in hand frame: (%f, %f, %f)\n", req.point_in_hand.x, req.point_in_hand.y, req.point_in_hand.z);
@@ -167,45 +167,55 @@ bool Helper_Services::go_target_service_callback(
     pheumatic_control.call(extend_cmd);
     printf("Motion primitive: \033[1;32msuck\033[0m\n");
     printf("Position in hand frame: (%f, %f, %f)\n", req.point_in_hand.x, req.point_in_hand.y, req.point_in_hand.z);
+    printf("Surface normal: (%f, %f, %f)\n", req.x_axis.x, req.x_axis.y, req.x_axis.z);
   }
-  /*std::string des_frame = (arm_prefix==""?"base_link":arm_prefix+"_base_link");
-  std::string ori_frame = cam_prefix+"_color_optical_frame";
-  tf::StampedTransform st;
-  try{
-    listener.waitForTransform(des_frame, ori_frame, ros::Time(0), ros::Duration(0.5));
-    listener.lookupTransform(des_frame, ori_frame, ros::Time(0), st);
-  }catch (tf::TransformException ex) {ROS_ERROR("%s", ex.what()); return false;}
-  tf::Transform tf(st.getRotation(), st.getOrigin());
-  tf::Vector3 point_in_cam(req.point_in_cam.x, req.point_in_cam.y, req.point_in_cam.z),
-              point_in_arm = tf*point_in_cam;
-  */
   tf::Vector3 point_in_arm(req.point_in_hand.x, req.point_in_hand.y, req.point_in_hand.z);
-  tf::Matrix3x3 rotm(0.0f, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f);
   tf::Quaternion q, q_gripper; 
-  rotm.getRotation(q); 
-  if(req.primmitive==GRASP){ // Grasp
+  if(req.primitive==GRASP){ // Grasp
+    tf::Matrix3x3 rotm(0.0f, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f);
+    rotm.getRotation(q); 
     q_gripper.setRPY(req.yaw, 0.0, 0.0);
     q*=q_gripper;
+  } else{ // SUCK
+    tf::Vector3 x_axis(req.x_axis.x, req.x_axis.y, req.x_axis.z), 
+                y_axis(0.0f, -1.0f, 0.0f);
+    if(x_axis.getX()==0.0f and x_axis.getY()==0.0f and x_axis.getZ()==0.0f){
+      ROS_WARN("Incorrect surface normal given, using default perpendicular one...");
+      x_axis = tf::Vector3(0.0f, 0.0f, -1.0f);
+    }
+    tf::Vector3 z_axis = x_axis.cross(y_axis);
+    tf::Matrix3x3 rotm(x_axis.x(), y_axis.x(), z_axis.x(),
+                       x_axis.y(), y_axis.y(), z_axis.y(),
+                       x_axis.z(), y_axis.z(), z_axis.z());
+    rotm.getRotation(q); 
   }
-  res.result_pose.position.x = point_in_arm.getX();
-  res.result_pose.position.y = point_in_arm.getY();
-  res.result_pose.position.z = point_in_arm.getZ();
   res.result_pose.orientation.x = q.getX();
   res.result_pose.orientation.y = q.getY();
   res.result_pose.orientation.z = q.getZ();
   res.result_pose.orientation.w = q.getW();
-  if(req.primmitive==GRASP){ // Grasp
+  if(req.primitive==GRASP){ // Grasp
+    res.result_pose.position.x = point_in_arm.getX();
+    res.result_pose.position.y = point_in_arm.getY();
+    res.result_pose.position.z = point_in_arm.getZ();
     res.result_pose.position.z += gripper_tcp[0];
   } else{ // Suck
-    res.result_pose.position.x += suction_tcp[2];
-    res.result_pose.position.z += suction_tcp[0];
+    // Perpendicular suck
+    //res.result_pose.position.x += suction_tcp[2];
+    //res.result_pose.position.z += suction_tcp[0];
+    // Consider surface normal
+    tf::Transform homo_mat(q, point_in_arm);
+    tf::Vector3 suction_cup_tcp(-suction_tcp[0], 0.0f, -suction_tcp[2]),
+                final_position = homo_mat*suction_cup_tcp;
+    res.result_pose.position.x = final_position.getX();
+    res.result_pose.position.y = final_position.getY();
+    res.result_pose.position.z = final_position.getZ();
   }
   // Correction
   res.result_pose.position.x += X_OFFSET; 
   res.result_pose.position.z += OFFSET;
-  if(req.primmitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.02f; // Low object, for instance, cuboid lying down
-  if(req.primmitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.014f; // Hight object, for instance, standed cylinder
-  if(req.primmitive==SUCK  and res.result_pose.position.z<=0.23f) res.result_pose.position.z = 0.23f;
+  if(req.primitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.02f; // Low object, for instance, cuboid lying down
+  if(req.primitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.014f; // Hight object, for instance, standed cylinder
+  if(req.primitive==SUCK  and res.result_pose.position.z<=0.23f) res.result_pose.position.z = 0.23f;
   arm_operation::target_pose myPoseReq;
   myPoseReq.request.target_pose = res.result_pose;
   myPoseReq.request.factor = 0.8f;
@@ -213,7 +223,7 @@ bool Helper_Services::go_target_service_callback(
             res.result_pose.position.x, res.result_pose.position.y, res.result_pose.position.z,
             res.result_pose.orientation.x, res.result_pose.orientation.y, res.result_pose.orientation.z, res.result_pose.orientation.w);
   robot_arm_goto_pose.call(myPoseReq);
-  if(req.primmitive==GRASP){ // Grasp
+  if(req.primitive==GRASP){ // Grasp
     std_srvs::Empty empty;
     close_gripper.call(empty); // Close gripper
     ros::Duration(0.5).sleep();

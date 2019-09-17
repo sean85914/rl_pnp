@@ -8,9 +8,9 @@
 cv::Mat applyMeanFilter(cv::Mat original_image, int kernel_size);
 bool isPointInCloud(const pcl::PointCloud<pcl::PointXYZRGB> pc, const pcl::PointXYZRGB p);
 bool isPointInCloud(const pcl::PointCloud<pcl::PointXYZ> pc, const pcl::PointXYZ p);
-Eigen::Vector4f getCentroidPoint(double radius, 
+Eigen::Vector4f getCentroidPoint(const double radius, 
                                  const pcl::PointCloud<pcl::PointXYZ> pc, 
                                  const pcl::PointXYZ p);
-Eigen::Vector3f getSurfaceNormal(double radius, 
+Eigen::Vector3f getSurfaceNormal(const double radius, 
                                  const pcl::PointCloud<pcl::PointXYZ> pc,
                                  const pcl::PointXYZ p);
