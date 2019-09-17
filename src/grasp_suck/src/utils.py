@@ -197,7 +197,7 @@ def grasp_only_policy(grasp_predictions):
 '''
 
 def show_args(args):
-	args_list = ['episode', 'epsilon', 'force_cpu', 'grasp_only', 'is_testing', 'model', 'num_of_items', 'update_target']
+	args_list = ['episode', 'epsilon', 'force_cpu', 'grasp_only', 'is_testing', 'model', 'update_target', 'learn_every']
 	d = vars(args)
 	print "================================================"
 	for i in range(len(args_list)):

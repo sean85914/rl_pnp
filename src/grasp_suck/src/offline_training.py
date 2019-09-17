@@ -53,8 +53,7 @@ feat_path  =  logger_dir + 'feat/'
 grasp_path = [feat_path + 'rotate_idx_0/',
               feat_path + 'rotate_idx_1/',
               feat_path + 'rotate_idx_2/',
-              feat_path + 'rotate_idx_3/',
-              feat_path + 'rotate_idx_4/']
+              feat_path + 'rotate_idx_3/']
 model_path =  logger_dir + 'models/'
 vis_path   =  logger_dir + 'vis/'
 
@@ -65,17 +64,8 @@ if not os.path.exists(save_path):
 	os.makedirs(save_path)
 if not os.path.exists(logger_dir):
 	os.makedirs(logger_dir)
-#if not os.path.exists(image_path):
-#	os.makedirs(image_path)
-#if not os.path.exists(mixed_path):
-#	os.makedirs(mixed_path)
-#if not os.path.exists(feat_path):
-#	os.makedirs(feat_path)
 if not os.path.exists(model_path):
 	os.makedirs(model_path)
-#for i in range(5):
-#	if not os.path.exists(grasp_path[i]):
-#		os.makedirs(grasp_path[i])
 
 # trainer
 trainer = Trainer(suck_reward, grasp_reward, discount, False, use_cpu)
