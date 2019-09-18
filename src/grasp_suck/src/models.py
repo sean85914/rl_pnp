@@ -127,7 +127,7 @@ class reinforcement_net(nn.Module):
                 torch.cuda.empty_cache()
             return output_prob, interm_feat
 
-        else:
+        else: # volatile is false
             self.output_prob = []
             self.interm_feat = []
             if self.use_cuda:

@@ -22,7 +22,8 @@ parser.add_argument("--save_every", type=int, default=10, help="After how much i
 parser.add_argument("--model",         type=str,          default="",    help="If provided, continue training the model or using this model for testing, default is empty string")
 parser.add_argument("--save_path", type=str, default="offline", help="Where to save the models, default is offline")
 parser.add_argument("--data_path", type=str, help="Data for training")
-parser.add_argument("--learn_every", type=int, default=10, help="Frequency for updating network")
+parser.add_argument("--learn_every", type=int, default=10, help="Frequency for updating network, default is 10")
+parser.add_argument("--learn_amount", type=int, default=3, help="How many trajectories to train for each learn, default is 3")
 
 args = parser.parse_args()
 
@@ -41,6 +42,7 @@ save_path    = args.save_path
 data_path    = args.data_path
 save_every   = args.save_every
 learn_every  = args.learn_every
+learn_amount = args.learn_amount
 
 td_target_deque = deque(maxlen=max_len)
 string_deque    = deque(maxlen=max_len)
@@ -73,9 +75,12 @@ trainer = Trainer(suck_reward, grasp_reward, discount, False, use_cpu)
 if args.model != "":
 	print "[%f]: Loading provided model..." %(time.time())
 	trainer.model.load_state_dict(torch.load(args.model))
+	trainer.copyNetwork()
+
+first_ts = time.time()
 
 while iteration < args.max_iter:
-	print "[%f] Iteration: %d"%(time.time(), iteration)
+	print "[%f, %f] Iteration: %d"%(time.time(), time.time()-first_ts, iteration)
 	select_dir = random.choice(enum_dir)
 	image_list = os.listdir(data_path+"/"+select_dir+"/images")
 	color_images = list(filter(color_matcher.match, image_list))
@@ -99,23 +104,28 @@ while iteration < args.max_iter:
 	string_deque.append(color_image_name)
 	iteration+=1
 	if iteration % learn_every == 0:
+		index_list = np.arange(len(td_target_deque))
+		random_sample_index = np.random.choice(index_list, learn_amount)
 		tmp = np.sort(td_target_deque)
 		print "Top five: %f, %f, %f, %f, %f" %(tmp[-1], tmp[-2], tmp[-3], tmp[-4], tmp[-5])
-		argmax = np.argmax(td_target_deque)
-		idx, depth_str, _, _, primitive_csv_str, result_csv_str, target_csv_str = \
-			utils.get_file_path(string_deque[argmax])
-		color = cv2.imread(string_deque[argmax])
-		depth = cv2.imread(depth_str, -1)
-		action_primitive = np.loadtxt(primitive_csv_str, delimiter=",")[idx]
-		pixel_index = np.loadtxt(target_csv_str, delimiter=",")[idx]
-		label_value = td_target_deque[argmax]
-		if action_primitive == -1: action_str = "invalid"
-		elif action_primitive == 1: action_str = "suck"
-		else: action_str = "grasp"
-		loss_value = trainer.backprop(color, depth, action_str, pixel_index, label_value)
-		# remove from deque
-		td_target_deque.remove(td_target_deque[argmax])
-		string_deque.remove(string_deque[argmax])
+		random_sample_index[0] = np.argmax(td_target_deque)
+		for i in range(learn_amount):
+			sample_idx = random_sample_index[i]
+			idx, depth_str, _, _, primitive_csv_str, result_csv_str, target_csv_str = \
+				utils.get_file_path(string_deque[sample_idx])
+			print "Using %s" %string_deque[sample_idx]
+			color = cv2.imread(string_deque[sample_idx])
+			depth = cv2.imread(depth_str, -1)
+			action_primitive = np.loadtxt(primitive_csv_str, delimiter=",")[idx]
+			pixel_index = np.loadtxt(target_csv_str, delimiter=",")[idx]
+			label_value = td_target_deque[sample_idx]
+			if action_primitive == -1: action_str = "invalid"
+			elif action_primitive == 1: action_str = "suck"
+			else: action_str = "grasp"
+			loss_value = trainer.backprop(color, depth, action_str, pixel_index, label_value)
+		# remove the maximum one from deque
+		td_target_deque.remove(td_target_deque[random_sample_index[0]])
+		string_deque.remove(string_deque[random_sample_index[0]])
 	if iteration % (update_fre*learn_every) == 0:
 		trainer.target = trainer.model
 	if iteration % (save_every*learn_every) == 0:

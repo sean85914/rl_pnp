@@ -23,17 +23,6 @@ br = CvBridge()
                         |___/                                       
 '''
 
-'''# Get color and depth images from service response and save them
-def get_imgs_from_msg(response, img_path, iteration):
-	color = br.imgmsg_to_cv2(response.crop_color_img)
-	depth = br.imgmsg_to_cv2(response.crop_depth_img)
-	color_name = img_path + "color_{:06}.jpg".format(iteration)
-	depth_name = img_path + "depth_{:06}.png".format(iteration)
-	cv2.imwrite(color_name, color)
-	cv2.imwrite(depth_name, depth)
-	return color, depth
-'''
-
 def get_heightmap(pc, img_path, iteration):
 	color_heightmap = np.zeros((224, 224, 3), dtype=np.uint8)
 	depth_heightmap = np.zeros((224, 224))
@@ -63,7 +52,7 @@ def get_heightmap(pc, img_path, iteration):
 	depth_img_msg = br.cv2_to_imgmsg(depth_img)
 	#depth_heightmap[depth_heightmap == -z_bot] = np.nan
 	depth_name = img_path + "depth_{:06}.png".format(iteration)
-	cv2.imwrite(depth_name, depth_img)
+	cv2.imwrite(depth_name, depth_heightmap)
 	color_name = img_path + "color_{:06}.jpg".format(iteration)
 	cv2.imwrite(color_name, color_heightmap)
 	return color_heightmap, depth_heightmap, points, depth_img_msg

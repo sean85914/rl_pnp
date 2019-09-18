@@ -1,5 +1,6 @@
 import os
 import time
+import copy
 import numpy as np
 import cv2
 import torch
@@ -24,7 +25,8 @@ class Trainer(object):
         
         # Model
         self.model  = reinforcement_net(self.use_cuda, 4)
-        self.target = reinforcement_net(self.use_cuda, 4) 
+        #self.target = reinforcement_net(self.use_cuda, 4)
+        self.target = copy.deepcopy(self.model)
 		
         if self.use_cuda:
             self.model  = self.model.cuda()
@@ -45,6 +47,9 @@ class Trainer(object):
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-4, momentum=0.9, weight_decay=2e-5)
         self.iteration = 0
         
+    def copyNetwork(self):
+        self.target = copy.deepcopy(self.model)
+
     # Forward pass through image, get affordance (Q value) and features
     def forward(self, color_img, depth_img, is_volatile=False, specific_rotation=-1, network="behavior"):
     	# Preprocessing
@@ -170,7 +175,7 @@ class Trainer(object):
         tmp_label[action_area>0] = label_value
         label[0, 48: (320-48), 48: (320-48)] = tmp_label
        
-        # Computelabel mask
+        # Compute label mask
         label_weights = np.zeros(label.shape)
         tmp_label_weights = np.zeros((224, 224))
         tmp_label_weights[action_area>0] = 1
