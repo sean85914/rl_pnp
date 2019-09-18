@@ -43,6 +43,7 @@ double z_lower; // Z lower bound, in hand coord.
 double z_upper; // Z upper bound, in hand coord.
 //double z_thres_lower; // Z lower bound to check if workspace were empty
 //double z_thres_upper; // Z upper bound to check if workspace were empty
+std::string frame_name;
 std::vector<double> intrinsic; // [fx, fy, cx, cy]
 cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
 Eigen::Matrix4f arm2cam_tf;
@@ -79,7 +80,7 @@ int main(int argc, char** argv)
   if(!pnh.getParam("factor", factor)) factor = 0.995f; // Points number greater than this value will be considered as not empty
   if(verbose) ROS_WARN("[%s] Save pointcloud for debuging", ros::this_node::getName().c_str());
   else ROS_WARN("[%s] Not save pointcloud", ros::this_node::getName().c_str());
-  arm2cam_tf = lookup_transform();
+  //arm2cam_tf = lookup_transform();
   pass_x.setFilterFieldName("x");
   pass_x.setFilterLimits(x_lower, x_upper);
   pass_y.setFilterFieldName("y");
@@ -111,8 +112,8 @@ Eigen::Matrix4f lookup_transform(void){
   tf::TransformListener listener;
   tf::StampedTransform stf;
   try{
-    listener.waitForTransform("base_link", "camera1_color_optical_frame", ros::Time(0), ros::Duration(0.3));
-    listener.lookupTransform("base_link", "camera1_color_optical_frame", ros::Time(0), stf);
+    listener.waitForTransform("base_link", frame_name, ros::Time(0), ros::Duration(0.3));
+    listener.lookupTransform("base_link", frame_name, ros::Time(0), stf);
   } catch(tf::TransformException ex){
     ROS_ERROR("%s", ex.what());
     ROS_ERROR("Can't get transformation, shutdown...");
@@ -130,6 +131,7 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image,
                   const sensor_msgs::ImageConstPtr& depth_image, 
                   const sensor_msgs::CameraInfoConstPtr& cam_info)
 {
+  frame_name = cam_info->header.frame_id;
   intrinsic[0] = cam_info->K[0]; // fx
   intrinsic[1] = cam_info->K[4]; // fy
   intrinsic[2] = cam_info->K[2]; // cx
@@ -197,6 +199,7 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
 bool callback_get_pc(visual_system::get_pc::Request  &req, 
                      visual_system::get_pc::Response &res)
 {
+  arm2cam_tf = lookup_transform();
   // Transform points to hand coordinate
   pcl::PointCloud<pcl::PointXYZRGB> pc_in_range;
   pcl::transformPointCloud(pc, pc_in_range, arm2cam_tf);

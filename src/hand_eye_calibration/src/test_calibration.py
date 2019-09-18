@@ -12,7 +12,7 @@ h = rospy.ServiceProxy("/helper_services_node/robot_go_home", Empty)
 p = rospy.ServiceProxy("/helper_services_node/robot_goto_place", Empty)
 o = rospy.ServiceProxy("/robotiq_finger_control_node/open_gripper", Empty)
 v = rospy.ServiceProxy("/arduino_control/vacuum_control", vacuum_control)
-p = rospy.ServiceProxy("/arduino_control/pheumatic_control", SetBool)
+r = rospy.ServiceProxy("/arduino_control/pheumatic_control", SetBool)
 
 pub = rospy.Publisher("/test_marker", Marker, queue_size=1)
 
@@ -38,7 +38,7 @@ def cb(msg):
 	if pri != 0 and pri != 1:
 		rospy.logwarn("Invalid input, ignore...")
 		return
-	req.primmitive = pri
+	req.primitive = pri
 	if pri == 0:
 		yaw = int(raw_input("Input index for grasp: [0: -90; 1: -45; 2:0; 3: 45]\n"))
 		if yaw != 0 and yaw != 1 and yaw != 2 and yaw != 3:
@@ -55,7 +55,7 @@ def cb(msg):
 		elif command is 'o':
 			o()
 		elif command is 'r':
-			p(False)
+			r(False)
 		elif command is 'v':
 			v(1)
 			rospy.sleep(0.5)

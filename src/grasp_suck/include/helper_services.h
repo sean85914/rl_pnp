@@ -27,7 +27,6 @@
 #define SUCK  true
 
 const int    REPEAT_TIME = 2;
-const double OFFSET = -0.025f; // Lower 1 centimeter to make sure have contract with object
 const double X_OFFSET = 0.0f; // Seems error from hand-eye calibration
 
 class Helper_Services{
@@ -37,8 +36,8 @@ class Helper_Services{
   bool define_home; // If define home joint
   bool define_place; // If define place joint
   bool last_motion; // Last motion primitive
-  std::string cam_prefix; // Camera prefix
-  std::string arm_prefix; // UR prefix
+  double suck_offset;
+  double grasp_offset;
   std::vector<double> suction_tcp; // Suction TCP translation from end effector
   std::vector<double> gripper_tcp; // Gripper TCP translation from end effector
   std::vector<double> home_joint; 

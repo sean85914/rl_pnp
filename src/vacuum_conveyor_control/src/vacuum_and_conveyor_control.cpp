@@ -18,10 +18,12 @@ class ArduinoControl{
   ros::ServiceServer conveyor_srv;
   ros::ServiceServer pheumatic_srv;
   ros::ServiceServer check_success_srv;
+  ros::Timer checkParameterTimer;
   bool vacuum_control_cb(vacuum_conveyor_control::vacuum_control::Request&, vacuum_conveyor_control::vacuum_control::Response&);
   bool conveyor_control_cb(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
   bool pheumatic_control_cb(std_srvs::SetBool::Request&, std_srvs::SetBool::Response&);
   bool check_suck_success(std_srvs::SetBool::Request&, std_srvs::SetBool::Response&);
+  void checkParameterTimerCallback(const ros::TimerEvent& event);
  public:
   ArduinoControl(ros::NodeHandle, ros::NodeHandle);
   ~ArduinoControl(){mySerial.close();}
@@ -36,6 +38,7 @@ ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh)
   ROS_INFO("[%s] port: %s", ros::this_node::getName().c_str(), port.c_str());
   ROS_INFO("[%s] vacuum_thres: %d", ros::this_node::getName().c_str(), vacuum_thres);
   ROS_INFO("[%s] type: %s", ros::this_node::getName().c_str(), (is_upper?"upper":"lower"));
+  checkParameterTimer = pnh_.createTimer(ros::Duration(1.0), &ArduinoControl::checkParameterTimerCallback, this);
   // Open serial
   mySerial.setPort(port);
   mySerial.setBaudrate(baudrate);
@@ -99,6 +102,14 @@ bool ArduinoControl::check_suck_success(std_srvs::SetBool::Request &req, std_srv
     else res.success = false;
   }
   return true;
+}
+
+void ArduinoControl::checkParameterTimerCallback(const ros::TimerEvent& event){
+  int tmp; pnh_.getParam("vacuum_thres", tmp);
+  if(tmp!=vacuum_thres){
+    ROS_INFO("[%s] vacuum_thres changed from %d to %d", ros::this_node::getName().c_str(), vacuum_thres, tmp);
+    vacuum_thres = tmp;
+  }
 }
 
 int main(int argc, char** argv)

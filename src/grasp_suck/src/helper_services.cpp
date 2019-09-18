@@ -7,8 +7,8 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   suction_tcp.resize(3); gripper_tcp.resize(3); home_joint.resize(6); place_joint.resize(6);
   // Get parameters
   if(!pnh.getParam("has_vacuum", has_vacuum)) has_vacuum = false;
-  if(!pnh.getParam("cam_prefix", cam_prefix)) cam_prefix = "camera1";
-  if(!pnh.getParam("arm_prefix", arm_prefix)) arm_prefix = "";
+  if(!pnh.getParam("suck_offset", suck_offset)) suck_offset = -0.015f;
+  if(!pnh.getParam("grasp_offset", grasp_offset)) grasp_offset = 0.0f;
   if(!pnh.getParam("/tcp_transformation_publisher/suction", suction_tcp)) {suction_tcp[0] = suction_tcp[1] = suction_tcp[2] = 0.0f;}
   if(!pnh.getParam("/tcp_transformation_publisher/gripper", gripper_tcp)) {gripper_tcp[0] = gripper_tcp[1] = gripper_tcp[2] = 0.0f;}
   if(!pnh.getParam("home_joint", home_joint)) {define_home = false; ROS_WARN("No predefined home joint received!");}
@@ -16,12 +16,12 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   // Show parameters
   ROS_INFO("--------------------------------------");
   ROS_INFO("[%s] has_vacuum: %s", ros::this_node::getName().c_str(), (has_vacuum==true?"true":"false"));
-  ROS_INFO("[%s] Camera prefix: %s", ros::this_node::getName().c_str(), cam_prefix.c_str());
-  ROS_INFO("[%s] Arm prefix: %s", ros::this_node::getName().c_str(), arm_prefix.c_str());
+  ROS_INFO("[%s] suck_offset: %f", ros::this_node::getName().c_str(), suck_offset);
+  ROS_INFO("[%s] grasp_offset: %f", ros::this_node::getName().c_str(), grasp_offset);
   ROS_INFO("[%s] Suction translation: %f %f %f", ros::this_node::getName().c_str(), suction_tcp[0], suction_tcp[1], suction_tcp[2]);
   ROS_INFO("[%s] Gripper translation: %f %f %f", ros::this_node::getName().c_str(), gripper_tcp[0], gripper_tcp[1], gripper_tcp[2]);
-  if(define_home) ROS_INFO("UR5 home joints: %f %f %f %f %f %f", ros::this_node::getName().c_str(), home_joint[0], home_joint[1], home_joint[2], home_joint[3], home_joint[4], home_joint[5]);
-  if(define_place) ROS_INFO("UR5 place joints: %f %f %f %f %f %f", ros::this_node::getName().c_str(), place_joint[0], place_joint[1], place_joint[2], place_joint[3], place_joint[4], place_joint[5]);
+  if(define_home) ROS_INFO("[%s] UR5 home joints: %f %f %f %f %f %f", ros::this_node::getName().c_str(), home_joint[0], home_joint[1], home_joint[2], home_joint[3], home_joint[4], home_joint[5]);
+  if(define_place) ROS_INFO("[%s] UR5 place joints: %f %f %f %f %f %f", ros::this_node::getName().c_str(), place_joint[0], place_joint[1], place_joint[2], place_joint[3], place_joint[4], place_joint[5]);
   ROS_INFO("--------------------------------------");
   // Publisher
   //pub_marker = pnh_.advertise<visualization_msgs::Marker>("marker", 1);
@@ -211,11 +211,13 @@ bool Helper_Services::go_target_service_callback(
     res.result_pose.position.z = final_position.getZ();
   }
   // Correction
-  res.result_pose.position.x += X_OFFSET; 
+  if(req.primitive==SUCK)  res.result_pose.position.z += suck_offset;
+  if(req.primitive==GRASP) res.result_pose.position.z += grasp_offset;
+  /*res.result_pose.position.x += X_OFFSET; 
   res.result_pose.position.z += OFFSET;
   if(req.primitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.02f; // Low object, for instance, cuboid lying down
   if(req.primitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.014f; // Hight object, for instance, standed cylinder
-  if(req.primitive==SUCK  and res.result_pose.position.z<=0.23f) res.result_pose.position.z = 0.23f;
+  if(req.primitive==SUCK  and res.result_pose.position.z<=0.23f) res.result_pose.position.z = 0.23f;*/
   arm_operation::target_pose myPoseReq;
   myPoseReq.request.target_pose = res.result_pose;
   myPoseReq.request.factor = 0.8f;
