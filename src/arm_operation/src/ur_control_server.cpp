@@ -39,9 +39,9 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   ROS_INFO("[%s] Tool length: %f", ros::this_node::getName().c_str(), tool_length);
   ROS_INFO("[%s] Prefix: %s", ros::this_node::getName().c_str(), prefix.c_str());
   ROS_INFO("[%s] Sim: %s", ros::this_node::getName().c_str(), (sim==true?"True":"False"));
-  ROS_INFO("[%s] Wrist 1 upper bound: %f, lower bound: %f", ros::this_node::getName().c_str(), wrist1_upper_bound, wrist1_lower_bound);
-  ROS_INFO("[%s] Wrist 2 upper bound: %f, lower bound: %f", ros::this_node::getName().c_str(), wrist2_upper_bound, wrist2_lower_bound);
-  ROS_INFO("[%s] Wrist 3 upper bound: %f, lower bound: %f", ros::this_node::getName().c_str(), wrist3_upper_bound, wrist3_lower_bound);
+  ROS_INFO("[%s] Wrist 1 bound: [%f, %f]", ros::this_node::getName().c_str(), wrist1_lower_bound, wrist1_upper_bound);
+  ROS_INFO("[%s] Wrist 2 bound: [%f, %f]", ros::this_node::getName().c_str(), wrist2_lower_bound, wrist2_upper_bound);
+  ROS_INFO("[%s] Wrist 3 bound: [%f, %f]", ros::this_node::getName().c_str(), wrist3_lower_bound, wrist3_upper_bound);
   ROS_INFO("*********************************************************************************");
   // Tell the action client that we want to spin a thread by default
   if(!sim)

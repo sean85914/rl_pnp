@@ -41,8 +41,8 @@ double y_lower; // Y lower bound, in hand coord.
 double y_upper; // Y upper bound, in hand coord.
 double z_lower; // Z lower bound, in hand coord.
 double z_upper; // Z upper bound, in hand coord.
-double z_thres_lower; // Z lower bound to check if workspace were empty
-double z_thres_upper; // Z upper bound to check if workspace were empty
+//double z_thres_lower; // Z lower bound to check if workspace were empty
+//double z_thres_upper; // Z upper bound to check if workspace were empty
 std::vector<double> intrinsic; // [fx, fy, cx, cy]
 cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
 Eigen::Matrix4f arm2cam_tf;
@@ -73,14 +73,12 @@ int main(int argc, char** argv)
   if(!pnh.getParam("y_upper", y_upper)) y_upper =  0.114f;
   if(!pnh.getParam("z_lower", z_lower)) z_lower = -0.100f;
   if(!pnh.getParam("z_upper", z_upper)) z_upper =  0.200f;
-  if(!pnh.getParam("z_thres_lower", z_thres_lower)) z_thres_lower = 0.02f;
-  if(!pnh.getParam("z_thres_upper", z_thres_upper)) z_thres_upper = 0.20f;
+  //if(!pnh.getParam("z_thres_lower", z_thres_lower)) z_thres_lower = 0.02f;
+  //if(!pnh.getParam("z_thres_upper", z_thres_upper)) z_thres_upper = 0.20f;
   if(!pnh.getParam("verbose", verbose)) verbose = false;
   if(!pnh.getParam("factor", factor)) factor = 0.995f; // Points number greater than this value will be considered as not empty
-  if(verbose)
-    ROS_WARN("Save pointcloud for debuging");
-  else
-    ROS_WARN("Not save pointcloud");
+  if(verbose) ROS_WARN("[%s] Save pointcloud for debuging", ros::this_node::getName().c_str());
+  else ROS_WARN("[%s] Not save pointcloud", ros::this_node::getName().c_str());
   arm2cam_tf = lookup_transform();
   pass_x.setFilterFieldName("x");
   pass_x.setFilterLimits(x_lower, x_upper);

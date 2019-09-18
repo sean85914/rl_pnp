@@ -8,20 +8,20 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   // Get parameters
   if(!pnh.getParam("has_vacuum", has_vacuum)) has_vacuum = false;
   if(!pnh.getParam("cam_prefix", cam_prefix)) cam_prefix = "camera1";
-  if(!pnh.getParam("arn_prefix", arm_prefix)) arm_prefix = "";
+  if(!pnh.getParam("arm_prefix", arm_prefix)) arm_prefix = "";
   if(!pnh.getParam("/tcp_transformation_publisher/suction", suction_tcp)) {suction_tcp[0] = suction_tcp[1] = suction_tcp[2] = 0.0f;}
   if(!pnh.getParam("/tcp_transformation_publisher/gripper", gripper_tcp)) {gripper_tcp[0] = gripper_tcp[1] = gripper_tcp[2] = 0.0f;}
   if(!pnh.getParam("home_joint", home_joint)) {define_home = false; ROS_WARN("No predefined home joint received!");}
   if(!pnh.getParam("place_joint", place_joint)) {define_place = false; ROS_WARN("No predefined place joint received!");}
   // Show parameters
   ROS_INFO("--------------------------------------");
-  ROS_INFO("has_vacuum: %s", (has_vacuum==true?"true":"false"));
-  ROS_INFO("Camera prefix: %s", cam_prefix.c_str());
-  ROS_INFO("Arm prefix: %s", arm_prefix.c_str());
-  ROS_INFO("Suction translation: %f %f %f", suction_tcp[0], suction_tcp[1], suction_tcp[2]);
-  ROS_INFO("Gripper translation: %f %f %f", gripper_tcp[0], gripper_tcp[1], gripper_tcp[2]);
-  if(define_home) ROS_INFO("UR5 home joints: %f %f %f %f %f %f", home_joint[0], home_joint[1], home_joint[2], home_joint[3], home_joint[4], home_joint[5]);
-  if(define_place) ROS_INFO("UR5 place joints: %f %f %f %f %f %f", place_joint[0], place_joint[1], place_joint[2], place_joint[3], place_joint[4], place_joint[5]);
+  ROS_INFO("[%s] has_vacuum: %s", ros::this_node::getName().c_str(), (has_vacuum==true?"true":"false"));
+  ROS_INFO("[%s] Camera prefix: %s", ros::this_node::getName().c_str(), cam_prefix.c_str());
+  ROS_INFO("[%s] Arm prefix: %s", ros::this_node::getName().c_str(), arm_prefix.c_str());
+  ROS_INFO("[%s] Suction translation: %f %f %f", ros::this_node::getName().c_str(), suction_tcp[0], suction_tcp[1], suction_tcp[2]);
+  ROS_INFO("[%s] Gripper translation: %f %f %f", ros::this_node::getName().c_str(), gripper_tcp[0], gripper_tcp[1], gripper_tcp[2]);
+  if(define_home) ROS_INFO("UR5 home joints: %f %f %f %f %f %f", ros::this_node::getName().c_str(), home_joint[0], home_joint[1], home_joint[2], home_joint[3], home_joint[4], home_joint[5]);
+  if(define_place) ROS_INFO("UR5 place joints: %f %f %f %f %f %f", ros::this_node::getName().c_str(), place_joint[0], place_joint[1], place_joint[2], place_joint[3], place_joint[4], place_joint[5]);
   ROS_INFO("--------------------------------------");
   // Publisher
   //pub_marker = pnh_.advertise<visualization_msgs::Marker>("marker", 1);

@@ -9,8 +9,8 @@ class ArduinoControl{
  private:
   bool is_upper; // Deciding type, true means that if suck success, the value reported from the sensor will be higher than the threshold, false otherwise
   int baudrate;
+  int vacuum_thres; // Value from sensor higher/lower than this value will consider as fail
   const int TO = 50; // Serial timeout, not sure what this really are
-  int vacuum_thres; // Volotage from sensor higher than this value will consider as fail
   std::string port;
   serial::Serial mySerial;
   ros::NodeHandle nh_, pnh_;
@@ -27,11 +27,15 @@ class ArduinoControl{
   ~ArduinoControl(){mySerial.close();}
 };
 
-ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
+ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), baudrate(115200){
+  // Get parameters
   if(!pnh_.getParam("is_upper", is_upper)) is_upper = true; ROS_INFO("is_upper: %s", is_upper?"True":"False");
-  if(!pnh_.getParam("baudrate", baudrate)) baudrate = 115200; ROS_INFO("baudrate: %d", baudrate);
   if(!pnh_.getParam("port", port)) port = "/dev/ttyACM0"; ROS_INFO("port: %s", port.c_str());
   if(!pnh_.getParam("vacuum_thres", vacuum_thres)) vacuum_thres = 800; ROS_INFO("vacuum_thres: %d", vacuum_thres);
+  // Show parameters
+  ROS_INFO("[%s] port: %s", ros::this_node::getName().c_str(), port.c_str());
+  ROS_INFO("[%s] vacuum_thres: %d", ros::this_node::getName().c_str(), vacuum_thres);
+  ROS_INFO("[%s] type: %s", ros::this_node::getName().c_str(), (is_upper?"upper":"lower"));
   // Open serial
   mySerial.setPort(port);
   mySerial.setBaudrate(baudrate);
