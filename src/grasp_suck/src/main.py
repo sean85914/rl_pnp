@@ -43,7 +43,9 @@ epsilon      = None
 max_len      = 1000
 iteration    = 0
 episode      = args.episode
+learn_every  = args.learn_every
 use_normal   = False
+abnormal     = False
 grasp_radius = 0.015
 suck_radius  = 0.015
 # Reward
@@ -114,6 +116,8 @@ if args.model != "":
 
 
 # Service client
+# Robot state
+get_robot_state   = rospy.ServiceProxy('/ur5_control_server/ur_control/get_robot_state', Trigger)
 # Gripper
 open_gripper      = rospy.ServiceProxy('/robotiq_finger_control_node/open_gripper', Empty)
 grasp_state       = rospy.ServiceProxy('/robotiq_finger_control_node/get_grasp_state', Trigger)
@@ -265,6 +269,7 @@ try:
 		viz_req.angle = angle
 		viz_req.valid = is_valid
 		viz(viz_req)
+		target_list.append(pixel_index)
 		# Take action
 		if is_valid:
 			cnt_invalid = 0 # Reset cnt
@@ -283,11 +288,20 @@ try:
 		
 			goto_target(gotoTarget)
 			time.sleep(0.5)
+			# Robot emergency/protective stop
+			if get_robot_state().success == False:
+				abnormal = True
+				print "\033[1;31m[%f] Robot protective, aborting...\033[0m" %(time.time())
+				action_success = False
+				result_list.append(action_success)
+				go_home()
+				pheumatic(SetBoolRequest(False)); rospy.sleep(0.5)
+				vacuum(vacuum_controlRequest(0))
+				break
 
 			go_home() # TODO: service maybe block
 		else: # INVALID
 			action_list.append(-1)
-		target_list.append(pixel_index)
 		# Get action result
 		get_pc_req.file_name = pc_path + "/{}_after.pcd".format(iteration)
 		next_pc = get_pc_client(get_pc_req).pc
@@ -326,7 +340,7 @@ try:
 			label_value, prev_reward_value = trainer.get_label_value("invalid", False, next_color, next_depth, is_empty)
 		print "Get label: {} seconds".format(time.time()-ts)
 		return_ += prev_reward_value * np.power(discount, iteration)
-		if (iteraion+1) % learn_every == 0:
+		if (iteration+1) % learn_every == 0:
 			ts = time.time()
 			loss_value = trainer.backprop(color, depth, action_str, pixel_index, label_value)
 			loss_list.append(loss_value)
@@ -342,10 +356,7 @@ try:
 			trainer.target = trainer.model
 		# Pass test checker
 		if testing:
-			if iteration >= 3*init_num:
-				print "Fail to pass test since too much iterations!"
-				break
-			if cnt_invalid >= init_num:
+			if cnt_invalid >= 10:
 				print "Fail to pass test since too much invalid target"
 				break
 		time.sleep(0.5) # Sleep 0.5 s for next iteration
@@ -355,9 +366,14 @@ try:
 		
 	# Num of item = 0
 	if not testing:
-		model_name = model_path + "final.pth"
-		torch.save(trainer.model.state_dict(), model_name)
-		print "Model: %s saved" % model_name
+		if not abnormal:
+			model_name = model_path + "final.pth"
+			torch.save(trainer.model.state_dict(), model_name)
+			print "Model: %s saved" % model_name
+		else:
+			model_name = model_path + "force_terminate.pth"
+			torch.save(trainer.model.state_dict(), model_name)
+			print "Model: %s saved" % model_name
 	# Save files
 	num_of_invalid = np.where(np.array(action_list) == -1)[0].size
 	grasp_idx      = np.where(np.array(action_list) == 0)
@@ -372,8 +388,8 @@ try:
 	else: grasp_rate = float('nan')
 	if num_of_suck is not 0: suck_rate  = float(suck_success)/num_of_suck
 	else: suck_rate = float('nan')
-	result_str = str("Time: %f\nItem remain: %d\nIteration: %d\nReturn: %f\nMean loss: %f\nNum of Invalid: %d\nValid action ratio: %f\nNum of Grasp: %d\nGrasp success rate: %f\nNum of suck: %d\nSuck success rate: %f\nEfficiency: %f\n"
-					%(total_time, num_of_items, iteration, return_, np.mean(loss_list), num_of_invalid, valid_action_ratio, num_of_grasp, grasp_rate, num_of_suck, suck_rate, efficiency))
+	result_str = str("Time: %f\nIteration: %d\nReturn: %f\nMean loss: %f\nNum of Invalid: %d\nValid action ratio: %f\nNum of Grasp: %d\nGrasp success rate: %f\nNum of suck: %d\nSuck success rate: %f\nEfficiency: %f\n"
+					%(total_time, iteration, return_, np.mean(loss_list), num_of_invalid, valid_action_ratio, num_of_grasp, grasp_rate, num_of_suck, suck_rate, efficiency))
 	f.write(result_str)
 	f.close()
 	np.savetxt(loss_file   , loss_list   , delimiter=",")
@@ -402,8 +418,8 @@ except KeyboardInterrupt:
 	else: grasp_rate = float('nan')
 	if num_of_suck is not 0: suck_rate  = float(suck_success)/num_of_suck
 	else: suck_rate = float('nan')
-	result_str = str("Time: %f\nItem remain: %d\nIteration: %d\nReturn: %f\nMean loss: %f\nNum of Invalid: %d\nValid action ratio: %f\nNum of Grasp: %d\nGrasp success rate: %f\nNum of suck: %d\nSuck success rate: %f\nEfficiency: %f\n"
-					%(total_time, num_of_items, iteration, return_, np.mean(loss_list), num_of_invalid, valid_action_ratio, num_of_grasp, grasp_rate, num_of_suck, suck_rate, efficiency))
+	result_str = str("Time: %f\nIteration: %d\nReturn: %f\nMean loss: %f\nNum of Invalid: %d\nValid action ratio: %f\nNum of Grasp: %d\nGrasp success rate: %f\nNum of suck: %d\nSuck success rate: %f\nEfficiency: %f\n"
+					%(total_time, iteration, return_, np.mean(loss_list), num_of_invalid, valid_action_ratio, num_of_grasp, grasp_rate, num_of_suck, suck_rate, efficiency))
 	f.write(result_str)
 	f.close()
 	np.savetxt(loss_file   , loss_list   , delimiter=",")

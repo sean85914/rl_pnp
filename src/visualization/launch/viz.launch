@@ -1,0 +1,3 @@
+<launch>
+  <node pkg="rviz" name="rviz" type="rviz" args="-d $(find visualization)/config/system.rviz"/>
+</launch>

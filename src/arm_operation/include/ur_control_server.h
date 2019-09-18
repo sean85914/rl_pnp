@@ -8,6 +8,7 @@
  *    ~ur5_control/goto_pose: move robot TCP to given target pose in Cartesian space
  *    ~ur5_control/go_straight: move robot TCP from current pose to target pose straightly
  *    ~ur5_control/goto_joint_pose: move robot to given joint space
+ *    ~ur5_control/get_robot_state: get the state of the robot arm, i.e., whether it is emergency/protective stop
  *  Parameters:
  *    ~tool_length: length from ee_link to tcp_link
  *    ~sim: true if using simulation
@@ -24,20 +25,23 @@
 
 #include <ros/ros.h>
 #include <actionlib/client/simple_action_client.h>
+#include <cmath>
+#include <Eigen/Dense>
+#include <ur_kin.h>
 // MSG
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Quaternion.h>
 #include <sensor_msgs/JointState.h>
+#include <ur_msgs/RobotModeDataMsg.h>
 // SRV
 #include <std_srvs/Empty.h>
+#include <std_srvs/Trigger.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <arm_operation/target_pose.h>
 #include <arm_operation/joint_pose.h>
 #include <arm_operation/rotate_to_flip.h>
 #include <tf/transform_datatypes.h>
-#include <cmath>
-#include <Eigen/Dense>
-#include <ur_kin.h>
+
 
 #define deg2rad(x) (x*M_PI/180.0)
 #define NUMBEROFPOINTS 10
@@ -55,6 +59,7 @@ class RobotArm {
   double wrist1_upper_bound, wrist1_lower_bound;
   double wrist2_upper_bound, wrist2_lower_bound;
   double wrist3_upper_bound, wrist3_lower_bound;
+  bool is_robot_enable;
   bool sim;
   bool wrist1_collision;
   bool wrist2_collision;
@@ -65,12 +70,14 @@ class RobotArm {
   ros::NodeHandle nh_, pnh_;
   // Subscriber
   ros::Subscriber sub_joint_state;
+  ros::Subscriber sub_robot_state;
   // Services
   ros::ServiceServer goto_pose_srv;
   ros::ServiceServer go_straight_srv;
   ros::ServiceServer goto_joint_pose_srv;
   ros::ServiceServer fast_rotate_srv;
   ros::ServiceServer flip_srv;
+  ros::ServiceServer robot_state_srv;
   TrajClient *traj_client;
   control_msgs::FollowJointTrajectoryGoal goal; 
   control_msgs::FollowJointTrajectoryGoal path;
@@ -87,6 +94,10 @@ class RobotArm {
    *  Subscriber callback, update joint values
    */
   void JointStateCallback(const sensor_msgs::JointState &msg);
+  /*
+   *  Subscriber cakkback, update robot mode state
+   */
+  void RobotModeStateCallback(const ur_msgs::RobotModeDataMsg &msg);
   /*
    *  Convert pose to transformation matrix
    *  Input:
@@ -171,6 +182,7 @@ class RobotArm {
    bool FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
    bool FlipService(arm_operation::rotate_to_flip::Request &req,
                     arm_operation::rotate_to_flip::Response &res);
+   bool GetRobotModeStateService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 };
 
 #endif

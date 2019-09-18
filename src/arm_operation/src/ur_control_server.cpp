@@ -10,15 +10,17 @@ inline double makeMinorRotate(const double joint_now, const double joint_togo){
 }
 
 // Public functions
-RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), num_sols(1){
+RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), num_sols(1), is_robot_enable(true){
   // Subscriber
   sub_joint_state = pnh_.subscribe("joint_states", 1, &RobotArm::JointStateCallback, this);
+  sub_robot_state = pnh_.subscribe("/ur_driver/robot_mode_state", 1, &RobotArm::RobotModeStateCallback, this);
   // Service server
   goto_pose_srv = pnh_.advertiseService("ur_control/goto_pose", &RobotArm::GotoPoseService, this);
   go_straight_srv = pnh_.advertiseService("ur_control/go_straight", &RobotArm::GoStraightLineService, this);
   goto_joint_pose_srv = pnh_.advertiseService("ur_control/goto_joint_pose", &RobotArm::GotoJointPoseService, this);
   fast_rotate_srv = pnh_.advertiseService("ur_control/fast_rotate", &RobotArm::FastRotateService, this);
   flip_srv = pnh_.advertiseService("ur_control/flip_service", &RobotArm::FlipService, this);
+  robot_state_srv = pnh_.advertiseService("ur_control/get_robot_state", &RobotArm::GetRobotModeStateService, this);
   // Parameters
   if(!pnh_.getParam("tool_length", tool_length)) tool_length = 0.18;
   if(!pnh_.getParam("prefix", prefix)) prefix="";
@@ -310,6 +312,13 @@ bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty:
   }
 }
 
+bool RobotArm::GetRobotModeStateService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res){
+  res.success = is_robot_enable;
+  res.message = is_robot_enable?"robot enable":"robot disable";
+  ROS_INFO("%s", res.message.c_str());
+  return true;
+}
+
 // Private functions
 
 inline double RobotArm::validAngle(double angle){
@@ -331,6 +340,10 @@ void RobotArm::JointStateCallback(const sensor_msgs::JointState &msg){
     joint[2] = msg.position[0]; // elbow_joint
     for(int i=3; i<6; ++i) joint[i] = msg.position[i];
   }
+}
+
+void RobotArm::RobotModeStateCallback(const ur_msgs::RobotModeDataMsg &msg){
+  is_robot_enable = !msg.is_emergency_stopped and !msg.is_protective_stopped;
 }
 
 void RobotArm::PoseToDH(geometry_msgs::Pose pose, double *T){
