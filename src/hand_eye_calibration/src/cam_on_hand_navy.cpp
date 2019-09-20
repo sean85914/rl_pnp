@@ -123,6 +123,13 @@ class calibration{
     if(!pnh_.getParam("tag_name", tag_name)) tag_name = "tag_0";
     if(!pnh_.getParam("arm_prefix", arm_prefix)) arm_prefix = "";
     if(!pnh_.getParam("file_name", file_name)) file_name = "navy";
+    // Get package path, and check if saved directory exist
+    package_path = ros::package::getPath("hand_eye_calibration");
+    boost::filesystem::path p(package_path+"/data");
+    if(!boost::filesystem::exists(p)){
+      ROS_INFO("Directory doesnot exist, creating one...");
+      boost::filesystem::create_directory(p);
+    } 
     file_full_path = package_path + "/data/" + file_name + ".txt";
     ROS_INFO("\n\
 *************************\n\
@@ -132,13 +139,6 @@ tag_name: %s\n\
 arm_prefix: %s\n\
 file_path: %s\n\
 *************************", ros::this_node::getName().c_str(), camera_name.c_str(), tag_name.c_str(), arm_prefix.c_str(), file_full_path.c_str());
-    // Get package path, and check if saved directory exist
-    package_path = ros::package::getPath("hand_eye_calibration");
-    boost::filesystem::path p(package_path+"/data");
-    if(!boost::filesystem::exists(p)){
-      ROS_INFO("Directory doesnot exist, creating one...");
-      boost::filesystem::create_directory(p);
-    } 
   matrix_M = Eigen::Matrix3f::Zero();
   ROS_INFO("\n================== Cam-on-hand calibration process ==================\n \
 After this process, you will get the transformation from ee_link to camera_link\n \
