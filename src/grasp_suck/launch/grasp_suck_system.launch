@@ -22,12 +22,15 @@
   <!-- robotiq 2-finger gripper -->
   <node pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" name="robotiq2FGripper" args="/dev/ttyGripper" required="true"/>
   <!-- robotiq gripper control -->
-  <node pkg="grasp_suck" type="robotiq_gripper_control" name="robotiq_finger_control_node" output="screen" required="true"/>
+  <node pkg="grasp_suck" type="robotiq_gripper_control" name="robotiq_finger_control_node" output="screen" required="true">
+    <param name="upper_thres" value="222"/>
+    <param name="lower_thres" value="10"/>
+  </node>
   <!-- Visual System -->
   <!-- Convert pointcloud from eye coord. to hand coord. -->
   <node pkg="visual_system" type="pc_transform" name="pc_transform" output="screen" required="true">
     <param name="verbose" value="true"/>
-    <param name="z_lower" value="-0.01"/>
+    <param name="fitness_thres" value="0.000024"/>
     <remap from="camera/color/image_raw" to="/on_hand_cam/color/image_raw"/>
     <remap from="camera/aligned_depth_to_color/image_raw" to="/on_hand_cam/aligned_depth_to_color/image_raw"/>
     <remap from="camera/color/camera_info" to="/on_hand_cam/color/camera_info"/>

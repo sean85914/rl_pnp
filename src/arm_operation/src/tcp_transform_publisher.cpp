@@ -13,8 +13,8 @@ int main(int argc, char** argv)
   if(suction.size()!=3) has_suction = false;
   if(gripper.size()!=3) has_gripper = false;
   ROS_INFO("*******************************************");
-  if(has_suction) ROS_INFO("Suction TCP: [%f, %f, %f]", suction[0], suction[1], suction[2]);
-  if(has_gripper) ROS_INFO("Gripper TCP: [%f, %f, %f]", gripper[0], gripper[1], gripper[2]);
+  if(has_suction) ROS_INFO("[%s] Suction TCP: [%f, %f, %f]", ros::this_node::getName().c_str(), suction[0], suction[1], suction[2]);
+  if(has_gripper) ROS_INFO("[%s] Gripper TCP: [%f, %f, %f]", ros::this_node::getName().c_str(), gripper[0], gripper[1], gripper[2]);
   if(!has_suction and !has_gripper){
     ROS_WARN("No parameters got, shutdown the node"); ros::shutdown(); 
   }

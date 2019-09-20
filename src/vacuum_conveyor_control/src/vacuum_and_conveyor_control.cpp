@@ -31,9 +31,9 @@ class ArduinoControl{
 
 ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), baudrate(115200){
   // Get parameters
-  if(!pnh_.getParam("is_upper", is_upper)) is_upper = true; ROS_INFO("is_upper: %s", is_upper?"True":"False");
-  if(!pnh_.getParam("port", port)) port = "/dev/ttyACM0"; ROS_INFO("port: %s", port.c_str());
-  if(!pnh_.getParam("vacuum_thres", vacuum_thres)) vacuum_thres = 800; ROS_INFO("vacuum_thres: %d", vacuum_thres);
+  if(!pnh_.getParam("is_upper", is_upper)) is_upper = true;
+  if(!pnh_.getParam("port", port)) port = "/dev/ttyACM0";
+  if(!pnh_.getParam("vacuum_thres", vacuum_thres)) vacuum_thres = 800;
   // Show parameters
   ROS_INFO("[%s] port: %s", ros::this_node::getName().c_str(), port.c_str());
   ROS_INFO("[%s] vacuum_thres: %d", ros::this_node::getName().c_str(), vacuum_thres);

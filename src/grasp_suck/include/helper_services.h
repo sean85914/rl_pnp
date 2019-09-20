@@ -60,11 +60,14 @@ class Helper_Services{
   ros::ServiceServer service_home;
   ros::ServiceServer service_place;
   ros::ServiceServer service_goto_target;
+  // Timer to check if parameters change
+  ros::Timer param_timer;
   // End variables
   // Private methods
   bool go_home_service_callback(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
   bool go_place_service_callback(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
   bool go_target_service_callback(grasp_suck::get_pose::Request &req, grasp_suck::get_pose::Response &res);
+  void timer_callback(const ros::TimerEvent& event);
  public:
   // Constructor
   Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh);

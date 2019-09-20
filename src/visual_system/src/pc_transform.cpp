@@ -13,6 +13,8 @@
 #include <pcl/sample_consensus/method_types.h> // pcl::SAC_RANSAC
 #include <pcl/sample_consensus/model_types.h> // pcl::SACMODEL_PLANE
 #include <pcl/segmentation/sac_segmentation.h> // pcl::SACSegmentation
+#include <pcl/registration/icp.h> // pcl::IterativeClosestPoint
+#include <pcl/filters/voxel_grid.h> // pcl::VoxelGrid
 #include "helper.h"
 // message filters
 #include <message_filters/subscriber.h>
@@ -34,7 +36,7 @@
 
 bool verbose; // If save point cloud as pcd
 const int KERNEL_SIZE = 7;
-double factor; // If ratio of plane over total points higher than this value, the workspace will be considered as empty
+double fitness_thres; // Fitness score threshold for ICP, higher than this value will be consider as non-empty workspace
 double x_lower; // X lower bound, in hand coord.
 double x_upper; // X upper bound, in hand coord.
 double y_lower; // Y lower bound, in hand coord.
@@ -44,12 +46,17 @@ double z_upper; // Z upper bound, in hand coord.
 //double z_thres_lower; // Z lower bound to check if workspace were empty
 //double z_thres_upper; // Z upper bound to check if workspace were empty
 std::string frame_name;
+std::string node_name;
+std::string package_path;
 std::vector<double> intrinsic; // [fx, fy, cx, cy]
 cv_bridge::CvImagePtr color_img_ptr, depth_img_ptr;
 Eigen::Matrix4f arm2cam_tf;
 pcl::PointCloud<pcl::PointXYZRGB> pc;
 pcl::PassThrough<pcl::PointXYZRGB> pass_x, pass_y, pass_z;
 ros::Publisher pub_sphere, pub_vector;
+pcl::PointCloud<pcl::PointXYZ>::Ptr empty_workspace;
+pcl::VoxelGrid<pcl::PointXYZ> vg;
+pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
 
 Eigen::Matrix4f lookup_transform(void);
 void callback_sub(const sensor_msgs::ImageConstPtr& color_image, 
@@ -62,25 +69,37 @@ bool callback_check_valid(visual_system::check_valid::Request  &req,
                           visual_system::check_valid::Response &res);
 bool callback_get_surface_feature(visual_system::get_surface_feature::Request  &req,
                                   visual_system::get_surface_feature::Response &res);
+void callback_timer(const ros::TimerEvent& event);
 
 int main(int argc, char** argv)
 {
   intrinsic.resize(4);
   ros::init(argc, argv, "pixel_to_xyz");
   ros::NodeHandle nh, pnh("~");
-  if(!pnh.getParam("x_lower", x_lower)) x_lower = -0.659f;
-  if(!pnh.getParam("x_upper", x_upper)) x_upper = -0.273f;
+  node_name = ros::this_node::getName();
+  if(!pnh.getParam("x_lower", x_lower)) x_lower = -0.659f; 
+  if(!pnh.getParam("x_upper", x_upper)) x_upper = -0.273f; ROS_INFO("[%s] x range: [%f, %f]", node_name.c_str(), x_lower, x_upper);
   if(!pnh.getParam("y_lower", y_lower)) y_lower = -0.269f;
-  if(!pnh.getParam("y_upper", y_upper)) y_upper =  0.114f;
+  if(!pnh.getParam("y_upper", y_upper)) y_upper =  0.114f; ROS_INFO("[%s] y range: [%f, %f]", node_name.c_str(), y_lower, y_upper);
   if(!pnh.getParam("z_lower", z_lower)) z_lower = -0.100f;
-  if(!pnh.getParam("z_upper", z_upper)) z_upper =  0.200f;
+  if(!pnh.getParam("z_upper", z_upper)) z_upper =  0.200f; ROS_INFO("[%s] z range: [%f, %f]", node_name.c_str(), z_lower, z_upper);
   //if(!pnh.getParam("z_thres_lower", z_thres_lower)) z_thres_lower = 0.02f;
   //if(!pnh.getParam("z_thres_upper", z_thres_upper)) z_thres_upper = 0.20f;
   if(!pnh.getParam("verbose", verbose)) verbose = false;
-  if(!pnh.getParam("factor", factor)) factor = 0.995f; // Points number greater than this value will be considered as not empty
-  if(verbose) ROS_WARN("[%s] Save pointcloud for debuging", ros::this_node::getName().c_str());
-  else ROS_WARN("[%s] Not save pointcloud", ros::this_node::getName().c_str());
-  //arm2cam_tf = lookup_transform();
+  if(verbose) ROS_WARN("[%s] Save pointcloud for debuging", node_name.c_str());
+  else ROS_WARN("[%s] Not save pointcloud", node_name.c_str());
+  if(!pnh.getParam("fitness_thres", fitness_thres)) fitness_thres = 0.000024; ROS_INFO("[%s] fitness_thres: %f", node_name.c_str(), fitness_thres);
+  // Read prestored point cloud
+  package_path = ros::package::getPath("visual_system");
+  vg.setLeafSize(1e-2, 1e-2, 1e-2);
+  empty_workspace = pcl::PointCloud<pcl::PointXYZ>::Ptr (new pcl::PointCloud<pcl::PointXYZ>);
+  if(pcl::io::loadPCDFile<pcl::PointXYZ>(package_path+"/empty_workspace.pcd", *empty_workspace)==-1){
+    ROS_ERROR("[%s] No empty workspace pcd file provided, shutdown...", node_name.c_str());
+    ros::shutdown();
+  } 
+  vg.filter(*empty_workspace);
+  icp.setInputSource(empty_workspace);
+  icp.setEuclideanFitnessEpsilon(1e-1);
   pass_x.setFilterFieldName("x");
   pass_x.setFilterLimits(x_lower, x_upper);
   pass_y.setFilterFieldName("y");
@@ -101,6 +120,7 @@ int main(int argc, char** argv)
   ros::ServiceServer check_empty_service = pnh.advertiseService("empty_state", callback_is_empty);
   ros::ServiceServer check_valid_service = pnh.advertiseService("check_valid", callback_check_valid);
   ros::ServiceServer get_surface_feature_service = pnh.advertiseService("get_surface_feature", callback_get_surface_feature);
+  ros::Timer param_checker = pnh.createTimer(ros::Duration(1.0), callback_timer);
   pub_sphere = pnh.advertise<visualization_msgs::Marker>("centroid", 1);
   pub_vector = pnh.advertise<visualization_msgs::Marker>("surface_normal", 1);
   ros::spin();
@@ -165,8 +185,8 @@ void callback_sub(const sensor_msgs::ImageConstPtr& color_image,
 
 bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::pc_is_empty::Response &res)
 {
+  // Method 1: check number of points in range [z_lower, z_upper]
   /*
-  // Old method
   pcl::PointCloud<pcl::PointXYZRGB> pc, pc_filtered;
   pcl::fromROSMsg(req.input_pc, pc);
   pcl::PassThrough<pcl::PointXYZRGB> pass;
@@ -177,7 +197,10 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
   ROS_INFO("[%s] Points in range: %d", ros::this_node::getName().c_str(), (int)pc_filtered.size());
   if(pc_filtered.points.size()<=num_thres) {res.is_empty.data = true; ROS_INFO("\033[0;33mWorkspace is empty\033[0m");}
   else {res.is_empty.data = false; ROS_INFO("\033[0;33mWorkspace is not empty\033[0m");}
-  return true;*/
+  return true;
+  */
+  // Method 2: segment the dominant plane in input pc and compute the factor of plane points over total points
+  /*
   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients ());
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices ());
   pcl::SACSegmentation<pcl::PointXYZRGB> seg;
@@ -193,6 +216,20 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
   ROS_INFO("Ratio: %f", ratio);
   if(ratio>=factor) res.is_empty.data = true;
   else res.is_empty.data = false;
+  return true;
+  */
+  // Method 3: prestored an empty workspace point cloud and uisng ICP to fit two sets
+  ROS_INFO("Receive new request");
+  pcl::PointCloud<pcl::PointXYZ> pc;
+  pcl::fromROSMsg(req.input_pc, pc);
+  vg.setInputCloud(pc.makeShared());
+  vg.filter(pc);
+  icp.setInputTarget(pc.makeShared());
+  pcl::PointCloud<pcl::PointXYZ> Final;
+  icp.align(Final);
+  if(icp.getFitnessScore() > fitness_thres) res.is_empty.data = false;
+  else res.is_empty.data = true;
+  ROS_INFO("[%s] ICP fitness score: %f |-> %s", node_name.c_str(), icp.getFitnessScore(), res.is_empty.data?"Empty workspace":"Non-empty workspace");
   return true;
 }
 
@@ -295,4 +332,12 @@ bool callback_get_surface_feature(visual_system::get_surface_feature::Request  &
     pub_vector.publish(vector_marker);
   } 
   res.result = true; return true;
+}
+
+void callback_timer(const ros::TimerEvent& event){
+  double tmp; ros::param::get(node_name+"/fitness_thres", tmp);
+  if(tmp!=fitness_thres){
+    ROS_INFO("[%s] fitness_thres changes from %f to %f", node_name.c_str(), fitness_thres, tmp);
+    fitness_thres = tmp;
+  }
 }

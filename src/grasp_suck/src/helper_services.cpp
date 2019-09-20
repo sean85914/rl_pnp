@@ -6,13 +6,13 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   // Initialize vector size
   suction_tcp.resize(3); gripper_tcp.resize(3); home_joint.resize(6); place_joint.resize(6);
   // Get parameters
-  if(!pnh.getParam("has_vacuum", has_vacuum)) has_vacuum = false;
-  if(!pnh.getParam("suck_offset", suck_offset)) suck_offset = -0.015f;
-  if(!pnh.getParam("grasp_offset", grasp_offset)) grasp_offset = 0.0f;
-  if(!pnh.getParam("/tcp_transformation_publisher/suction", suction_tcp)) {suction_tcp[0] = suction_tcp[1] = suction_tcp[2] = 0.0f;}
-  if(!pnh.getParam("/tcp_transformation_publisher/gripper", gripper_tcp)) {gripper_tcp[0] = gripper_tcp[1] = gripper_tcp[2] = 0.0f;}
-  if(!pnh.getParam("home_joint", home_joint)) {define_home = false; ROS_WARN("No predefined home joint received!");}
-  if(!pnh.getParam("place_joint", place_joint)) {define_place = false; ROS_WARN("No predefined place joint received!");}
+  if(!pnh_.getParam("has_vacuum", has_vacuum)) has_vacuum = false;
+  if(!pnh_.getParam("suck_offset", suck_offset)) suck_offset = -0.015f;
+  if(!pnh_.getParam("grasp_offset", grasp_offset)) grasp_offset = 0.0f;
+  if(!pnh_.getParam("/tcp_transformation_publisher/suction", suction_tcp)) {suction_tcp[0] = suction_tcp[1] = suction_tcp[2] = 0.0f;}
+  if(!pnh_.getParam("/tcp_transformation_publisher/gripper", gripper_tcp)) {gripper_tcp[0] = gripper_tcp[1] = gripper_tcp[2] = 0.0f;}
+  if(!pnh_.getParam("home_joint", home_joint)) {define_home = false; ROS_WARN("No predefined home joint received!");}
+  if(!pnh_.getParam("place_joint", place_joint)) {define_place = false; ROS_WARN("No predefined place joint received!");}
   // Show parameters
   ROS_INFO("--------------------------------------");
   ROS_INFO("[%s] has_vacuum: %s", ros::this_node::getName().c_str(), (has_vacuum==true?"true":"false"));
@@ -29,40 +29,42 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   // Connect to service server
   // goto_joint_pose
   while(!ros::service::waitForService("/ur5_control_server/ur_control/goto_joint_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_joint_pose service...");}
-  robot_arm_goto_joint = pnh.serviceClient<arm_operation::joint_pose>("/ur5_control_server/ur_control/goto_joint_pose");
+  robot_arm_goto_joint = pnh_.serviceClient<arm_operation::joint_pose>("/ur5_control_server/ur_control/goto_joint_pose");
   // goto_pose
   while(!ros::service::waitForService("/ur5_control_server/ur_control/goto_pose", ros::Duration(3.0))) {ROS_WARN("Try to connect to goto_pose service...");}
-  robot_arm_goto_pose = pnh.serviceClient<arm_operation::target_pose>("/ur5_control_server/ur_control/goto_pose");
+  robot_arm_goto_pose = pnh_.serviceClient<arm_operation::target_pose>("/ur5_control_server/ur_control/goto_pose");
   // vacuum_control
   if(has_vacuum){
     while(!ros::service::waitForService("/arduino_control/vacuum_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to vacuum_control service...");}
-    vacuum_control = pnh.serviceClient<vacuum_conveyor_control::vacuum_control>("/arduino_control/vacuum_control");
+    vacuum_control = pnh_.serviceClient<vacuum_conveyor_control::vacuum_control>("/arduino_control/vacuum_control");
   }
   // pheumatic_control
   if(has_vacuum){
     while(!ros::service::waitForService("/arduino_control/pheumatic_control", ros::Duration(3.0))) {ROS_WARN("Try to connect to pheumatic_control service...");}
-    pheumatic_control = pnh.serviceClient<std_srvs::SetBool>("/arduino_control/pheumatic_control");
+    pheumatic_control = pnh_.serviceClient<std_srvs::SetBool>("/arduino_control/pheumatic_control");
   }
   // close_gripper
   while(!ros::service::waitForService("/robotiq_finger_control_node/close_gripper", ros::Duration(3.0))) {ROS_WARN("Try to connect to close_gripper service...");}
-  close_gripper = pnh.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/close_gripper");
+  close_gripper = pnh_.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/close_gripper");
   // open_gripper
   while(!ros::service::waitForService("/robotiq_finger_control_node/open_gripper", ros::Duration(3.0))) {ROS_WARN("Try to connect to open_gripper service...");}
-  open_gripper = pnh.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/open_gripper");
+  open_gripper = pnh_.serviceClient<std_srvs::Empty>("/robotiq_finger_control_node/open_gripper");
   // Advertise service server
   // go home
   assert(define_home);
-  service_home = pnh.advertiseService("robot_go_home", 
+  service_home = pnh_.advertiseService("robot_go_home", 
                                       &Helper_Services::go_home_service_callback, 
                                       this);
   // go to placing
   assert(define_place);
-  service_place = pnh.advertiseService("robot_goto_place", 
+  service_place = pnh_.advertiseService("robot_goto_place", 
                                        &Helper_Services::go_place_service_callback, 
                                        this);
-  service_goto_target = pnh.advertiseService("goto_target", 
+  service_goto_target = pnh_.advertiseService("goto_target", 
                                              &Helper_Services::go_target_service_callback, 
                                              this);
+  // Timer
+  param_timer = pnh_.createTimer(ros::Duration(1.0), &Helper_Services::timer_callback, this);
   ROS_INFO("\033[1;37mNode ready\033[0m");
 }
 
@@ -240,6 +242,19 @@ bool Helper_Services::go_target_service_callback(
     }while(tmp_counter<=REPEAT_TIME);
   }
   return true;
+}
+
+void Helper_Services::timer_callback(const ros::TimerEvent& event){
+  double suck_tmp, grasp_tmp;
+  pnh_.getParam("suck_offset", suck_tmp); pnh_.getParam("grasp_offset", grasp_tmp);
+  if(suck_tmp!=suck_offset){
+    ROS_INFO("[%s] suck_offset changes from %f to %f", ros::this_node::getName().c_str(), suck_offset, suck_tmp);
+    suck_offset = suck_tmp;
+  }
+  if(grasp_tmp!=grasp_offset){
+    ROS_INFO("[%s] suck_offset changes from %f to %f", ros::this_node::getName().c_str(), grasp_offset, grasp_tmp);
+    grasp_offset = grasp_tmp;
+  }
 }
 
 int main(int argc, char** argv)
