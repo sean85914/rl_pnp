@@ -75,8 +75,8 @@ class RobotArm {
   ros::ServiceServer goto_pose_srv;
   ros::ServiceServer go_straight_srv;
   ros::ServiceServer goto_joint_pose_srv;
-  ros::ServiceServer fast_rotate_srv;
-  ros::ServiceServer flip_srv;
+  //ros::ServiceServer fast_rotate_srv;
+  //ros::ServiceServer flip_srv;
   ros::ServiceServer robot_state_srv;
   TrajClient *traj_client;
   control_msgs::FollowJointTrajectoryGoal goal; 
@@ -179,9 +179,9 @@ class RobotArm {
    bool GotoPoseService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
    bool GoStraightLineService(arm_operation::target_pose::Request &req, arm_operation::target_pose::Response &res);
    bool GotoJointPoseService(arm_operation::joint_pose::Request &req, arm_operation::joint_pose::Response &res);
-   bool FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
-   bool FlipService(arm_operation::rotate_to_flip::Request &req,
-                    arm_operation::rotate_to_flip::Response &res);
+   //bool FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+   //bool FlipService(arm_operation::rotate_to_flip::Request &req,
+   //                 arm_operation::rotate_to_flip::Response &res);
    bool GetRobotModeStateService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 };
 

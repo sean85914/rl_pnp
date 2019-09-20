@@ -1,8 +1,10 @@
+#include <fstream>
 #include <iomanip>
-#include <signal.h>
+#include <boost/filesystem.hpp>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/MatrixFunctions>
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <tf/transform_listener.h>
 
 /*
@@ -31,10 +33,15 @@ inline void print_tf(const tf::Transform t){
 class calibration{
  private:
   bool computed;
+  bool writed;
   const int REQUIRED_DATA = 4; // At least 3 data points is required
   int num_data; // How many data points we have now
   std::string camera_name; // camera namespace
   std::string tag_name; // tag name
+  std::string arm_prefix; // arm prefix
+  std::string file_name; // saved file name
+  std::string file_full_path; // full saved file path, package_path + "/data/" + file_name + ".txt"
+  std::string package_path; // package path
   ros::NodeHandle nh_, pnh_;
   tf::TransformListener listener;
   Eigen::Vector3f trans_X;
@@ -59,7 +66,7 @@ class calibration{
       rot_mat = B_vec.back().block<3, 3>(0,0);
       beta_vec.push_back(rot_mat.log());
       // Compute M
-      matrix_M += beta_vec.back() * alpha_vec.back().transpose();
+      matrix_M += beta_vec.back() * alpha_vec.back().transpose(); // M = sum(beta_(i) * alpha_(i)^T)
     }
     // Compute rotation matrix
     Eigen::Matrix3f trans_mul = matrix_M.transpose()*matrix_M;
@@ -68,6 +75,8 @@ class calibration{
     Eigen::MatrixXf least_square_A(A_vec.size()*3, 3), least_square_b(A_vec.size()*3, 1);
     Eigen::Matrix3f eye_3 = Eigen::Matrix3f::Identity();
     for(int i=0; i<A_vec.size(); ++i){
+      // A = THETA_(A_(i)) - I_3
+      // b = THETA_(X) * b_(B_(i)) - b_(A_(i))
       least_square_A.block<3, 3>(i*3, 0) = A_vec[i].block<3, 3>(0, 0) - eye_3;
       least_square_b.block<3, 1>(i*3, 0) = \
                   rot_mat_X * B_vec[i].block<3, 1>(0, 3) - A_vec[i].block<3, 1>(0, 3);
@@ -89,16 +98,47 @@ class calibration{
     computed = true;
     return;
   }
+  void write_file(void){
+    std::fstream fs;
+    fs.open(file_full_path, std::fstream::out | std::fstream::trunc);
+    fs << "Rotation matrix: \n" << rot_mat_X << "\n";
+    fs << "Translation matrix: \n" << trans_X << "\n";
+    // For URDF
+    tf::Matrix3x3 rot_mat_tf(rot_mat_X(0, 0), rot_mat_X(0, 1), rot_mat_X(0, 2), 
+                             rot_mat_X(1, 0), rot_mat_X(1, 1), rot_mat_X(1, 2),
+                             rot_mat_X(2, 0), rot_mat_X(2, 1), rot_mat_X(2, 2));
+    tf::Quaternion quat; rot_mat_tf.getRotation(quat);
+    double r, p, y;
+    rot_mat_tf.getRPY(r, p, y);
+    fs << "Transflation: " << trans_X(0, 0) << " " << trans_X(1, 0) << " " << trans_X(2, 0) << "\n";
+    fs << "Orientation(Quaternion): " << quat.getX() << " " << quat.getY() << " " << quat.getZ() << " " << quat.getW() << "\n";
+    fs << "Orientation(Euler): " << r << " " << p << " " << y << "\n";
+    fs.close(); 
+    writed = true;
+  }
  public:
-  calibration(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), computed(false), num_data(0){
+  calibration(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), computed(false), writed(false), num_data(0){
     // Get parameters and show
     if(!pnh_.getParam("camera_name", camera_name)) camera_name = "camera";
     if(!pnh_.getParam("tag_name", tag_name)) tag_name = "tag_0";
+    if(!pnh_.getParam("arm_prefix", arm_prefix)) arm_prefix = "";
+    if(!pnh_.getParam("file_name", file_name)) file_name = "navy";
+    file_full_path = package_path + "/data/" + file_name + ".txt";
     ROS_INFO("\n\
 *************************\n\
+[%s]\
 camera_name: %s\n\
 tag_name: %s\n\
-*************************", camera_name.c_str(), tag_name.c_str());
+arm_prefix: %s\n\
+file_path: %s\n\
+*************************", ros::this_node::getName().c_str(), camera_name.c_str(), tag_name.c_str(), arm_prefix.c_str(), file_full_path.c_str());
+    // Get package path, and check if saved directory exist
+    package_path = ros::package::getPath("hand_eye_calibration");
+    boost::filesystem::path p(package_path+"/data");
+    if(!boost::filesystem::exists(p)){
+      ROS_INFO("Directory doesnot exist, creating one...");
+      boost::filesystem::create_directory(p);
+    } 
   matrix_M = Eigen::Matrix3f::Zero();
   ROS_INFO("\n================== Cam-on-hand calibration process ==================\n \
 After this process, you will get the transformation from ee_link to camera_link\n \
@@ -108,7 +148,11 @@ The more data you collect, the more precise the result is\n \
   }
   void printInfo(void){
     ROS_INFO("At least %d data points required, you have: %d data points now\n\
-Press 'r' to record data, 'c' to compute: ", REQUIRED_DATA, num_data);
+Command: \n\
+'r': record data \n\
+'c': compute result \n\
+'w': write result to file and exit \n\
+'e': shutdown the process", REQUIRED_DATA, num_data);
     char command; std::cin >> command;
     if(command=='c' and num_data<REQUIRED_DATA){
       ROS_WARN("No enough data, abort...");
@@ -142,9 +186,15 @@ Press 'r' to record data, 'c' to compute: ", REQUIRED_DATA, num_data);
       } ++num_data; ROS_INFO("Data logged.");
     } else if(command=='c'){
       compute_transform();
-    } else {ROS_WARN("Invalid input, abort...");}
+    } else if(command=='e'){
+      ROS_INFO("Shutdown request from user...");
+      ros::shutdown();
+    } else if(command=='w'){
+      if(!computed) {ROS_WARN("No result computed yet, abort..."); return;}
+      write_file();
+    }
   }
-  bool getStatus(void) {return computed;}
+  bool getStatus(void) {return writed;}
 };
 
 int main(int argc, char** argv)

@@ -18,8 +18,8 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   goto_pose_srv = pnh_.advertiseService("ur_control/goto_pose", &RobotArm::GotoPoseService, this);
   go_straight_srv = pnh_.advertiseService("ur_control/go_straight", &RobotArm::GoStraightLineService, this);
   goto_joint_pose_srv = pnh_.advertiseService("ur_control/goto_joint_pose", &RobotArm::GotoJointPoseService, this);
-  fast_rotate_srv = pnh_.advertiseService("ur_control/fast_rotate", &RobotArm::FastRotateService, this);
-  flip_srv = pnh_.advertiseService("ur_control/flip_service", &RobotArm::FlipService, this);
+  //fast_rotate_srv = pnh_.advertiseService("ur_control/fast_rotate", &RobotArm::FastRotateService, this);
+  //flip_srv = pnh_.advertiseService("ur_control/flip_service", &RobotArm::FlipService, this);
   robot_state_srv = pnh_.advertiseService("ur_control/get_robot_state", &RobotArm::GetRobotModeStateService, this);
   // Parameters
   if(!pnh_.getParam("tool_length", tool_length)) tool_length = 0.18;
@@ -87,8 +87,12 @@ bool RobotArm::GotoPoseService(arm_operation::target_pose::Request &req, arm_ope
                                                                req.target_pose.orientation.w);
   ROS_INFO("[%s] Joint state now: %f %f %f %f %f %f", ros::this_node::getName().c_str(),
                                                       joint[0], joint[1], joint[2], joint[3], joint[4], joint[5]);
+  if(!is_robot_enable){
+    ROS_WARN("Robot is emergency/protective stop, abort request...");
+    res.plan_result = "robot_disable"; return true;
+  }
   StartTrajectory(ArmToDesiredPoseTrajectory(req.target_pose, req.factor));
-  if(num_sols == 0) {res.plan_result = "fail_to_find_solution"; return false;}
+  if(num_sols == 0) {res.plan_result = "fail_to_find_solution"; return true;}
   res.plan_result = "find_one_feasible_solution";
   return true;
 }
@@ -102,6 +106,10 @@ bool RobotArm::GoStraightLineService(arm_operation::target_pose::Request &req, a
                                                                         req.target_pose.orientation.y,
                                                                         req.target_pose.orientation.z,
                                                                         req.target_pose.orientation.w);
+  if(!is_robot_enable){
+    ROS_WARN("Robot is emergency/protective stop, abort request...");
+    res.plan_result = "robot_disable"; return true;
+  }
   trajectory_msgs::JointTrajectory &l = path.trajectory;
   geometry_msgs::Pose pose_now = getCurrentTCPPose();
   double waypoint_sol_[NUMBEROFPOINTS * 6] = {0}, temp[6] = {0};
@@ -174,6 +182,10 @@ bool RobotArm::GotoJointPoseService(arm_operation::joint_pose::Request  &req, ar
   trajectory_msgs::JointTrajectory &t = goal.trajectory;
   ROS_INFO("[%s] Receive new joint pose request: %f %f %f %f %f %f", 
             ros::this_node::getName().c_str(), req.joint[0], req.joint[1], req.joint[2], req.joint[3], req.joint[4], req.joint[5]);
+  if(!is_robot_enable){
+    ROS_WARN("Robot is emergency/protective stop, abort request...");
+    res.plan_result = "robot_disable"; return true;
+  }
   for (int i = 0; i < 6; ++i) {
     t.points[0].positions[i] = joint[i];
     t.points[1].positions[i] = req.joint[i];
@@ -189,6 +201,7 @@ bool RobotArm::GotoJointPoseService(arm_operation::joint_pose::Request  &req, ar
   return true;
 }
 
+/*
 bool RobotArm::FlipService(arm_operation::rotate_to_flip::Request &req,
                  arm_operation::rotate_to_flip::Response &res){
   ROS_INFO("Flip service: rotate_times: %d", req.rotate_times);
@@ -255,6 +268,9 @@ bool RobotArm::FlipService(arm_operation::rotate_to_flip::Request &req,
   }
 }
 
+*/
+
+/*
 bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   ROS_INFO("Receive fast rotate service call.");
   trajectory_msgs::JointTrajectory &t = goal.trajectory;
@@ -311,6 +327,7 @@ bool RobotArm::FastRotateService(std_srvs::Empty::Request &req, std_srvs::Empty:
     return false;
   }
 }
+*/
 
 bool RobotArm::GetRobotModeStateService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res){
   res.success = is_robot_enable;
