@@ -89,9 +89,11 @@ while iteration < args.max_iter:
 	iter_, depth_image_name, next_color_image_name, next_depth_image_name, \
         primitive_csv, result_csv, target_csv = utils.get_file_path(color_image_name)
 	color = cv2.imread(color_image_name)
-	depth = cv2.imread(depth_image_name, -1)
+	depth = cv2.imread(depth_image_name, -1) # uint16
+	depth = (depth.astype(float)/1000).astype(float)
 	next_color = cv2.imread(next_color_image_name)
 	next_depth = cv2.imread(next_depth_image_name, -1)
+	next_depth = (next_depth.astype(float)/1000).astype(float)
 	action_primitive = np.loadtxt(primitive_csv, delimiter=",")[iter_]
 	pixel_index = np.loadtxt(target_csv, delimiter=",")[iter_]
 	pixel_index = list([int(pixel_index[0]), int(pixel_index[1]), int(pixel_index[2])])
@@ -116,6 +118,7 @@ while iteration < args.max_iter:
 			print "Using %s" %string_deque[sample_idx]
 			color = cv2.imread(string_deque[sample_idx])
 			depth = cv2.imread(depth_str, -1)
+			depth = (depth.astype(float)/1000).astype(float)
 			action_primitive = np.loadtxt(primitive_csv_str, delimiter=",")[idx]
 			pixel_index = np.loadtxt(target_csv_str, delimiter=",")[idx]
 			label_value = td_target_deque[sample_idx]

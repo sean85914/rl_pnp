@@ -360,9 +360,9 @@ try:
 				print "Fail to pass test since too much invalid target"
 				break
 		time.sleep(0.5) # Sleep 0.5 s for next iteration
-		get_pc_req.file_name = str()
-		empty_checker_req.input_pc = get_pc_client(get_pc_req).pc
-		is_empty = empty_checker(empty_checker_req).is_empty.data
+		#get_pc_req.file_name = str()
+		#empty_checker_req.input_pc = get_pc_client(get_pc_req).pc
+		#is_empty = empty_checker(empty_checker_req).is_empty.data
 		
 	# Num of item = 0
 	if not testing:

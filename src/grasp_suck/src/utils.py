@@ -52,7 +52,7 @@ def get_heightmap(pc, img_path, iteration):
 	depth_img_msg = br.cv2_to_imgmsg(depth_img)
 	#depth_heightmap[depth_heightmap == -z_bot] = np.nan
 	depth_name = img_path + "depth_{:06}.png".format(iteration)
-	cv2.imwrite(depth_name, depth_heightmap)
+	cv2.imwrite(depth_name, depth_img)
 	color_name = img_path + "color_{:06}.jpg".format(iteration)
 	cv2.imwrite(color_name, color_heightmap)
 	return color_heightmap, depth_heightmap, points, depth_img_msg

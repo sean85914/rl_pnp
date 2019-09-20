@@ -2,6 +2,8 @@
   <arg name="has_vacuum" default="true"/>
   <node pkg="grasp_suck" type="helper_services" name="helper_services_node" output="screen" clear_params="true">
     <param name="has_vacuum" value="$(arg has_vacuum)"/>
+    <param name="suck_offset" value="-0.015"/>
+    <param name="grasp_offset" value="0.0"/>
     <!-- Static cam
     <rosparam param="home_joint">[2.834, -2.629, 1.749, -1.482, -1.457, -0.187]</rosparam>
     --> 
