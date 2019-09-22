@@ -21,6 +21,7 @@
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/exact_time.h>
 // SRV
+#include <std_srvs/Empty.h>
 #include <std_srvs/SetBool.h>
 #include <visual_system/get_xyz.h>
 #include <visual_system/get_pc.h>
@@ -69,6 +70,7 @@ bool callback_check_valid(visual_system::check_valid::Request  &req,
                           visual_system::check_valid::Response &res);
 bool callback_get_surface_feature(visual_system::get_surface_feature::Request  &req,
                                   visual_system::get_surface_feature::Response &res);
+bool callback_save_data(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 void callback_timer(const ros::TimerEvent& event);
 
 int main(int argc, char** argv)
@@ -97,6 +99,8 @@ int main(int argc, char** argv)
     ROS_ERROR("[%s] No empty workspace pcd file provided, shutdown...", node_name.c_str());
     ros::shutdown();
   } 
+  boost::filesystem::path p(package_path+"/barcode_data");
+  if(!boost::filesystem::exists(p)) create_directories(p);
   vg.filter(*empty_workspace);
   icp.setInputSource(empty_workspace);
   icp.setEuclideanFitnessEpsilon(1e-1);
@@ -120,6 +124,7 @@ int main(int argc, char** argv)
   ros::ServiceServer check_empty_service = pnh.advertiseService("empty_state", callback_is_empty);
   ros::ServiceServer check_valid_service = pnh.advertiseService("check_valid", callback_check_valid);
   ros::ServiceServer get_surface_feature_service = pnh.advertiseService("get_surface_feature", callback_get_surface_feature);
+  ros::ServiceServer save_data_service = pnh.advertiseService("save_image_data", callback_save_data);
   ros::Timer param_checker = pnh.createTimer(ros::Duration(1.0), callback_timer);
   pub_sphere = pnh.advertise<visualization_msgs::Marker>("centroid", 1);
   pub_vector = pnh.advertise<visualization_msgs::Marker>("surface_normal", 1);
@@ -332,6 +337,28 @@ bool callback_get_surface_feature(visual_system::get_surface_feature::Request  &
     pub_vector.publish(vector_marker);
   } 
   res.result = true; return true;
+}
+
+bool callback_save_data(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
+  static int counter = 0;
+  // Write intrinsic matrix
+  if(counter==0){
+    std::fstream f;
+    f.open(package_path+"/barcode_data/intrinsic.txt");
+    f << "fx: " << intrinsic[0] << "\n"
+      << "fy: " << intrinsic[1] << "\n"
+      << "cx: " << intrinsic[2] << "\n"
+      << "cy: " << intrinsic[3];
+    f.close();
+  };
+  std::stringstream ss;
+  ss << std::setw(6) << std::setfill('0') << std::to_string(counter);
+  std::string color_image_name = package_path + "/barcode_data/" + "color_" + ss.str() + ".png";
+  std::string depth_image_name = package_path + "/barcode_data/" + "depth_" + ss.str() + ".png";
+  cv::imwrite(color_image_name, color_img_ptr->image);
+  cv::imwrite(depth_image_name, depth_img_ptr->image);
+  ++counter;
+  return true;
 }
 
 void callback_timer(const ros::TimerEvent& event){
