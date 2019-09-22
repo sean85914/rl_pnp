@@ -344,11 +344,11 @@ bool callback_save_data(std_srvs::Empty::Request &req, std_srvs::Empty::Response
   // Write intrinsic matrix
   if(counter==0){
     std::fstream f;
-    f.open(package_path+"/barcode_data/intrinsic.txt");
-    f << "fx: " << intrinsic[0] << "\n"
-      << "fy: " << intrinsic[1] << "\n"
-      << "cx: " << intrinsic[2] << "\n"
-      << "cy: " << intrinsic[3];
+    f.open(package_path+"/barcode_data/intrinsic.txt", std::fstream::out);
+    f << intrinsic[0] << " "
+      << intrinsic[1] << " "
+      << intrinsic[2] << " "
+      << intrinsic[3];
     f.close();
   };
   std::stringstream ss;

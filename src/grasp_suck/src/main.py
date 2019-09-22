@@ -52,7 +52,6 @@ suck_radius  = 0.015
 suck_reward  = 2.0
 grasp_reward = 2.0
 discount     = 0.5
-Z_THRES      = 0.016 # z value less than this value will be considered as invalid, CHANGE HERE
 item_counter = 0
 cnt_invalid  = 0 # Consecutive invalid action counter
 update_fre = args.update_target
@@ -113,6 +112,7 @@ if testing:
 if args.model != "":
 	print "[%f]: Loading provided model..." %(time.time())
 	trainer.model.load_state_dict(torch.load(args.model))
+	trainer.copyNetwork()
 
 
 # Service client
@@ -239,12 +239,17 @@ try:
 		# 2. Point belongs to the plane 
 		# TODO 3. Gripper collision with object
 		print "###### [%f, %f, %f] ######" %(points[pixel_index[1], pixel_index[2], 0], points[pixel_index[1], pixel_index[2], 1], points[pixel_index[1], pixel_index[2], 2])
-		check_valid_req = check_validRequest()
-		check_valid_req.pc = pc_response.pc
-		check_valid_req.p.x = points[pixel_index[1], pixel_index[2], 0]
-		check_valid_req.p.y = points[pixel_index[1], pixel_index[2], 1]
-		check_valid_req.p.z = points[pixel_index[1], pixel_index[2], 2]
-		is_valid = valid_checker(check_valid_req).is_valid
+		#check_valid_req = check_validRequest()
+		#check_valid_req.pc = pc_response.pc
+		#check_valid_req.p.x = points[pixel_index[1], pixel_index[2], 0]
+		#check_valid_req.p.y = points[pixel_index[1], pixel_index[2], 1]
+		#check_valid_req.p.z = points[pixel_index[1], pixel_index[2], 2]
+		#is_valid = valid_checker(check_valid_req).is_valid
+		is_valid = True
+		if points[pixel_index[1], pixel_index[2], 0] == 0.0 or \
+		   points[pixel_index[1], pixel_index[2], 1] == 0.0 or \
+		   points[pixel_index[1], pixel_index[2], 2] == 0.0:
+			is_valid = False
 		# Use surface feature
 		surface_feat_req = get_surface_featureRequest()
 		surface_feat_req.pc = pc_response.pc
@@ -262,9 +267,9 @@ try:
 		# TODO: Check if normal valid
 		# Visualize markers
 		viz_req = viz_markerRequest()
-		viz_req.point.x = surface_res.c_p.x
-		viz_req.point.y = surface_res.c_p.y
-		viz_req.point.z = surface_res.c_p.z
+		viz_req.point.x = points[pixel_index[1], pixel_index[2], 0]
+		viz_req.point.y = points[pixel_index[1], pixel_index[2], 1]
+		viz_req.point.z = points[pixel_index[1], pixel_index[2], 2]
 		viz_req.primitive = action
 		viz_req.angle = angle
 		viz_req.valid = is_valid
