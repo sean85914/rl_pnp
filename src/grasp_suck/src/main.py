@@ -307,10 +307,6 @@ try:
 			go_home() # TODO: service maybe block
 		else: # INVALID
 			action_list.append(-1)
-		# Get action result
-		get_pc_req.file_name = pc_path + "/{}_after.pcd".format(iteration)
-		next_pc = get_pc_client(get_pc_req).pc
-		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(next_pc, image_path + "next_", iteration)
 		if is_valid:
 			if not action: # GRASP
 				action_success = grasp_state().success
@@ -334,6 +330,11 @@ try:
 					time.sleep(0.3)
 					pheumatic(SetBoolRequest(False))
 					time.sleep(0.3)
+		rospy.sleep(1.0)
+		# Get action result
+		get_pc_req.file_name = pc_path + "/{}_after.pcd".format(iteration)
+		next_pc = get_pc_client(get_pc_req).pc
+		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(next_pc, image_path + "next_", iteration)
 		ts = time.time()
 		empty_checker_req = pc_is_emptyRequest()
 		empty_checker_req.input_pc = next_pc
