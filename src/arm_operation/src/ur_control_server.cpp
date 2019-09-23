@@ -360,7 +360,19 @@ void RobotArm::JointStateCallback(const sensor_msgs::JointState &msg){
 }
 
 void RobotArm::RobotModeStateCallback(const ur_msgs::RobotModeDataMsg &msg){
-  is_robot_enable = !msg.is_emergency_stopped and !msg.is_protective_stopped;
+  is_robot_enable = (!msg.is_emergency_stopped and !msg.is_protective_stopped) or (force>=FORCE_THRES);
+}
+
+void RobotArm::RobotWrenchCallback(const geometry_msgs::WrenchStamped &msg){
+  double f_x = msg.wrench.force.x,
+         f_y = msg.wrench.force.y,
+         f_z = msg.wrench.force.z;
+  force = sqrt(f_x*f_x+f_y*f_y+f_z*f_z);
+  if(force>=FORCE_THRES){
+    ROS_WARN("Hugh flance surface force detected, cancel the goal to prevent robot protective stop");
+    traj_client->cancelGoal();
+    is_robot_enable = false; // To prevent protective stop
+  }
 }
 
 void RobotArm::PoseToDH(geometry_msgs::Pose pose, double *T){

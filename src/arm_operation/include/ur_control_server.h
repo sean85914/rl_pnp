@@ -31,6 +31,7 @@
 // MSG
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Quaternion.h>
+#include <geometry_msgs/WrenchStamped.h>
 #include <sensor_msgs/JointState.h>
 #include <ur_msgs/RobotModeDataMsg.h>
 // SRV
@@ -55,10 +56,12 @@ class RobotArm {
   // Varaibles
   int num_sols;
   double joint[6];
+  double force;
   double tool_length;
   double wrist1_upper_bound, wrist1_lower_bound;
   double wrist2_upper_bound, wrist2_lower_bound;
   double wrist3_upper_bound, wrist3_lower_bound;
+  const double FORCE_THRES = 220.0f; // Higher than this value should cancel the goal
   bool is_robot_enable;
   bool sim;
   bool wrist1_collision;
@@ -71,6 +74,7 @@ class RobotArm {
   // Subscriber
   ros::Subscriber sub_joint_state;
   ros::Subscriber sub_robot_state;
+  ros::Subscriber sub_wrench;
   // Services
   ros::ServiceServer goto_pose_srv;
   ros::ServiceServer go_straight_srv;
@@ -95,9 +99,13 @@ class RobotArm {
    */
   void JointStateCallback(const sensor_msgs::JointState &msg);
   /*
-   *  Subscriber cakkback, update robot mode state
+   *  Subscriber callback, update robot mode state
    */
   void RobotModeStateCallback(const ur_msgs::RobotModeDataMsg &msg);
+  /*
+   *  Subscriber callback, update robot flance surface force
+   */
+  void RobotWrenchCallback(const geometry_msgs::WrenchStamped &msg);
   /*
    *  Convert pose to transformation matrix
    *  Input:
