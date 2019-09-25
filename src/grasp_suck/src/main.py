@@ -331,7 +331,7 @@ try:
 					pheumatic(SetBoolRequest(False))
 					time.sleep(0.3)
 		rospy.sleep(1.0)
-		# Get action result
+		# Get next images
 		get_pc_req.file_name = pc_path + "/{}_after.pcd".format(iteration)
 		next_pc = get_pc_client(get_pc_req).pc
 		next_color, next_depth, next_points, next_depth_img = utils.get_heightmap(next_pc, image_path + "next_", iteration)
@@ -366,11 +366,8 @@ try:
 				print "Fail to pass test since too much invalid target"
 				break
 		time.sleep(0.5) # Sleep 0.5 s for next iteration
-		#get_pc_req.file_name = str()
-		#empty_checker_req.input_pc = get_pc_client(get_pc_req).pc
-		#is_empty = empty_checker(empty_checker_req).is_empty.data
-		
-	# Num of item = 0
+
+	# Workspace is empty
 	if not testing:
 		if not abnormal:
 			model_name = model_path + "final.pth"

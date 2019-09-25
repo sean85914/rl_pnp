@@ -212,19 +212,26 @@ bool Helper_Services::go_target_service_callback(
     res.result_pose.position.y = final_position.getY();
     res.result_pose.position.z = final_position.getZ();
   }
+  // First waypoint, height 20 cm
+  tf::Matrix3x3 rotm(tf::Quaternion(res.result_pose.orientation.x, res.result_pose.orientation.y, res.result_pose.orientation.z, res.result_pose.orientation.w));
+  tf::Vector3 first_wp(-0.2f, 0.0f, 0.0f), first_wp_offset = rotm*first_wp;
+  arm_operation::target_pose myPoseReq;
+  myPoseReq.request.target_pose = res.result_pose;
+  myPoseReq.request.target_pose.position.x = res.result_pose.position.x+first_wp_offset.getX();
+  myPoseReq.request.target_pose.position.y = res.result_pose.position.y+first_wp_offset.getY();
+  myPoseReq.request.target_pose.position.z = res.result_pose.position.z+first_wp_offset.getZ();
+  myPoseReq.request.factor = 0.5f;
+  ROS_INFO("\nUR5 goto temp waypoint: \nPosition: [%f, %f, %f]\nOrientation: [%f, %f, %f, %f]",
+            myPoseReq.request.target_pose.position.x, myPoseReq.request.target_pose.position.y, myPoseReq.request.target_pose.position.z,
+            res.result_pose.orientation.x, res.result_pose.orientation.y, res.result_pose.orientation.z, res.result_pose.orientation.w);
+  robot_arm_goto_pose.call(myPoseReq);
   // Correction
   if(req.primitive==SUCK)  res.result_pose.position.z += suck_offset;
   if(req.primitive==GRASP) res.result_pose.position.z += grasp_offset;
-  /*res.result_pose.position.x += X_OFFSET; 
-  res.result_pose.position.z += OFFSET;
-  if(req.primitive==GRASP and res.result_pose.position.z<0.21f) res.result_pose.position.z += 0.02f; // Low object, for instance, cuboid lying down
-  if(req.primitive==GRASP and res.result_pose.position.z>0.27f) res.result_pose.position.z += 0.014f; // Hight object, for instance, standed cylinder
-  if(req.primitive==SUCK  and res.result_pose.position.z<=0.23f) res.result_pose.position.z = 0.23f;*/
-  arm_operation::target_pose myPoseReq;
+  if(req.primitive==SUCK and res.result_pose.position.z>=0.04f) res.result_pose.position.z += 0.005f;
   myPoseReq.request.target_pose = res.result_pose;
-  myPoseReq.request.factor = 0.8f;
   ROS_INFO("\nUR5 goto target: \nPosition: [%f, %f, %f]\nOrientation: [%f, %f, %f, %f]",
-            res.result_pose.position.x, res.result_pose.position.y, res.result_pose.position.z,
+            myPoseReq.request.target_pose.position.x, myPoseReq.request.target_pose.position.y, myPoseReq.request.target_pose.position.z,
             res.result_pose.orientation.x, res.result_pose.orientation.y, res.result_pose.orientation.z, res.result_pose.orientation.w);
   robot_arm_goto_pose.call(myPoseReq);
   if(req.primitive==GRASP){ // Grasp
@@ -252,7 +259,7 @@ void Helper_Services::timer_callback(const ros::TimerEvent& event){
     suck_offset = suck_tmp;
   }
   if(grasp_tmp!=grasp_offset){
-    ROS_INFO("[%s] suck_offset changes from %f to %f", ros::this_node::getName().c_str(), grasp_offset, grasp_tmp);
+    ROS_INFO("[%s] grasp_offset changes from %f to %f", ros::this_node::getName().c_str(), grasp_offset, grasp_tmp);
     grasp_offset = grasp_tmp;
   }
 }
