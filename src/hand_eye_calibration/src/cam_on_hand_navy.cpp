@@ -53,7 +53,7 @@ class calibration{
   std::vector<Eigen::Matrix3f> alpha_vec;
   std::vector<Eigen::Matrix3f> beta_vec;
   void compute_transform(void){
-    for(int i=1; i<num_data; ++i){
+    for(int i=A_vec.size()+1; i<num_data; ++i){
       Eigen::Matrix3f rot_mat;
       // Get A
       tf::Transform between_ee = base2ee[i].inverse()*base2ee[i-1];
@@ -159,8 +159,8 @@ Command: \n\
     }else if(command=='r'){
       tf::StampedTransform stf;
       try{
-        listener.waitForTransform("base_link", "ee_link", ros::Time(0), ros::Duration(0.5));
-        listener.lookupTransform("base_link", "ee_link", ros::Time(0), stf);
+        listener.waitForTransform(arm_prefix+"base_link", arm_prefix+"ee_link", ros::Time(0), ros::Duration(0.5));
+        listener.lookupTransform(arm_prefix+"base_link", arm_prefix+"ee_link", ros::Time(0), stf);
         tf::Transform t(stf.getRotation(), stf.getOrigin());
         base2ee.push_back(t);
         ROS_INFO("ee_link index: %d", num_data+1); print_tf(t);
