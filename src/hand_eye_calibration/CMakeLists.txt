@@ -46,3 +46,6 @@ target_link_libraries(eyes_calibration ${catkin_LIBRARIES})
 
 add_executable(cam_on_hand_navy src/cam_on_hand_navy.cpp)
 target_link_libraries(cam_on_hand_navy ${catkin_LIBRARIES})
+
+add_executable(set_urdf src/set_urdf.cpp)
+target_link_libraries(set_urdf ${catkin_LIBRARIES} tinyxml2)
