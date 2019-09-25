@@ -10,8 +10,11 @@ If you want to run on real robot, also make sure you have [ur_modern_driver](htt
     * ~ur_control/goto_pose (arm_operation::target_pose)
     * ~ur_control/go_straight (arm_operation::target_pose)
     * ~ur_control/goto_joint_pose (arm_operation::joint_pose)
+    * ~ur_control/get_robot_state [(std_srvs/Trigger)](http://docs.ros.org/melodic/api/std_srvs/html/srv/Trigger.html)
   * Subscribe topics
     * [~joint_states](http://docs.ros.org/melodic/api/sensor_msgs/html/msg/JointState.html)
+    * [/wrench](http://docs.ros.org/jade/api/geometry_msgs/html/msg/WrenchStamped.html)
+    * [/ur_driver/robot_mode_state](http://docs.ros.org/kinetic/api/ur_msgs/html/msg/RobotModeDataMsg.html)
   * Actions
     * [/follow_joint_trajectory](http://docs.ros.org/api/control_msgs/html/action/FollowJointTrajectory.html) if sim is false
     * [/arm_controller/follow_joint_trajectory](http://docs.ros.org/api/control_msgs/html/action/FollowJointTrajectory.html) if sim is true

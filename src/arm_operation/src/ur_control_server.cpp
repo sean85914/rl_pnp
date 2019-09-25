@@ -14,6 +14,7 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   // Subscriber
   sub_joint_state = pnh_.subscribe("joint_states", 1, &RobotArm::JointStateCallback, this);
   sub_robot_state = pnh_.subscribe("/ur_driver/robot_mode_state", 1, &RobotArm::RobotModeStateCallback, this);
+  sub_wrench      = pnh_.subscribe("/wrench", 1, &RobotArm::RobotWrenchCallback, this);
   // Service server
   goto_pose_srv = pnh_.advertiseService("ur_control/goto_pose", &RobotArm::GotoPoseService, this);
   go_straight_srv = pnh_.advertiseService("ur_control/go_straight", &RobotArm::GoStraightLineService, this);
