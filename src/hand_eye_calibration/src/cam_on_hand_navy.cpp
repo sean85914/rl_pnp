@@ -34,7 +34,7 @@ inline void print_tf(const tf::Transform t){
 }
 class calibration{
  private:
-  bool stop_thread_cmd;
+  char stop_thread_cmd;
   bool computed;
   bool writed;
   const int REQUIRED_DATA = 4; // At least 3 data points is required
@@ -126,8 +126,10 @@ class calibration{
                              rot_mat_X(1, 0), rot_mat_X(1, 1), rot_mat_X(1, 2),
                              rot_mat_X(2, 0), rot_mat_X(2, 1), rot_mat_X(2, 2));
     tf::Transform tf(rot_mat_tf, trans_tf);
-    while(stop_thread_cmd!='s')
+    while(stop_thread_cmd!='s'){
       br.sendTransform(tf::StampedTransform(tf, ros::Time::now(), arm_prefix+"ee_link", camera_name+"_link"));
+      ros::Duration(0.1).sleep();
+    }
   }
  public:
   calibration(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), computed(false), writed(false), num_data(0){
@@ -153,11 +155,11 @@ arm_prefix: %s\n\
 file_path: %s\n\
 *************************", ros::this_node::getName().c_str(), camera_name.c_str(), tag_name.c_str(), arm_prefix.c_str(), file_full_path.c_str());
   matrix_M = Eigen::Matrix3f::Zero();
-  ROS_INFO("\n================== Cam-on-hand calibration process ==================\n \
-After this process, you will get the transformation from ee_link to camera_link\n \
-\033[1;33mManually moving the arm is recommended\033[0m, or the result will be weird\n \
-\033[1;33mRemember to disconnect `arm` tree and `camera` tree\033[0m\n \
-The more data you collect, the more precise the result is\n \
+  ROS_INFO("\n================== Cam-on-hand calibration process ==================\n\
+After this process, you will get the transformation from ee_link to camera_link\n\
+\033[1;33mManually moving the arm is recommended\033[0m, or the result will be weird\n\
+\033[1;33mRemember to disconnect `arm` tree and `camera` tree\033[0m\n\
+The more data you collect, the more precise the result is\n\
 =====================================================================");
   if(!arm_prefix.empty()) arm_prefix+="_";
   }
@@ -211,15 +213,12 @@ Command: \n\
     } else if(command=='t'){
       if(!computed) {ROS_WARN("No result computed yet, abort..."); return;}
       std::thread test_thread(&calibration::broadcast_thread, this);
-      while(1){
+      while(stop_thread_cmd!='s'){
         ROS_INFO("Press 's' to stop broadcast: "); 
         std::cin >> stop_thread_cmd;
-        if(stop_thread_cmd=='s'){
-          test_thread.join();
-          ROS_INFO("Thread terminated.");
-          break;
-        }
       }
+      test_thread.join();
+      ROS_INFO("Thread terminated.");
     }
   }
   bool getStatus(void) {return writed;}
