@@ -15,10 +15,10 @@
 #include <chrono>
 
 inline std::string get_unix_time(void){
-  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-  double unix_time = (double)ms.count()/1000.0f; // ms
+  auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch());
+  double unix_time = (double)ns.count()/1000000000.0f; // ns -> s
   std::stringstream ss;
-  ss << std::fixed << std::setprecision(3) << unix_time;
+  ss << std::fixed << std::setprecision(9) << unix_time;
   return ss.str();
 }
 
