@@ -42,7 +42,8 @@
 #include <arm_operation/joint_pose.h>
 #include <arm_operation/rotate_to_flip.h>
 #include <tf/transform_datatypes.h>
-
+// Self-defined
+#include "ur_script_socket.h"
 
 #define deg2rad(x) (x*M_PI/180.0)
 #define NUMBEROFPOINTS 10
@@ -61,13 +62,15 @@ class RobotArm {
   double wrist1_upper_bound, wrist1_lower_bound;
   double wrist2_upper_bound, wrist2_lower_bound;
   double wrist3_upper_bound, wrist3_lower_bound;
-  const double FORCE_THRES = 220.0f; // Higher than this value should cancel the goal
+  double force_thres;// Higher than this value should cancel the goal
+  bool is_send_goal;
   bool is_robot_enable;
   bool sim;
   bool wrist1_collision;
   bool wrist2_collision;
   bool wrist3_collision;
   std::string prefix;
+  URScriptSocket ur_control;
   // ROS
   // Node handle
   ros::NodeHandle nh_, pnh_;
@@ -79,12 +82,16 @@ class RobotArm {
   ros::ServiceServer goto_pose_srv;
   ros::ServiceServer go_straight_srv;
   ros::ServiceServer goto_joint_pose_srv;
+  ros::ServiceServer unlock_protective_stop_srv;
+  ros::ServiceServer stop_program_srv;
   //ros::ServiceServer fast_rotate_srv;
   //ros::ServiceServer flip_srv;
   ros::ServiceServer robot_state_srv;
   TrajClient *traj_client;
   control_msgs::FollowJointTrajectoryGoal goal; 
   control_msgs::FollowJointTrajectoryGoal path;
+  // Timer
+  ros::Timer checkParameterTimer;
   // Private Functions
   /* 
    *  Convert input joint angle to branch [-pi, pi]
@@ -106,6 +113,10 @@ class RobotArm {
    *  Subscriber callback, update robot flance surface force
    */
   void RobotWrenchCallback(const geometry_msgs::WrenchStamped &msg);
+  /*
+   * Timer callback, to check if threshold parameter is changed
+   */
+  void TimerCallback(const ros::TimerEvent &event);
   /*
    *  Convert pose to transformation matrix
    *  Input:
@@ -191,6 +202,8 @@ class RobotArm {
    //bool FlipService(arm_operation::rotate_to_flip::Request &req,
    //                 arm_operation::rotate_to_flip::Response &res);
    bool GetRobotModeStateService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+   bool UnlockProtectiveStopService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+   bool StopProgramService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 };
 
 #endif
