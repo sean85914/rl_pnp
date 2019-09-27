@@ -1,11 +1,13 @@
 #include <fstream>
 #include <iomanip>
+#include <thread>
 #include <boost/filesystem.hpp>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/MatrixFunctions>
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <tf/transform_listener.h>
+#include <tf/transform_broadcaster.h>
 
 /*
  * Using Navy method to solve hand-eye calibration problem
@@ -32,6 +34,7 @@ inline void print_tf(const tf::Transform t){
 }
 class calibration{
  private:
+  bool stop_thread_cmd;
   bool computed;
   bool writed;
   const int REQUIRED_DATA = 4; // At least 3 data points is required
@@ -116,6 +119,16 @@ class calibration{
     fs.close(); 
     writed = true;
   }
+  void broadcast_thread(void){
+    static tf::TransformBroadcaster br;
+    tf::Vector3 trans_tf(trans_X(0, 0), trans_X(1, 0), trans_X(2, 0));
+    tf::Matrix3x3 rot_mat_tf(rot_mat_X(0, 0), rot_mat_X(0, 1), rot_mat_X(0, 2), 
+                             rot_mat_X(1, 0), rot_mat_X(1, 1), rot_mat_X(1, 2),
+                             rot_mat_X(2, 0), rot_mat_X(2, 1), rot_mat_X(2, 2));
+    tf::Transform tf(rot_mat_tf, trans_tf);
+    while(stop_thread_cmd!='s')
+      br.sendTransform(tf::StampedTransform(tf, ros::Time::now(), arm_prefix+"ee_link", camera_name+"_link"));
+  }
  public:
   calibration(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), computed(false), writed(false), num_data(0){
     // Get parameters and show
@@ -142,15 +155,18 @@ file_path: %s\n\
   matrix_M = Eigen::Matrix3f::Zero();
   ROS_INFO("\n================== Cam-on-hand calibration process ==================\n \
 After this process, you will get the transformation from ee_link to camera_link\n \
-Manually moving the arm is recommended, or the result will be weird\n \
+\033[1;33mManually moving the arm is recommended\033[0m, or the result will be weird\n \
+\033[1;33mRemember to disconnect `arm` tree and `camera` tree\033[0m\n \
 The more data you collect, the more precise the result is\n \
 =====================================================================");
+  if(!arm_prefix.empty()) arm_prefix+="_";
   }
   void printInfo(void){
     ROS_INFO("At least %d data points required, you have: %d data points now\n\
 Command: \n\
 'r': record data \n\
 'c': compute result \n\
+'t': broadcast transform to test \n\
 'w': write result to file and exit \n\
 'e': shutdown the process", REQUIRED_DATA, num_data);
     char command; std::cin >> command;
@@ -192,6 +208,18 @@ Command: \n\
     } else if(command=='w'){
       if(!computed) {ROS_WARN("No result computed yet, abort..."); return;}
       write_file();
+    } else if(command=='t'){
+      if(!computed) {ROS_WARN("No result computed yet, abort..."); return;}
+      std::thread test_thread(&calibration::broadcast_thread, this);
+      while(1){
+        ROS_INFO("Press 's' to stop broadcast: "); 
+        std::cin >> stop_thread_cmd;
+        if(stop_thread_cmd=='s'){
+          test_thread.join();
+          ROS_INFO("Thread terminated.");
+          break;
+        }
+      }
     }
   }
   bool getStatus(void) {return writed;}
