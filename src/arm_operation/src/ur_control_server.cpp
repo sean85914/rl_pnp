@@ -23,7 +23,7 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   unlock_protective_stop_srv = pnh_.advertiseService("ur_control/unlock_protective", &RobotArm::UnlockProtectiveStopService, this);
   stop_program_srv = pnh_.advertiseService("ur_control/stop_program", &RobotArm::StopProgramService, this);
   // Parameters
-  if(!pnh_.getParam("tool_length", tool_length)) tool_length = 0.18;
+  if(!pnh_.getParam("tool_length", tool_length)) tool_length = 0.0;
   if(!pnh_.getParam("prefix", prefix)) prefix="";
   if(!pnh_.getParam("sim", sim)) sim = false;
   // Wrist1 default bound [-240, -30]
@@ -49,6 +49,7 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   ROS_INFO("[%s] Wrist 3 bound: [%f, %f]", ros::this_node::getName().c_str(), wrist3_lower_bound, wrist3_upper_bound);
   ROS_INFO("[%s] Force thres: %f", ros::this_node::getName().c_str(), force_thres);
   ROS_INFO("*********************************************************************************");
+  if(!prefix.empty()) prefix+="_"; // [prefix]+"_"+[joint name]
   // Tell the action client that we want to spin a thread by default
   if(!sim)
     traj_client = new TrajClient("/follow_joint_trajectory", true);
@@ -240,7 +241,7 @@ void RobotArm::JointStateCallback(const sensor_msgs::JointState &msg){
       joint[i] = msg.position[i];
     }
   }
-  else{
+  else{ // Different convension in gazebo
     joint[0] = msg.position[2]; // shoulder_pan_joint
     joint[1] = msg.position[1]; // shoulder_lift_joint
     joint[2] = msg.position[0]; // elbow_joint
@@ -266,7 +267,7 @@ void RobotArm::RobotWrenchCallback(const geometry_msgs::WrenchStamped &msg){
   else should_shot = false;
   if(should_shot){
     if(is_send_goal){
-      ROS_WARN("[%s] | %f | High flance force detected, stop program", ros::this_node::getName().c_str(), force);
+      ROS_WARN("[%s] | %f | High flange force detected, stop program", ros::this_node::getName().c_str(), force);
       traj_client->cancelGoal();
       ur_control.stop_program();
       is_send_goal = false;
@@ -428,7 +429,7 @@ control_msgs::FollowJointTrajectoryGoal RobotArm::ArmToDesiredPoseTrajectory(geo
   trajectory_msgs::JointTrajectory &t = goal.trajectory;
   // Get closest joint space solution
   double sol[6] = {0}; ROS_INFO("[%s] Joints to go solve from IK: ", ros::this_node::getName().c_str());
-  // If not solutions, assign angle now to sol
+  // If not solutions, assign current joint angle to sol
   if(!PerformIK(pose, sol)) {
     ROS_WARN("Cannot find IK solution!");
     for (int i = 0; i < 6; ++i) sol[i] = joint[i];
