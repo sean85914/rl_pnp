@@ -46,7 +46,6 @@
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <arm_operation/target_pose.h>
 #include <arm_operation/joint_pose.h>
-#include <arm_operation/rotate_to_flip.h>
 #include <tf/transform_datatypes.h>
 // Self-defined
 #include "ur_script_socket.h"

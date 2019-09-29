@@ -4,6 +4,13 @@ project(arm_operation)
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
 
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOMIC ON)
+
+SET (CMAKE_CXX_FLAGS "-fPIC")
+set (CMAKE_INCLUDE_CURRENT_DIR ON)
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -21,7 +28,7 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
   message_generation
 )
 find_package(Eigen REQUIRED)
-
+find_package(Qt5 COMPONENTS Widgets Gui Core REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -68,7 +75,6 @@ add_service_files(
   FILES
   target_pose.srv
   joint_pose.srv
-  rotate_to_flip.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -117,7 +123,6 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
  INCLUDE_DIRS include
- #LIBRARIES arm_operation
  CATKIN_DEPENDS roscpp rospy std_msgs roslib message_runtime
  DEPENDS Eigen
 )
@@ -132,6 +137,8 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${Eigen_INCLUDE_DIRS}
+  ${Qt5Widgets_INCLUDE_DIRS}
+  ${Qt5Gui_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -238,3 +245,27 @@ target_link_libraries(ur5_ik_solver ${catkin_LIBRARIES} ur5_kin)
 
 add_executable(tcp_transform_publisher src/tcp_transform_publisher.cpp)
 target_link_libraries(tcp_transform_publisher ${catkin_LIBRARIES})
+
+qt5_wrap_cpp(gui_SRC include/mainwindow.h)
+qt5_wrap_ui(gui_UI src/qt/mainwindow.ui)
+
+add_executable(ur5_ik_solver_ui
+  src/qt/mainwindow.cpp
+  src/qt/main.cpp
+  ${gui_SRC}
+  ${gui_UI}
+  src/ik_solver.hpp
+)
+qt5_use_modules(ur5_ik_solver_ui Widgets)
+target_link_libraries(ur5_ik_solver_ui ${catkin_LIBRARIES} ur5_kin)
+
+add_executable(ur3_ik_solver_ui
+  src/qt/mainwindow.cpp
+  src/qt/main.cpp
+  ${gui_SRC}
+  ${gui_UI}
+  src/ik_solver.hpp
+)
+qt5_use_modules(ur3_ik_solver_ui Widgets)
+target_link_libraries(ur3_ik_solver_ui ${catkin_LIBRARIES} ur3_kin)
+#target_link_libraries(ur5_ik_solver_ui ${Qt5Widgets_LIBRARIES} ${Qt5Gui_LIBRARIES})
