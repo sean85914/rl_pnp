@@ -223,6 +223,10 @@ bool RobotArm::GotoJointPoseService(arm_operation::joint_pose::Request  &req, ar
   }
   ROS_INFO("[%s] Receive new joint pose request:\n\
 Totally %d waypoints\n%s", ros::this_node::getName().c_str(), (int)req.joints.size(), ss.str().c_str());
+  if(!is_robot_enable){
+    ROS_WARN("Robot is emergency/protective stop, abort request...");
+    res.plan_result = "robot_disable"; return true;
+  }
   control_msgs::FollowJointTrajectoryGoal tmp;
   trajectory_msgs::JointTrajectory &t = tmp.trajectory;
   t.joint_names.resize(6);
