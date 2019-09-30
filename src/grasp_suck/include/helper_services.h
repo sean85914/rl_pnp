@@ -42,6 +42,7 @@ class Helper_Services{
   std::vector<double> gripper_tcp; // Gripper TCP translation from end effector
   std::vector<double> home_joint; 
   std::vector<double> place_joint;
+  std::vector<double> z_axis; // Z axis vector w.r.t base_link frame
   // Node handle
   ros::NodeHandle nh_, pnh_;
   // Publisher 

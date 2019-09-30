@@ -4,13 +4,14 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
  nh_(nh), pnh_(pnh), define_home(true), define_place(true)
 {
   // Initialize vector size
-  suction_tcp.resize(3); gripper_tcp.resize(3); home_joint.resize(6); place_joint.resize(6);
+  suction_tcp.resize(3); gripper_tcp.resize(3); home_joint.resize(6); place_joint.resize(6); z_axis.resize(3);
   // Get parameters
   if(!pnh_.getParam("has_vacuum", has_vacuum)) has_vacuum = false;
   if(!pnh_.getParam("suck_offset", suck_offset)) suck_offset = -0.015f;
   if(!pnh_.getParam("grasp_offset", grasp_offset)) grasp_offset = 0.0f;
   if(!pnh_.getParam("/tcp_transformation_publisher/suction", suction_tcp)) {suction_tcp[0] = suction_tcp[1] = suction_tcp[2] = 0.0f;}
   if(!pnh_.getParam("/tcp_transformation_publisher/gripper", gripper_tcp)) {gripper_tcp[0] = gripper_tcp[1] = gripper_tcp[2] = 0.0f;}
+  if(!pnh_.getParam("z_axis", z_axis)) {z_axis[0] = -1.0f; z_axis[1] = z_axis[2] = 0.0;}
   if(!pnh_.getParam("home_joint", home_joint)) {define_home = false; ROS_WARN("No predefined home joint received!");}
   if(!pnh_.getParam("place_joint", place_joint)) {define_place = false; ROS_WARN("No predefined place joint received!");}
   // Show parameters
@@ -18,6 +19,7 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
   ROS_INFO("[%s] has_vacuum: %s", ros::this_node::getName().c_str(), (has_vacuum==true?"true":"false"));
   ROS_INFO("[%s] suck_offset: %f", ros::this_node::getName().c_str(), suck_offset);
   ROS_INFO("[%s] grasp_offset: %f", ros::this_node::getName().c_str(), grasp_offset);
+  ROS_INFO("[%s] z_axis: %f %f %f", ros::this_node::getName().c_str(), z_axis[0], z_axis[1], z_axis[2]);
   ROS_INFO("[%s] Suction translation: %f %f %f", ros::this_node::getName().c_str(), suction_tcp[0], suction_tcp[1], suction_tcp[2]);
   ROS_INFO("[%s] Gripper translation: %f %f %f", ros::this_node::getName().c_str(), gripper_tcp[0], gripper_tcp[1], gripper_tcp[2]);
   if(define_home) ROS_INFO("[%s] UR5 home joints: %f %f %f %f %f %f", ros::this_node::getName().c_str(), home_joint[0], home_joint[1], home_joint[2], home_joint[3], home_joint[4], home_joint[5]);
@@ -176,21 +178,26 @@ bool Helper_Services::go_target_service_callback(
   tf::Vector3 point_in_arm(req.point_in_hand.x, req.point_in_hand.y, req.point_in_hand.z);
   tf::Quaternion q, q_gripper; 
   if(req.primitive==GRASP){ // Grasp
-    tf::Matrix3x3 rotm(0.0f, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f);
+    tf::Vector3 x_axis_tf(0.0f, 0.0f, -1.0f),
+                z_axis_tf(z_axis[0], z_axis[1], z_axis[2]),
+                y_axis_tf = z_axis_tf.cross(x_axis_tf);
+    tf::Matrix3x3 rotm(x_axis_tf.x(), y_axis_tf.x(), z_axis_tf.x(),
+                       x_axis_tf.y(), y_axis_tf.y(), z_axis_tf.y(),
+                       x_axis_tf.z(), y_axis_tf.z(), z_axis_tf.z());
     rotm.getRotation(q); 
     q_gripper.setRPY(req.yaw, 0.0, 0.0);
     q*=q_gripper;
   } else{ // SUCK
-    tf::Vector3 x_axis(req.x_axis.x, req.x_axis.y, req.x_axis.z), 
-                y_axis(0.0f, -1.0f, 0.0f);
-    if(x_axis.getX()==0.0f and x_axis.getY()==0.0f and x_axis.getZ()==0.0f){
+    tf::Vector3 x_axis_tf(req.x_axis.x, req.x_axis.y, req.x_axis.z), 
+                fake_z(z_axis[0], z_axis[1], z_axis[2]);
+    if(x_axis_tf.getX()==0.0f and x_axis_tf.getY()==0.0f and x_axis_tf.getZ()==0.0f){
       ROS_WARN("Incorrect surface normal given, using default perpendicular one...");
-      x_axis = tf::Vector3(0.0f, 0.0f, -1.0f);
+      x_axis_tf = tf::Vector3(0.0f, 0.0f, -1.0f);
     }
-    tf::Vector3 z_axis = x_axis.cross(y_axis);
-    tf::Matrix3x3 rotm(x_axis.x(), y_axis.x(), z_axis.x(),
-                       x_axis.y(), y_axis.y(), z_axis.y(),
-                       x_axis.z(), y_axis.z(), z_axis.z());
+    tf::Vector3 y_axis_tf = fake_z.cross(x_axis_tf), z_axis_tf = x_axis_tf.cross(y_axis_tf);
+    tf::Matrix3x3 rotm(x_axis_tf.x(), y_axis_tf.x(), z_axis_tf.x(),
+                       x_axis_tf.y(), y_axis_tf.y(), z_axis_tf.y(),
+                       x_axis_tf.z(), y_axis_tf.z(), z_axis_tf.z());
     rotm.getRotation(q); 
   }
   res.result_pose.orientation.x = q.getX();
