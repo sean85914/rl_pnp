@@ -43,14 +43,15 @@ int main(int argc, char** argv)
                        *joint = root->FirstChildElement("joint"),
                        *origin;
   if(root==NULL or joint==NULL){
-    std::cout << "Can't parse XARCO correctly, abort\033[0m\n";
+    std::cout << "\033[1;31mCan't parse XARCO correctly, abort\033[0m\n";
     exit(EXIT_FAILURE);
   }
   while(strcmp(joint->Attribute("name"), argv[1])!=0){
     joint = joint->NextSiblingElement("joint");
+    if(joint==NULL) break;
   }
   if(joint==NULL){
-    std::cout << "Can't parse XARCO correctly, abort\033[0m\n";
+    std::cout << "\033[1;31mCan't parse XARCO correctly, abort\033[0m\n";
     exit(EXIT_FAILURE);
   }
   origin = joint->FirstChildElement("origin");

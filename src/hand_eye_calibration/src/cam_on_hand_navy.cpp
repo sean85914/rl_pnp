@@ -216,7 +216,7 @@ Command: \n\
       while(stop_thread_cmd!='s'){
         ROS_INFO("Press 's' to stop broadcast: "); 
         std::cin >> stop_thread_cmd;
-      }
+      } stop_thread_cmd = ' '; // Reset for next test
       test_thread.join();
       ROS_INFO("Thread terminated.");
     }
