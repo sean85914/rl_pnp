@@ -80,7 +80,8 @@ Helper_Services::Helper_Services(ros::NodeHandle nh, ros::NodeHandle pnh):
 
 bool Helper_Services::go_home_service_callback(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   arm_operation::joint_pose myJointReq;
-  for(int i=0; i<6; ++i) myJointReq.request.joint[i] = home_joint[i];
+  myJointReq.request.joints.resize(1);
+  for(int i=0; i<6; ++i) myJointReq.request.joints[0].joint_value[i] = home_joint[i];
   ROS_INFO("UR5 goto home");
   robot_arm_goto_joint.call(myJointReq);
   std_srvs::Empty empty_req;
@@ -100,7 +101,8 @@ bool Helper_Services::go_home_service_callback(std_srvs::Empty::Request &req, st
 
 bool Helper_Services::go_place_service_callback(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   arm_operation::joint_pose myJointReq;
-  for(int i=0; i<6; ++i) myJointReq.request.joint[i] = place_joint[i];
+  myJointReq.request.joints.resize(1);
+  for(int i=0; i<6; ++i) myJointReq.request.joints[0].joint_value[i] = place_joint[i];
   ROS_INFO("UR5 goto place");
   robot_arm_goto_joint.call(myJointReq); ros::Duration(0.3).sleep();
   if(last_motion==false){ // Grasp
@@ -134,7 +136,7 @@ bool Helper_Services::go_place_service_callback(std_srvs::Empty::Request &req, s
     }while(tmp_counter<=REPEAT_TIME-1);
   }
   // Then go home
-  for(int i=0; i<6; ++i) myJointReq.request.joint[i] = home_joint[i];
+  for(int i=0; i<6; ++i) myJointReq.request.joints[0].joint_value[i] = home_joint[i];
   ROS_INFO("UR5 goto home"); 
   robot_arm_goto_joint.call(myJointReq);
   return true;
