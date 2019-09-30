@@ -35,10 +35,16 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   // Wrist3 default bound [-220, 5]
   if(!pnh_.getParam("wrist3_upper_bound", wrist3_upper_bound)) wrist3_upper_bound = deg2rad(5);
   if(!pnh_.getParam("wrist3_lower_bound", wrist3_lower_bound)) wrist3_lower_bound = deg2rad(-220);
-  if(!pnh_.getParam("force_thres", force_thres)) force_thres = 100.0f;
-  std::string host_ip; 
-  nh_.getParam("/ur_driver/robot_ip_address", host_ip);
-  ur_control.setHost(host_ip);
+  if(!pnh_.getParam("force_thres", force_thres)){
+    force_thres = 100.0f;
+    pnh_.setParam("force_thres", force_thres);
+    ROS_WARN("[%s] Set force_thres with default value: %f", ros::this_node::getName().c_str(), force_thres);
+  }
+  if(!sim){
+    std::string host_ip; 
+    nh_.getParam("/ur_driver/robot_ip_address", host_ip);
+    ur_control.setHost(host_ip);
+  }
   // Show parameter information
   ROS_INFO("*********************************************************************************");
   ROS_INFO("[%s] Tool length: %f", ros::this_node::getName().c_str(), tool_length);
@@ -187,6 +193,7 @@ bool RobotArm::GoStraightLineService(arm_operation::target_pose::Request &req, a
 }
 
 bool RobotArm::GotoJointPoseService(arm_operation::joint_pose::Request  &req, arm_operation::joint_pose::Response &res){
+  /*
   trajectory_msgs::JointTrajectory &t = goal.trajectory;
   ROS_INFO("[%s] Receive new joint pose request: %f %f %f %f %f %f", 
             ros::this_node::getName().c_str(), req.joint[0], req.joint[1], req.joint[2], req.joint[3], req.joint[4], req.joint[5]);
@@ -206,6 +213,43 @@ bool RobotArm::GotoJointPoseService(arm_operation::joint_pose::Request  &req, ar
   ROS_INFO("[%s] Execution time: %f seconds", ros::this_node::getName().c_str(), calculate_time(joint, togo));
   StartTrajectory(goal);
   res.plan_result = "Success";
+  return true;
+  */
+  std::stringstream ss;
+  for(int i=0; i<req.joints.size(); ++i){
+    for(int j=0; j<6; ++j) 
+      ss << std::fixed << std::setprecision(6) << req.joints[i].joint_value[j] << " ";
+    ss << "\n";
+  }
+  ROS_INFO("[%s] Receive new joint pose request:\n\
+Totally %d waypoints\n%s", ros::this_node::getName().c_str(), (int)req.joints.size(), ss.str().c_str());
+  control_msgs::FollowJointTrajectoryGoal tmp;
+  trajectory_msgs::JointTrajectory &t = tmp.trajectory;
+  t.joint_names.resize(6);
+  t.joint_names[0] = prefix + "shoulder_pan_joint";
+  t.joint_names[1] = prefix + "shoulder_lift_joint";
+  t.joint_names[2] = prefix + "elbow_joint";
+  t.joint_names[3] = prefix + "wrist_1_joint";
+  t.joint_names[4] = prefix + "wrist_2_joint";
+  t.joint_names[5] = prefix + "wrist_3_joint";
+  t.points.resize(req.joints.size()+1);
+  for(int i=0; i<=req.joints.size(); ++i){
+    t.points[i].positions.resize(6);
+    t.points[i].velocities.resize(6);
+    for(int j=0; j<6; ++j){
+      if(i==0){
+        t.points[i].positions[j] = joint[j];
+        t.points[i].time_from_start = ros::Duration(0);
+      } else{
+        t.points[i].positions[j] = req.joints[i-1].joint_value[j];
+        double tmp_arr[6];
+        std::copy(req.joints[i-1].joint_value.begin(),
+                  req.joints[i-1].joint_value.end(), tmp_arr);
+        t.points[i].time_from_start = ros::Duration(calculate_time(joint, tmp_arr));
+      }
+    }
+  }
+  StartTrajectory(tmp);
   return true;
 }
 

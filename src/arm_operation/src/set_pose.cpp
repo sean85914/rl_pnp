@@ -12,9 +12,10 @@
  * Parameter:
  *   ~type: which robot to use, either 3 or 5
  *   ~file_name: file name with extension
- * Last modify: 7/28, 2019
+ * Last modify: 9/30, 2019
  * Changelog:
  *  7/28: revise hardcoded service name and add robot choosing parameter, abort invalid files, enlarge queue size
+ *  9/30: change joint_pose request from float64[6] to arm_operation/joint_value
  * Editor: Sean
  */
 
@@ -75,12 +76,13 @@ class GoToWP {
   void cbCallback(const std_msgs::Int16 msg){
     if(msg.data>=wp_len or msg.data<0) {ROS_WARN("Given index out of range, ignore..."); return;}
     for(int i=0; i<6; ++i){
-      js_req.request.joint[i] = wp_list[msg.data][i];
+      js_req.request.joints[0].joint_value[i] = wp_list[msg.data][i];
     }
     goto_joint_pose_client_.call(js_req); ros::Duration(0.3).sleep();
   }
  public:
   GoToWP(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
+    js_req.request.joints.resize(1);
     sub_index = pnh_.subscribe("index_to_go", 10, &GoToWP::cbCallback, this);
     if(!pnh_.getParam("type", type)) {type=true;}
     ROS_INFO("%s", (type==0?"Use UR3":"Use UR5"));

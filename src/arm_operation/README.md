@@ -1,9 +1,11 @@
 # arm_operation package
 ## Dependencies
+* ROS
+* Qt5
+
 Please make sure you have [universal_robot](http://wiki.ros.org/universal_robot) package in your workspace  
 If you want to run on real robot, also make sure you have [ur_modern_driver](https://github.com/ros-industrial/ur_modern_driver)  
 
-* Qt5
 
 ## Nodes:
 ### urX_control_server
@@ -52,11 +54,13 @@ If you want to run on real robot, also make sure you have [ur_modern_driver](htt
 * Parameters
   * ~suction: double vector, in format [x, y, z]
   * ~gripper: double vector, in format [x, y, z]
-  
+## Message:
+* joint_value.msg
+  * [float32[6]] joint_value
 ## Services:
 * joint_pose.srv
   * Request:
-    * [float64[6]](http://docs.ros.org/jade/api/std_msgs/html/msg/Float64.html) joint
+    * [arm_operation/joint_value] joints
   * Response:
     * [string](http://docs.ros.org/jade/api/std_msgs/html/msg/String.html) plan_result
 * target_pose.srv
@@ -85,4 +89,3 @@ To simulate URX in Gazebo
 
 For real robot, 
 > $ roslaunch arm_operation urX_real.launch tool_length:=[tool_length] robot_ip:=[ur_robot_ip]
-
