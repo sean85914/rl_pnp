@@ -241,18 +241,17 @@ Totally %d waypoints\n%s", ros::this_node::getName().c_str(), (int)req.joints.si
   for(int i=0; i<=req.joints.size(); ++i){
     t.points[i].positions.resize(6);
     t.points[i].velocities.resize(6);
+    double tmp_arr[6];
     for(int j=0; j<6; ++j){
-      if(i==0){
+      if(i==0)
         t.points[i].positions[j] = joint[j];
-        t.points[i].time_from_start = ros::Duration(0);
-      } else{
+      else
         t.points[i].positions[j] = req.joints[i-1].joint_value[j];
-        double tmp_arr[6];
-        std::copy(req.joints[i-1].joint_value.begin(),
-                  req.joints[i-1].joint_value.end(), tmp_arr);
-        t.points[i].time_from_start = ros::Duration(calculate_time(joint, tmp_arr));
-      }
     }
+    std::copy(req.joints[i-1].joint_value.begin(),
+              req.joints[i-1].joint_value.end(), tmp_arr);
+    if(i==0) t.points[i].time_from_start = ros::Duration(0);
+    else t.points[i].time_from_start = ros::Duration(calculate_time(joint, tmp_arr, req.factor));
   }
   StartTrajectory(tmp);
   return true;
