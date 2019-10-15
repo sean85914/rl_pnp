@@ -74,6 +74,7 @@ add_service_files(
   FILES
   target_pose.srv
   joint_pose.srv
+  getTCPPose.srv
 )
 
 ## Generate actions in the 'action' folder

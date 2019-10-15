@@ -22,6 +22,7 @@ RobotArm::RobotArm(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh),
   robot_state_srv = pnh_.advertiseService("ur_control/get_robot_state", &RobotArm::GetRobotModeStateService, this);
   unlock_protective_stop_srv = pnh_.advertiseService("ur_control/unlock_protective", &RobotArm::UnlockProtectiveStopService, this);
   stop_program_srv = pnh_.advertiseService("ur_control/stop_program", &RobotArm::StopProgramService, this);
+  get_tcp_pose_srv = pnh_.advertiseService("ur_control/get_tcp_pose", &RobotArm::GetTCPPoseService, this);
   // Parameters
   if(!pnh_.getParam("tool_length", tool_length)) tool_length = 0.0;
   if(!pnh_.getParam("prefix", prefix)) prefix="";
@@ -271,6 +272,11 @@ bool RobotArm::UnlockProtectiveStopService(std_srvs::Empty::Request &req, std_sr
 
 bool RobotArm::StopProgramService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
   ur_control.stop_program();
+  return true;
+}
+
+bool RobotArm::GetTCPPoseService(arm_operation::getTCPPose::Request &req, arm_operation::getTCPPose::Response &res){
+  res.tcp_pose = getCurrentTCPPose();
   return true;
 }
 

@@ -46,6 +46,7 @@
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <arm_operation/target_pose.h>
 #include <arm_operation/joint_pose.h>
+#include <arm_operation/getTCPPose.h>
 #include <tf/transform_datatypes.h>
 // Self-defined
 #include "ur_script_socket.h"
@@ -89,6 +90,7 @@ class RobotArm {
   ros::ServiceServer goto_joint_pose_srv;
   ros::ServiceServer unlock_protective_stop_srv;
   ros::ServiceServer stop_program_srv;
+  ros::ServiceServer get_tcp_pose_srv;
   //ros::ServiceServer fast_rotate_srv;
   //ros::ServiceServer flip_srv;
   ros::ServiceServer robot_state_srv;
@@ -206,6 +208,7 @@ class RobotArm {
    bool GetRobotModeStateService(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
    bool UnlockProtectiveStopService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
    bool StopProgramService(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+   bool GetTCPPoseService(arm_operation::getTCPPose::Request &req, arm_operation::getTCPPose::Response &res);
 };
 
 #endif
