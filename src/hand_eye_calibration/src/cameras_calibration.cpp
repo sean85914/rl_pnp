@@ -1,3 +1,4 @@
+#include <fstream>
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <boost/filesystem.hpp>
@@ -15,7 +16,7 @@ geometry_msgs::Point stampedTransform2Point(tf::StampedTransform t){
 class CamerasCalibration{
  private:
   int data_count; // Count how many data recorded
-  std::string tag_frame; // Target tag frame, from parameter server
+  int tag_mount; // Mount of tags
   std::string master_cam_name; // Master camera prefix/name, from parameter server
   std::string master_cam_link; // Master camera prefix + "_link"
   std::string slave_cam_name; // Slave camera prefix/name, from parameter server
@@ -24,7 +25,7 @@ class CamerasCalibration{
   std::string file_name; // Saved file name, from parameter server
   std::string file_path; // Path to saved file, package path + folder + file name + file extension
   std::fstream fs;
-  ros::NodeHandle nh, pnh;
+  ros::NodeHandle nh_, pnh_;
   void printParams(void);
   void writeData(geometry_msgs::Point, geometry_msgs::Point);
   bool getTransform(std::string, std::string, tf::StampedTransform&);
@@ -42,24 +43,24 @@ int main(int argc, char** argv){
 }
 
 CamerasCalibration::CamerasCalibration(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), data_count(0){
-  if(!pnh_.getParam("tag_frame", tag_frame)) tag_frame = "tag_0";
-  if(!pnh_.getParam("master_cam_name", master_cam_name)) master_cam_name = "camera_1";
-  if(!pnh_.getParam("slave_cam_name", slave_cam_name)) slave_cam_name = "camera_2";
+  if(!pnh_.getParam("tag_mount", tag_mount)) tag_mount = 5;
+  if(!pnh_.getParam("master_cam_name", master_cam_name)) master_cam_name = "camera1";
+  if(!pnh_.getParam("slave_cam_name", slave_cam_name)) slave_cam_name = "camera2";
   if(!pnh_.getParam("file_name", file_name)) file_name = "cameras_calibration";
   printParams();
   master_cam_link = master_cam_name+"_link";
   slave_cam_link  = slave_cam_name +"_link";
   package_path = ros::package::getPath("hand_eye_calibration");
   boost::filesystem::path p(package_path+"/data");
-  if(!boost::filesystem::exits(p)) boost::filesystem::create_directory(p);
+  if(!boost::filesystem::exists(p)) boost::filesystem::create_directory(p);
   file_path = package_path + "/data/" + file_name + ".txt";
   fs.open(file_path, std::fstream::out | std::fstream::app); // Write file at the end
   ROS_INFO("[%s] Node ready", ros::this_node::getName().c_str());
 }
 
-void CamerasCalibration::printParam(void){
+void CamerasCalibration::printParams(void){
   std::stringstream ss;
-  ss << "\ntag_frame: " << tag_frame << "\n"
+  ss << "\ntag_mount: " << tag_mount << "\n"
      << "master_cam_name: " << master_cam_name << "\n"
      << "slave_cam_name: "  << slave_cam_name  << "\n"
      << "file_name: " << file_name;
@@ -99,18 +100,21 @@ ros::this_node::getName().c_str(), data_count);
     return true; // Finish
   } 
   else if(in=='r'){
-    if(!getTransform(master_cam_link, tag_frame, t_master) or 
-       !getTransform(slave_cam_link,  tag_frame, t_slave)){
-       ROS_WARN("[%s] Can't get transform, make sure both cameras see the tag, abort request", ros::this_node::getName().c_str());
-    }else{
-      auto p_master = stampedTransform2Point(t_master);
-      auto p_slave  = stampedTransform2Point(t_slave);
-      writeData(p_master, p_slave);
-      ROS_INFO("[%s] One data wrote into the file", ros::this_node::getName().c_str());
-      ++data_count;
+    for(int i=0; i<tag_mount; ++i){
+      std::string tag_frame = "tag_" + std::to_string(i);
+      if(!getTransform(master_cam_link, tag_frame, t_master) or 
+         !getTransform(slave_cam_link,  tag_frame, t_slave)){
+         ROS_WARN("[%s] Can't get transform, make sure both cameras see the tag, abort request", ros::this_node::getName().c_str());
+      }else{
+        auto p_master = stampedTransform2Point(t_master);
+        auto p_slave  = stampedTransform2Point(t_slave);
+        writeData(p_master, p_slave);
+        ROS_INFO("[%s] One data wrote into the file", ros::this_node::getName().c_str());
+        ++data_count;
+      }
     }
-    return false; // Not yet finish
   } else{
     ROS_WARN("[%s] Invalid input, abort", ros::this_node::getName().c_str());
   }
+  return false;
 }

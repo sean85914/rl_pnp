@@ -70,6 +70,9 @@ add_executable(mat_quat_conversion
 qt5_use_modules(mat_quat_conversion Widgets)
 target_link_libraries(mat_quat_conversion ${catkin_LIBRARIES})
 
+add_executable(cameras_calibration src/cameras_calibration.cpp)
+target_link_libraries(cameras_calibration ${catkin_LIBRARIES})
+
 install(TARGETS mat_quat_conversion 
   RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
 )
