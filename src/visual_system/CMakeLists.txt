@@ -30,6 +30,7 @@ add_service_files(
   pc_is_empty.srv
   check_valid.srv
   get_surface_feature.srv
+  get_pick_pose.srv
 )
 
 generate_messages(
@@ -79,3 +80,6 @@ target_link_libraries(save_all ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 add_executable(pc_transform src/pc_transform.cpp)
 add_dependencies(pc_transform visual_system_gencpp)
 target_link_libraries(pc_transform ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} helper)
+
+add_executable(charuco src/charuco.cpp)
+target_link_libraries(charuco ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
