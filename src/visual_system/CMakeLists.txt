@@ -81,5 +81,10 @@ add_executable(pc_transform src/pc_transform.cpp)
 add_dependencies(pc_transform visual_system_gencpp)
 target_link_libraries(pc_transform ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} helper)
 
+add_library(charuco_detector SHARED src/charuco_detector.cpp)
+set_target_properties(charuco_detector PROPERTIES VERSION "1.0.0" SOVERSION "1")
+target_link_libraries(charuco_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+
 add_executable(charuco src/charuco.cpp)
-target_link_libraries(charuco ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+target_link_libraries(charuco ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} charuco_detector)
