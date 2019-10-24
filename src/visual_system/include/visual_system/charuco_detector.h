@@ -3,6 +3,7 @@
 #include <map>
 // ROS
 #include <geometry_msgs/Point.h>
+#include <cv_bridge/cv_bridge.h>
 #include <tf/transform_broadcaster.h>
 // CV
 #include <opencv2/core/core.hpp>
