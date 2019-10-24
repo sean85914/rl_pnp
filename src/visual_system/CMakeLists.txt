@@ -41,9 +41,8 @@ generate_messages(
 )
 
 catkin_package(
-  LIBRARIES visual_system
+  INCLUDE_DIRS include  
   CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs tf message_runtime
-  INCLUDE_DIRS include
 )
 
 include_directories(
@@ -84,7 +83,6 @@ target_link_libraries(pc_transform ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} helpe
 add_library(charuco_detector SHARED src/charuco_detector.cpp)
 set_target_properties(charuco_detector PROPERTIES VERSION "1.0.0" SOVERSION "1")
 target_link_libraries(charuco_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-
 
 add_executable(charuco src/charuco.cpp)
 target_link_libraries(charuco ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} charuco_detector)

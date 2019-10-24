@@ -12,13 +12,19 @@
   <build_depend>roslib</build_depend>
   <build_depend>geometry_msgs</build_depend>
   <build_depend>std_msgs</build_depend>
+  <build_depend>cmake_modules</build_depend>
   <build_depend>tf</build_depend>
+  <build_depend>message_generation</build_depend>
   <build_depend>arm_operation</build_depend>
+  <build_depend>visual_system</build_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>roslib</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <exec_depend>cmake_modules</exec_depend>
   <exec_depend>tf</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
   <exec_depend>arm_operation</exec_depend>
+  <exec_depend>visual_system</exec_depend>
 </package>
