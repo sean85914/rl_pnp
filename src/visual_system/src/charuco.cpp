@@ -8,7 +8,7 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/calib3d.hpp>
-#include <charuco_detector.h>
+#include <visual_system/charuco_detector.h>
 #include "conversion.hpp"
 
 

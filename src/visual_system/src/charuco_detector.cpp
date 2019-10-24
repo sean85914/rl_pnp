@@ -1,4 +1,4 @@
-#include <charuco_detector.h>
+#include <visual_system/charuco_detector.h>
 
 CharucoDetector::CharucoDetector(int row, int col, int num, int bits, 
                                  double square_length, double tag_length):

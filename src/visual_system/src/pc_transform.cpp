@@ -15,7 +15,7 @@
 #include <pcl/segmentation/sac_segmentation.h> // pcl::SACSegmentation
 #include <pcl/registration/icp.h> // pcl::IterativeClosestPoint
 #include <pcl/filters/voxel_grid.h> // pcl::VoxelGrid
-#include "helper.h"
+#include <visual_system/helper.h>
 // message filters
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>

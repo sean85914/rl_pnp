@@ -1,4 +1,4 @@
-#include "helper.h"
+#include "visual_system/helper.h"
 
 cv::Mat applyMeanFilter(cv::Mat original_image, int kernel_size){
   int l = floor(double(kernel_size)/2);
