@@ -1,0 +1,28 @@
+<launch>
+  <arg
+    name="model" />
+  <arg
+    name="gui"
+    default="False" />
+  <param
+    name="robot_description"
+    textfile="$(find irb1660id_urdf)/urdf/irb1660id_urdf.urdf" />
+  <param
+    name="use_gui"
+    value="$(arg gui)" />
+  <node
+    name="joint_state_publisher"
+    pkg="joint_state_publisher"
+    type="joint_state_publisher" if="$(arg gui)"/>
+  <node
+    name="robot_state_publisher"
+    pkg="robot_state_publisher"
+    type="state_publisher" >
+    <remap from="joint_states" to="abb/joint_states" unless="$(arg gui)"/>
+  </node>
+  <node
+    name="rviz"
+    pkg="rviz"
+    type="rviz"
+    args="-d $(find irb1660id_urdf)/urdf.rviz" />
+</launch>

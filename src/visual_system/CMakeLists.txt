@@ -30,7 +30,6 @@ add_service_files(
   pc_is_empty.srv
   check_valid.srv
   get_surface_feature.srv
-  get_pick_pose.srv
 )
 
 generate_messages(

@@ -1,0 +1,11 @@
+<launch>
+  <group ns="abb">
+    <rosparam command="load" file="$(find abb_node)/launch/robot_params.yaml"/>
+    <node pkg="abb_node" type="abb_node" name="abb_node" output="screen"/>
+  </group>
+  <param name="robot_description" textfile="$(find irb1660id_urdf)/urdf/irb1660id_urdf.urdf" />
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher">
+    <remap from="joint_states" to="abb/joint_states"/>
+  </node>
+  
+</launch>

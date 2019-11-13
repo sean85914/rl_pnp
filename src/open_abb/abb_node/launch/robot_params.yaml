@@ -1,0 +1,6 @@
+robot: {speedORI: 10.0, speedTCP: 50.0, toolQ0: 1.0,
+  toolQX: 0.0, toolQY: 0.0, toolQZ: 0.0, toolX: 0.0, toolY: 0.0,
+  toolZ: 0.0, workobjectQ0: 1.0, workobjectQX: 0.0, workobjectQY: 0.0,
+  workobjectQZ: 0.0, workobjectX: 0.0, workobjectY: 0.0, workobjectZ: 0.0,
+  zone: 1, robotIp: 192.168.125.1, robotLoggerPort: 5001, robotMotionPort: 5000, vacuum: 0}
+
