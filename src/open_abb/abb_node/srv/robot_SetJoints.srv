@@ -1,4 +1,5 @@
 # Service to Set Joints
+# Angle in radian
 float64[] position
 
 ---

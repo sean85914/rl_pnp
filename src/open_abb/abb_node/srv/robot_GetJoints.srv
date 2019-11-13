@@ -1,4 +1,5 @@
 # Service to get joint angles of the robot
+# Angle in radian
 
 ---
 float64 j1

@@ -436,6 +436,8 @@ bool RobotController::robot_GetJoints(
   // Simply call our internal method to get the current position of the robot
   if (getJoints(res.j1, res.j2, res.j3, res.j4, res.j5, res.j6))
   {
+    res.j1 /= 57.2957795; res.j2 /= 57.2957795; res.j3 /= 57.2957795; 
+    res.j4 /= 57.2957795; res.j5 /= 57.2957795; res.j6 /= 57.2957795; 
     res.ret = 1;
     res.msg = "ROBOT_CONTROLLER: OK.";
     return true;
