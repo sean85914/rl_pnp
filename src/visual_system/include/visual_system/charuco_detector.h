@@ -15,14 +15,14 @@
 
 class CharucoDetector{
  private:
-  bool ready;
-  bool has_intrinsic;
-  int row_;
-  int col_;
+  bool ready; // Is image set?
+  bool has_intrinsic; // Is the detector has intrinsic matrix?
+  int row_; // Row of charuco
+  int col_; // Column of charuco
   int num_; // number of markers
   int bits_; // number of bits in markers
-  double square_length_;
-  double tag_length_;
+  double square_length_; // Square length
+  double tag_length_; // Tag length
   cv::Ptr<cv::aruco::Dictionary> dictionary;
   cv::Ptr<cv::aruco::CharucoBoard> board;
   cv::Mat image_;
