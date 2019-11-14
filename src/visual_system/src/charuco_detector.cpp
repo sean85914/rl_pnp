@@ -5,6 +5,7 @@ CharucoDetector::CharucoDetector(int row, int col, int num, int bits,
   ready(false), has_intrinsic(false),
   row_(row), col_(col), num_(num), bits_(bits), 
   square_length_(square_length), tag_length_(tag_length){
+  // See `opencv2/aruco/dictionary.hpp`
   assert((num_==4 or num_==5 or num_==6 or num_==7));
   assert((bits_==50 or bits_==100 or bits_==250 or bits_==1000));
   dictionary.reset(new cv::aruco::Dictionary());
@@ -34,14 +35,17 @@ void CharucoDetector::setIntrinsic(double fx, double fy, double cx, double cy){
 }
 
 std::map<int, geometry_msgs::Point> CharucoDetector::getCornersPosition(cv::Mat &drawn, cv::Vec3d &rvec, cv::Vec3d &tvec){
+  // Refer: https://docs.opencv.org/3.4/df/d4a/tutorial_charuco_detection.html
   std::map<int, geometry_msgs::Point> point_map;
   assert(ready and has_intrinsic);
   image_.copyTo(drawn);
+  // Detect markers in the image
   std::vector<int> ids;
   std::vector<std::vector<cv::Point2f>> corners;
   cv::aruco::detectMarkers(image_, dictionary, corners, ids);
   cv::aruco::refineDetectedMarkers(image_, board, corners, ids, cv::noArray(), cameraMatrix);
-  if(ids.size()==0) return point_map;
+  if(ids.size()==0) return point_map; // Return empty map if no corner detected
+  // Detect corners in the image
   std::vector<cv::Point2f> charucoCorners;
   std::vector<int> charucoIds;
   int corners_amount = cv::aruco::interpolateCornersCharuco(corners,
@@ -51,18 +55,21 @@ std::map<int, geometry_msgs::Point> CharucoDetector::getCornersPosition(cv::Mat 
                                                             charucoCorners,
                                                             charucoIds,
                                                             cameraMatrix);
+  // Estimate pose of the charuco (Left bottom corner as origin, row as X-axis and column as Y-axis)
   bool valid_pose = cv::aruco::estimatePoseCharucoBoard(charucoCorners,
                                                         charucoIds,
                                                         board,
                                                         cameraMatrix,
                                                         cv::noArray(),
                                                         rvec, tvec);
-  if(!valid_pose) return point_map;
+  if(!valid_pose) return point_map; // Not valid pose, return empty map
+  // Draw corner and charuco coordinate in image
   cv::aruco::drawDetectedCornersCharuco(drawn, 
                                         charucoCorners, 
                                         charucoIds, 
                                         cv::Scalar(255, 0, 0));
   cv::aruco::drawAxis(drawn, cameraMatrix, cv::noArray(), rvec, tvec, 0.1);
+  // Get each corner position in image coordinate (for image from Intel RealSense, it's `camera_color_optical_frame`)
   // Convert rotation vector to matrix
   cv::Mat rot_matrix;
   cv::Rodrigues(rvec, rot_matrix);

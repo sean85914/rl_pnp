@@ -9,7 +9,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/calib3d.hpp>
 #include <visual_system/charuco_detector.h>
-#include "conversion.hpp"
+#include "conversion.hpp" // rvec2tf, tvec2tf, point2tf
 
 
 const int ROW = 6;
