@@ -36,7 +36,7 @@ class CharucoDetector{
   void setIntrinsic(double fx, double fy, double cx, double cy);
   /*
    * Get corners position and its corresponding ID
-   * [in] cv::Mat &drawn: image to draw, pass as referance
+   * [out] cv::Mat &drawn: image with drawn information, can visualized detection result
    * [out] cv::Vec3d &rvec: charuco board orientation w.r.t. image frame, can further change to matrix format by `cv::Rodrigues`
    * [out] cv::Vec3d &tvec: charuco board position w.r.t. image frame, notice that it represent the left bottom corner of the board
    * [out] std::map<int, geometry_msgs::Point>: map, which bind corner ID and its position in camera frame
