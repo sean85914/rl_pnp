@@ -53,7 +53,7 @@ file_name: %s\n \
 Press 'r' to record data, 'e' to exit the process:", REQURIED_DATA, data_num);
     char command; std::cin >> command;
     if((command == 'e' or command == 'E') and data_num < REQURIED_DATA){
-      ROS_WARN("Not enough data, do you sure you want to exit?\n [Press 'y' to exit]");
+      ROS_WARN("Not enough data, are you sure you want to exit?\n [Press 'y' to exit]");
       char sure; std::cin >> sure;
       if(sure == 'y' or sure == 'Y') {fs.close(); ros::shutdown(); completed = true;}
     } else if(command == 'r' or command == 'R'){
