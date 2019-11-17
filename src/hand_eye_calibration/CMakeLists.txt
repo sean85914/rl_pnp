@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_filters
   arm_operation
   visual_system
+  cv_bridge
 )
 
 find_package(Boost REQUIRED)
@@ -52,11 +53,8 @@ add_executable(cam_on_hand_calibration src/cam_on_hand_calibration.cpp)
 add_dependencies(cam_on_hand_calibration ${catkin_EXPORTED_TARGETS})
 target_link_libraries(cam_on_hand_calibration ${catkin_LIBRARIES})
 
-add_executable(get_transform src/get_transform.cpp)
+add_executable(get_transform src/get_transform.cpp src/point_set_registration.cpp)
 target_link_libraries(get_transform ${Eigen3_LIBRARIES} ${catkin_LIBRARIES})
-
-add_executable(eyes_calibration src/eyes_calibration.cpp)
-target_link_libraries(eyes_calibration ${catkin_LIBRARIES})
 
 add_executable(cam_on_hand_navy src/cam_on_hand_navy.cpp)
 target_link_libraries(cam_on_hand_navy ${catkin_LIBRARIES})
@@ -75,6 +73,22 @@ add_executable(mat_quat_conversion
 )
 qt5_use_modules(mat_quat_conversion Widgets)
 target_link_libraries(mat_quat_conversion ${catkin_LIBRARIES})
+
+set(gui_SRC "")
+set(gui_UI "")
+qt5_wrap_cpp(gui_SRC include/mainwindow_calibration.h)
+qt5_wrap_ui(gui_UI src/abb_calibration_qt/mainwindow_calibration.ui)
+message(STATUS ${gui_SRC})
+message(STATUS ${gui_UI})
+add_executable(hand_eye_calibration_abb
+  src/abb_calibration_qt/mainwindow.cpp
+  src/abb_calibration_qt/main.cpp
+  src/point_set_registration.cpp
+  ${gui_SRC}
+  ${gui_UI}
+)
+qt5_use_modules(hand_eye_calibration_abb Widgets)
+target_link_libraries(hand_eye_calibration_abb ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} charuco_detector)
 
 add_executable(cameras_calibration src/cameras_calibration.cpp)
 target_link_libraries(cameras_calibration ${catkin_LIBRARIES})
