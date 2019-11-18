@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="arm_operation" type="change_tool_service" name="change_tool_service" output="screen">
+    <rosparam command="load" file="$(find arm_operation)/config/change_tool_config.yaml"/>
+  </node>
+</launch>

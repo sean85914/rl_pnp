@@ -1,0 +1,4 @@
+int16 now
+int16 togo
+---
+string result

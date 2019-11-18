@@ -21,6 +21,7 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
   std_msgs
   sensor_msgs
   geometry_msgs
+  abb_node
   trajectory_msgs
   tf
   actionlib
@@ -75,6 +76,7 @@ add_service_files(
   target_pose.srv
   joint_pose.srv
   getTCPPose.srv
+  change_tool.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -269,3 +271,6 @@ add_executable(ur3_ik_solver_ui
 qt5_use_modules(ur3_ik_solver_ui Widgets)
 target_link_libraries(ur3_ik_solver_ui ${catkin_LIBRARIES} ur3_kin)
 #target_link_libraries(ur5_ik_solver_ui ${Qt5Widgets_LIBRARIES} ${Qt5Gui_LIBRARIES})
+
+add_executable(change_tool_service src/change_tool_service.cpp)
+target_link_libraries(change_tool_service ${catkin_LIBRARIES})
