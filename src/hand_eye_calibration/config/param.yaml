@@ -1,0 +1,7 @@
+charuco_offset: [0.0, 0.0, 0.0]
+charuco/row: 6
+charuco/col: 3
+charuco/num: 4
+charuco/bits: 50
+charuco/square_len: 0.04
+charuco/tag_len: 0.032

@@ -1,0 +1,8 @@
+<launch>
+  <arg name="camera" default="camera1"/>
+  <node pkg="hand_eye_calibration" type="hand_eye_calibration_abb" name="hand_eye_calibration_abb" output="screen">
+    <remap from="image" to="$(arg camera)/color/image_raw"/>
+    <remap from="camera_info" to="$(arg camera)/color/camera_info"/>
+    <rosparam command="load" file="$(find hand_eye_calibration)/config/param.yaml"/>
+  </node>
+</launch>
