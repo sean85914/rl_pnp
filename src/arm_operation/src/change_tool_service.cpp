@@ -24,7 +24,6 @@ inline bool in_range(double data, double upper, double lower){
 class ChangeToolService{
  private:
   std::vector<std::vector<double>> joints_vector;
-  //std::vector<double> standby;
   ros::NodeHandle nh_, pnh_;
   ros::ServiceServer change_tool_service;
   ros::ServiceClient getCartesian,
@@ -39,34 +38,60 @@ class ChangeToolService{
     }
   }
   void setupParameters(void){
+    bool in_radian;
+    pnh_.getParam("in_radian", in_radian);
     std::vector<double> arr;
-    pnh_.getParam("a_1", arr); joints_vector.push_back(deg2rad(arr));
-    pnh_.getParam("a_2", arr); joints_vector.push_back(deg2rad(arr));
-    pnh_.getParam("a_3", arr); joints_vector.push_back(deg2rad(arr));
-    pnh_.getParam("b_1", arr); joints_vector.push_back(deg2rad(arr));
-    pnh_.getParam("b_2", arr); joints_vector.push_back(deg2rad(arr));
-    pnh_.getParam("b_3", arr); joints_vector.push_back(deg2rad(arr));
-    pnh_.getParam("c_1", arr); joints_vector.push_back(deg2rad(arr));
-    pnh_.getParam("c_2", arr); joints_vector.push_back(deg2rad(arr));
-    pnh_.getParam("c_3", arr); joints_vector.push_back(deg2rad(arr));
-    //pnh_.getParam("standby", standby);
+    if(!pnh_.getParam("a_1", arr)){
+      exit(EXIT_FAILURE);
+    } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
+    if(!pnh_.getParam("a_2", arr)){
+      exit(EXIT_FAILURE);
+    } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
+    if(!pnh_.getParam("a_3", arr)){
+      exit(EXIT_FAILURE);
+    } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
+    if(!pnh_.getParam("b_1", arr)){
+      exit(EXIT_FAILURE);
+    } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
+    if(!pnh_.getParam("b_2", arr)){
+      exit(EXIT_FAILURE);
+    } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
+    if(!pnh_.getParam("b_3", arr)){
+      exit(EXIT_FAILURE);
+    } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
+    if(!pnh_.getParam("c_1", arr)){
+      exit(EXIT_FAILURE);
+    } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
+    if(!pnh_.getParam("c_2", arr)){
+      exit(EXIT_FAILURE);
+    } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
+    if(!pnh_.getParam("c_3", arr)){
+      exit(EXIT_FAILURE);
+    } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
     printInfo();
   }
   bool service_cb(arm_operation::change_tool::Request  &req,
                   arm_operation::change_tool::Response &res){
-    if(!in_range(req.now, 3, 1) or !in_range(req.togo, 3, 1)){
+    if((!in_range(req.now, 3, 1) or !in_range(req.togo, 3, 1)) and !req.now==-1){
       res.result = "request tool out of range";
       return true;
     } else if(req.now == req.togo){
       res.result = "same tool, abort request";
       return true;
     }
-    ROS_INFO("Receive new request: from %d to %d", req.now, req.togo);
+    ros::Time ts = ros::Time::now();
+    std::string info = "Receive new request: ";
+    if(req.now == -1){
+      info += "to " + std::to_string(req.togo);
+    } else{
+      info += "from " + std::to_string(req.now) + " to " + std::to_string(req.togo);
+    }
+    ROS_INFO("%s", info.c_str());
     abb_node::robot_GetJoints get_joints_srv;
     abb_node::robot_SetJoints set_joints_srv;
     abb_node::robot_GetCartesian get_cartesian_srv;
     abb_node::robot_SetCartesian set_cartesian_srv;
-    set_joints_srv.request.position.resize(6);
+    set_joints_srv.request.position.resize(6); // Seg. fault if not resize to correct size  
     // Get current joints and put it into buffer
     getJoints.call(get_joints_srv);
     std::vector<double> original_pose{get_joints_srv.response.j1, 
@@ -76,12 +101,14 @@ class ChangeToolService{
                                       get_joints_srv.response.j5, 
                                       get_joints_srv.response.j6};
     // Put `now` to its home
-    std::copy(joints_vector[(req.now-1)*3].begin(), joints_vector[(req.now-1)*3].end(), set_joints_srv.request.position.begin());
-    setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
-    std::copy(joints_vector[(req.now-1)*3+1].begin(), joints_vector[(req.now-1)*3+1].end(), set_joints_srv.request.position.begin());
-    setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
-    std::copy(joints_vector[(req.now-1)*3+2].begin(), joints_vector[(req.now-1)*3+2].end(), set_joints_srv.request.position.begin());
-    setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
+    if(req.now!=-1){
+      std::copy(joints_vector[(req.now-1)*3].begin(), joints_vector[(req.now-1)*3].end(), set_joints_srv.request.position.begin());
+      setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
+      std::copy(joints_vector[(req.now-1)*3+1].begin(), joints_vector[(req.now-1)*3+1].end(), set_joints_srv.request.position.begin());
+      setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
+      std::copy(joints_vector[(req.now-1)*3+2].begin(), joints_vector[(req.now-1)*3+2].end(), set_joints_srv.request.position.begin());
+      setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
+    }
     // Take `togo` away
     std::copy(joints_vector[(req.togo-1)*3+2].begin(), joints_vector[(req.togo-1)*3+2].end(), set_joints_srv.request.position.begin());
     setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
@@ -101,6 +128,8 @@ class ChangeToolService{
     std::copy(original_pose.begin(), original_pose.end(), set_joints_srv.request.position.begin());
     setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
     res.result = "success";
+    double time_response = (ros::Time::now()-ts).toSec();
+    ROS_INFO("Service response complete, takes %f seconds", time_response);
     return true;
   }
  public:
