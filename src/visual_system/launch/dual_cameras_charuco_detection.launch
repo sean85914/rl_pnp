@@ -1,0 +1,12 @@
+<launch>
+  <arg name="enable_1" default="true"/>
+  <arg name="enable_2" default="true"/>
+  <node pkg="visual_system" type="charuco" name="charuco_1" if="$(arg enable_1)">
+    <remap from="~image" to="/camera1/color/image_raw"/>
+    <remap from="~camera_info" to="/camera1/color/camera_info"/>
+  </node>
+  <node pkg="visual_system" type="charuco" name="charuco_2" if="$(arg enable_2)">
+    <remap from="~image" to="/camera2/color/image_raw"/>
+    <remap from="~camera_info" to="/camera2/color/camera_info"/>
+  </node>
+</launch>
