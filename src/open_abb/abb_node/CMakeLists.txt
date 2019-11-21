@@ -12,6 +12,11 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
 )
 
+add_message_files(
+ FILES
+ joints.msg
+)
+
 add_service_files(
  FILES
  robot_GetCartesian.srv
@@ -55,3 +60,6 @@ add_library(abb_comm packages/abb_communications/abb_comm.cpp)
 add_executable(abb_node src/abb_node.cpp)
 add_dependencies(abb_node abb_node_gencpp)
 target_link_libraries(abb_node ${catkin_LIBRARIES} abb_comm matVec)                   
+
+add_executable(abb_logger src/abb_logger.cpp)
+target_link_libraries(abb_logger ${catkin_LIBRARIES}) 

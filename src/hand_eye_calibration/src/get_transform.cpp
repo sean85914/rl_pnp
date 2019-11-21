@@ -23,6 +23,6 @@ int main(int argc, char** argv)
             << T.getRotation().getZ() << " " << T.getRotation().getW() << "]\n"
             << "Orientation: (Euler) [" 
             << r << " " << p << " " << y << "]\n";
-  std::cout << "Error: " << error << "\n";
+  std::cout << "Error: " << error << " (mm)\n";
   return 0;
 }
