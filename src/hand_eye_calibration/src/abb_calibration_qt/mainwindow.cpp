@@ -39,16 +39,13 @@ MainWindow::MainWindow(ros::NodeHandle nh, ros::NodeHandle pnh, QWidget *parent)
     get_robot_pose_server("/abb/robot_GetCartesian")
 {
     ui->setupUi(this);
-    detector = CharucoDetector(ROW, COL, NUM, BITS, SQUARE_LEN, TAG_LEN);
-    charuco_offset.resize(3);
-    if(!pnh_.getParam("charuco_offset", charuco_offset)){
-        ROS_ERROR("No charuco offset data provided, force terminated...");
-        exit(EXIT_FAILURE);
-    }
+    setupParams();
+    detector = CharucoDetector(row, col, num, bits, square_len, tag_len);
     connect(ui->record_button, SIGNAL(clicked()), SLOT(record_data(void)));
     connect(ui->compute_button, SIGNAL(clicked()), SLOT(compute_result(void)));
     connect(ui->broadcast_button, SIGNAL(clicked()), SLOT(broadcast_transform(void)));
     connect(ui->exit_button, SIGNAL(clicked()), SLOT(exit_program(void)));
+    connect(ui->empty_button, SIGNAL(clicked()), SLOT(empty_vec(void)));
     image_sub.subscribe(nh_, "image", 1);
     info_sub.subscribe(nh_, "camera_info", 1);
     sync.reset(new Sync(MySyncPolicy(10), image_sub, info_sub));
@@ -59,9 +56,11 @@ MainWindow::MainWindow(ros::NodeHandle nh, ros::NodeHandle pnh, QWidget *parent)
     ui->textBrowser->setText("Welcom to hand-eye calibration process,\n\
 press `Record` to record data, \n\
 `Compute` to get the transformation result, \n\
-`Broadcast` to broadcast the computed transform and \n\
+`Broadcast` to broadcast the computed transform, \n\
+`Empty` if you want to clear the recorded data and \n\
 `Exit` to turn off the program. \n\
 You have " + QString::number(data_pair_array.size()) + " data now.");
+    ui->data_browser->setText("");
     ros_timer->start(33); // 30 Hz
     show();
 }
@@ -70,6 +69,40 @@ MainWindow::~MainWindow()
 {
     delete ui;
 }
+
+void MainWindow::setupParams(void){
+    charuco_offset.resize(3);
+    if(!pnh_.getParam("charuco_offset", charuco_offset)){
+        ROS_ERROR("No charuco offset data provided, force terminated...");
+        exit(EXIT_FAILURE);
+    }
+    if(!pnh_.getParam("charuco/row", row)){
+        ROS_ERROR("No charuco row data provided, force terminated...");
+        exit(EXIT_FAILURE);
+    }
+    if(!pnh_.getParam("charuco/col", col)){
+        ROS_ERROR("No charuco column data provided, force terminated...");
+        exit(EXIT_FAILURE);
+    }
+    if(!pnh_.getParam("charuco/num", num)){
+        ROS_ERROR("No charuco number data provided, force terminated...");
+        exit(EXIT_FAILURE);
+    }
+    if(!pnh_.getParam("charuco/bits", bits)){
+        ROS_ERROR("No charuco bits data provided, force terminated...");
+        exit(EXIT_FAILURE);
+    }
+    if(!pnh_.getParam("charuco/square_len", square_len)){
+        ROS_ERROR("No charuco square length data provided, force terminated...");
+        exit(EXIT_FAILURE);
+    }
+    if(!pnh_.getParam("charuco/tag_len", tag_len)){
+        ROS_ERROR("No charuco tag length data provided, force terminated...");
+        exit(EXIT_FAILURE);
+    }
+}
+
+// SLOTS
 
 void MainWindow::record_data(void){
     // Call service to get robot arm end effector pose
@@ -102,6 +135,13 @@ void MainWindow::record_data(void){
       corner_point_hand.y = corner_offset.getY();
       corner_point_hand.z = corner_offset.getZ();
       data_pair_array.push_back(std::pair<geometry_msgs::Point, geometry_msgs::Point>(corner_point_hand, corner_point_eye));
+      std::string data_str = "["   + std::to_string(corner_point_hand.x) +
+                             " ,"  + std::to_string(corner_point_hand.y) + 
+                             " ,"  + std::to_string(corner_point_hand.z) + 
+                             "]: " + std::to_string(corner_point_eye.x)  + 
+                             " ,"  + std::to_string(corner_point_eye.y)  + 
+                             " ,"  + std::to_string(corner_point_eye.z)  + "\n";
+      ui->data_browser->append(QString::fromUtf8(data_str.c_str()));
     }
     ui->textBrowser->setText("Got " + QString::number(id_corner_map.size()) + \
                              " data\nYou have " + QString::number(data_pair_array.size()) + " data now.");
@@ -146,6 +186,16 @@ You haven't compute the result, abord request...");
     }
 }
 
+void MainWindow::empty_vec(void){
+    if(data_pair_array.size()==0){
+        ui->textBrowser->setText("You have empty data vector, abort request...\n");
+    } else{
+        data_pair_array.empty();
+        ui->data_browser->setText("");
+        ui->textBrowser->setText("You have " + QString::number(data_pair_array.size()) + " data now. \n");
+    }
+}
+
 void MainWindow::exit_program(void){
     MainWindow::close();
     ros_timer->stop();
@@ -173,7 +223,7 @@ void MainWindow::callback(const sensor_msgs::ImageConstPtr      &image,
     cv::Mat draw_img;
     id_corner_map = detector.getCornersPosition(draw_img, rvec, tvec);
     cv::cvtColor(draw_img, draw_img, CV_BGR2RGB);
-    ui->detection_view->setPixmap(QPixmap::fromImage(QImage(draw_img.data, \
+    ui->scene_view->setPixmap(QPixmap::fromImage(QImage(draw_img.data, \
                                                             draw_img.cols, \
                                                             draw_img.rows, \
                                                             draw_img.step, 
