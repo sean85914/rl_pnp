@@ -1,13 +1,6 @@
 #include "mainwindow_calibration.h"
 #include "ui_mainwindow_calibration.h"
 
-const int ROW = 6;
-const int COL = 3;
-const int NUM = 4;
-const int BITS = 50;
-const double SQUARE_LEN = 0.04f;
-const double TAG_LEN = 0.032f;
-
 // Conversion
 std::string tf2stringInfo(const tf::Transform t){
     std::string info;
@@ -53,7 +46,7 @@ MainWindow::MainWindow(ros::NodeHandle nh, ros::NodeHandle pnh, QWidget *parent)
     ros_timer = new QTimer(this);
     broadcast_timer = new QTimer(this);
     connect(ros_timer, SIGNAL(timeout()), this, SLOT(spin_timer()));
-    ui->textBrowser->setText("Welcom to hand-eye calibration process,\n\
+    ui->textBrowser->setText("Welcome to hand-eye calibration process,\n\
 press `Record` to record data, \n\
 `Compute` to get the transformation result, \n\
 `Broadcast` to broadcast the computed transform, \n\
@@ -106,6 +99,10 @@ void MainWindow::setupParams(void){
 
 void MainWindow::record_data(void){
     // Call service to get robot arm end effector pose
+    if(!ros::service::waitForService(get_robot_pose_server, ros::Duration(10.0))){
+        ROS_ERROR("Can't connect to %s, abort request...", get_robot_pose_server.c_str());
+        return;
+    }
     ros::ServiceClient client = nh_.serviceClient<abb_node::robot_GetCartesian>(get_robot_pose_server);
     if(id_corner_map.size()==0){
         ui->textBrowser->setText("You have " + QString::number(data_pair_array.size()) + \
@@ -118,7 +115,7 @@ void MainWindow::record_data(void){
                                  " data now. \nCan't get robot pose, abort request...");
         return;
     }
-    tf::Vector3 ee_position(srv.response.x/100.0, srv.response.y/100.0, srv.response.z/100.0);
+    tf::Vector3 ee_position(srv.response.x/1000.0, srv.response.y/1000.0, srv.response.z/1000.0); // mm to m
     tf::Quaternion ee_orientation(srv.response.qx, srv.response.qy, srv.response.qz, srv.response.q0);
     tf::Transform ee_transform(ee_orientation, ee_position);
     for(auto x: id_corner_map){
@@ -193,6 +190,7 @@ void MainWindow::empty_vec(void){
         data_pair_array.empty();
         ui->data_browser->setText("");
         ui->textBrowser->setText("You have " + QString::number(data_pair_array.size()) + " data now. \n");
+        has_result = false;
     }
 }
 
@@ -224,8 +222,8 @@ void MainWindow::callback(const sensor_msgs::ImageConstPtr      &image,
     id_corner_map = detector.getCornersPosition(draw_img, rvec, tvec);
     cv::cvtColor(draw_img, draw_img, CV_BGR2RGB);
     ui->scene_view->setPixmap(QPixmap::fromImage(QImage(draw_img.data, \
-                                                            draw_img.cols, \
-                                                            draw_img.rows, \
-                                                            draw_img.step, 
-                                                            QImage::Format_RGB888)));
+                                                        draw_img.cols, \
+                                                        draw_img.rows, \
+                                                        draw_img.step, 
+                                                        QImage::Format_RGB888)));
 }
