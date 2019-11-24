@@ -51,8 +51,8 @@ void PointSetRegistration::compute(void){
       target_sum += target(j, i);
       source_sum += source(j, i);
     }
-    target_centroid(i) = target_sum/(double)target.rows();
-    source_centroid(i) = source_sum/(double)source.rows();
+    target_centroid(i) = target_sum/(double)target.rows(); // (4)
+    source_centroid(i) = source_sum/(double)source.rows(); // (6)
     target_sum = source_sum = 0;
   }
   // 2. Compute deviation
@@ -60,17 +60,17 @@ void PointSetRegistration::compute(void){
                   source_deviation(source.rows(), 3);
   for(int i=0; i<target.rows(); ++i){
     for(int j=0; j<3; ++j){
-      target_deviation(i, j) = target(i, j) - target_centroid(j);
-      source_deviation(i, j) = source(i, j) - source_centroid(j);
+      target_deviation(i, j) = target(i, j) - target_centroid(j); // (8)
+      source_deviation(i, j) = source(i, j) - source_centroid(j); // (7)
     }
   }
   // 3. Compute H
-  Eigen::MatrixXf H(3, 3); H = source_deviation.transpose() * target_deviation;
+  Eigen::MatrixXf H(3, 3); H = source_deviation.transpose() * target_deviation; // (11)
   // 4. SVD
-  Eigen::JacobiSVD<Eigen::MatrixXf> svd(H, Eigen::ComputeThinU | Eigen::ComputeThinV);
+  Eigen::JacobiSVD<Eigen::MatrixXf> svd(H, Eigen::ComputeThinU | Eigen::ComputeThinV); // (12)
   // 5. Compute rotation and translation
-  Eigen::Matrix3f R = svd.matrixV() * svd.matrixU().transpose();
-  Eigen::Array3f trans = target_centroid - R * source_centroid;
+  Eigen::Matrix3f R = svd.matrixV() * svd.matrixU().transpose(); // (13)
+  Eigen::Array3f trans = target_centroid - R * source_centroid; // (10)
   // Convert to tf::Transform
   tf::Matrix3x3 rot(R(0, 0), R(0, 1), R(0, 2),
                     R(1, 0), R(1, 1), R(1, 2),
