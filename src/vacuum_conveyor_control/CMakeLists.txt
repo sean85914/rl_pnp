@@ -37,3 +37,7 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 add_executable(arduino_control src/vacuum_and_conveyor_control.cpp)
 add_dependencies(arduino_control ${catkin_EXPORTED_TARGETS} vacuum_conveyor_control_gencpp)
 target_link_libraries(arduino_control ${catkin_LIBRARIES} ${serial_LIBRARIES})
+
+add_executable(vacuum_pump_control src/vacuum_pump_control.cpp)
+add_dependencies(vacuum_pump_control ${catkin_EXPORTED_TARGETS} vacuum_conveyor_control_gencpp)
+target_link_libraries(vacuum_pump_control ${catkin_LIBRARIES} ${serial_LIBRARIES})
