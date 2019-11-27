@@ -121,11 +121,11 @@ void MainWindow::record_data(void){
     for(auto x: id_corner_map){
       int id = x.first;
       geometry_msgs::Point corner_point_eye = x.second;
-      int z_offset_unit = id%(ROW-1)+1;
-      int y_offset_unit = id/(ROW-1)+1;
+      int z_offset_unit = id%(row-1)+1;
+      int y_offset_unit = id/(row-1)+1;
       tf::Vector3 corner_offset(charuco_offset[0], \
-                                charuco_offset[1]+y_offset_unit*SQUARE_LEN, \
-                                charuco_offset[2]+z_offset_unit*SQUARE_LEN);
+                                charuco_offset[1]+y_offset_unit*square_len, \
+                                charuco_offset[2]+z_offset_unit*square_len);
       corner_offset = ee_transform*corner_offset;
       geometry_msgs::Point corner_point_hand;
       corner_point_hand.x = corner_offset.getX();
