@@ -19,6 +19,7 @@
 #include <geometry_msgs/Point.h>
 #include <cv_bridge/cv_bridge.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
 #include <abb_node/robot_GetCartesian.h>
 
 // OpenCV
@@ -57,7 +58,7 @@ private:
     // Charuco information
     int row, col, num, bits;
     double square_len, tag_len;
-    std::string camera_frame;
+    std::string camera_frame, camera_link_str;
     const std::string get_robot_pose_server;
     QTimer *broadcast_timer, *ros_timer;
     ros::NodeHandle nh_, pnh_;
@@ -79,7 +80,8 @@ public slots:
     }
     void broadcast_callback(void){
         static tf::TransformBroadcaster br;
-        br.sendTransform(tf::StampedTransform(result_transform, ros::Time::now(), "base_link", camera_frame));
+        result_transform.setRotation(result_transform.getRotation().normalized());
+        br.sendTransform(tf::StampedTransform(result_transform, ros::Time::now(), "base_link", camera_link_str));
     }
     void exit_program(void);
     void record_data(void);

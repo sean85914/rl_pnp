@@ -22,6 +22,16 @@ std::string tf2stringInfo(const tf::Transform t){
     return info;
 }
 
+geometry_msgs::Point change_coordinate(geometry_msgs::Point in, tf::Transform tf){
+  tf::Vector3 vector_in(in.x, in.y, in.z),
+              vector_out = tf*vector_in;
+  geometry_msgs::Point out;
+  out.x = vector_out.getX();
+  out.y = vector_out.getY();
+  out.z = vector_out.getZ();
+  return out;
+}
+
 MainWindow::MainWindow(ros::NodeHandle nh, ros::NodeHandle pnh, QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
@@ -98,9 +108,26 @@ void MainWindow::setupParams(void){
 // SLOTS
 
 void MainWindow::record_data(void){
+    // Get transformation from `cameraX_color_optical_frame` to `cameraX_link`
+    tf::TransformListener listener;
+    tf::StampedTransform stf;
+    std::string target = "color_optical_frame";
+    camera_link_str = camera_frame;
+    try{
+      std::size_t found = camera_link_str.find(target);
+      camera_link_str.replace(found, target.length(), "link");
+      listener.waitForTransform(camera_link_str, camera_frame, ros::Time(0), ros::Duration(1.0));
+      listener.lookupTransform(camera_link_str, camera_frame, ros::Time(0), stf);
+    } catch(tf::TransformException ex){
+      std::string warn_str = "Can't get transformation from " + camera_frame + " to " + camera_link_str + ", unknown error...\n";
+      ui->textBrowser->setText(QString::fromUtf8(warn_str.c_str()));
+      return;
+    }
+    tf::Transform camera_tf(stf.getRotation(), stf.getOrigin());
     // Call service to get robot arm end effector pose
     if(!ros::service::waitForService(get_robot_pose_server, ros::Duration(10.0))){
-        ROS_ERROR("Can't connect to %s, abort request...", get_robot_pose_server.c_str());
+        std::string error_str = "Can't connect to " + get_robot_pose_server + ", make sure you turn on the server, abort request...\n";
+        ui->textBrowser->setText(QString::fromUtf8(error_str.c_str()));
         return;
     }
     ros::ServiceClient client = nh_.serviceClient<abb_node::robot_GetCartesian>(get_robot_pose_server);
@@ -121,6 +148,8 @@ void MainWindow::record_data(void){
     for(auto x: id_corner_map){
       int id = x.first;
       geometry_msgs::Point corner_point_eye = x.second;
+      // Change to `cameraX_link` frame
+      corner_point_eye = change_coordinate(corner_point_eye, camera_tf);
       int z_offset_unit = id%(row-1)+1;
       int y_offset_unit = id/(row-1)+1;
       tf::Vector3 corner_offset(charuco_offset[0], \
@@ -140,6 +169,7 @@ void MainWindow::record_data(void){
                              " ,"  + std::to_string(corner_point_eye.z)  + "\n";
       ui->data_browser->append(QString::fromUtf8(data_str.c_str()));
     }
+    ui->data_browser->append("=========================\n");
     ui->textBrowser->setText("Got " + QString::number(id_corner_map.size()) + \
                              " data\nYou have " + QString::number(data_pair_array.size()) + " data now.");
 }
@@ -167,7 +197,7 @@ You haven't compute the result, abord request...");
             is_broadcasting = true;
             ui->record_button->setEnabled(false);
             ui->compute_button->setEnabled(false);
-            result_transform = tf::Transform(tf::Quaternion(0.0, 0.0, 0.0, 1.0), tf::Vector3(0.0, 0.0, 0.0)); // dummy one for test
+            ui->empty_button->setEnabled(false);
             ui->textBrowser->setText("Broadcasting transform, press `Broadcast` to stop\n"+\
                                      QString::fromUtf8(tf2stringInfo(result_transform).c_str()));
             connect(broadcast_timer, SIGNAL(timeout()), this, SLOT(broadcast_callback()));
@@ -178,6 +208,7 @@ You haven't compute the result, abord request...");
             is_broadcasting = false;
             ui->record_button->setEnabled(true);
             ui->compute_button->setEnabled(true);
+            ui->empty_button->setEnabled(true);
             ui->textBrowser->setText("Stop broadcast");
         } 
     }
@@ -187,7 +218,7 @@ void MainWindow::empty_vec(void){
     if(data_pair_array.size()==0){
         ui->textBrowser->setText("You have empty data vector, abort request...\n");
     } else{
-        data_pair_array.empty();
+        data_pair_array.clear();
         ui->data_browser->setText("");
         ui->textBrowser->setText("You have " + QString::number(data_pair_array.size()) + " data now. \n");
         has_result = false;
@@ -219,7 +250,7 @@ void MainWindow::callback(const sensor_msgs::ImageConstPtr      &image,
     detector.setImage(cv_ptr->image);
     cv::Vec3d rvec, tvec;
     cv::Mat draw_img;
-    id_corner_map = detector.getCornersPosition(draw_img, rvec, tvec);
+    id_corner_map = detector.getCornersPosition(draw_img, rvec, tvec); // Position w.r.t color_optical_frame
     cv::cvtColor(draw_img, draw_img, CV_BGR2RGB);
     ui->scene_view->setPixmap(QPixmap::fromImage(QImage(draw_img.data, \
                                                         draw_img.cols, \
