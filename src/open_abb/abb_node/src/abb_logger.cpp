@@ -10,8 +10,10 @@
 #include <unistd.h>
 
 #include <ros/ros.h>
+#include <sensor_msgs/JointState.h>
 #include <geometry_msgs/Pose.h>
 #include <abb_node/joints.h>
+#include <abb_node/robot_GetCartesian.h>
 
 const int MAX_LEN = 1024;
 
@@ -53,13 +55,34 @@ class TCPSocket{
 
 class ROSWrapper{
  private:
+  double x, y, z, q0, qx, qy, qz;
   ros::NodeHandle nh_, pnh_;
-  ros::Publisher pub_joints, pub_pose;
-  
+  sensor_msgs::JointState js_msg;
+  ros::Publisher pub_joints, pub_pose, pub_js;
+  ros::ServiceServer get_pose_server;
+  bool service_cb(abb_node::robot_GetCartesian::Request  &req, 
+                  abb_node::robot_GetCartesian::Response &res){
+    res.x = x;
+    res.y = y;
+    res.z = z;
+    res.q0 = q0;
+    res.qx = qx;
+    res.qy = qy;
+    res.qz = qz;
+    res.ret = 1;
+    res.msg = "ROBOT_CONTROLLER: OK.";
+    return true;
+  }
  public:
   ROSWrapper(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh_){
+    js_msg.name.resize(6); js_msg.position.resize(6);
+    for(int i=1; i<=6; ++i){
+      js_msg.name[i-1] = "joint" + std::to_string(i);
+    }
     pub_joints = nh_.advertise<abb_node::joints>("/abb/joints", 1);
     pub_pose   = nh_.advertise<geometry_msgs::Pose>("/abb/pose", 1);
+    pub_js     = nh_.advertise<sensor_msgs::JointState>("joint_states", 1);
+    get_pose_server = nh_.advertiseService("/abb/robot_GetCartesian", &ROSWrapper::service_cb, this);
   }
   void parseData(std::string str){
     // Valid string starts with `#`
@@ -75,7 +98,6 @@ class ROSWrapper{
     switch(code){
       case 0: {// Pose
         // # 0 [data] [time] [timer] [x] [y] [z] [q0] [qx] [qy] [qz]
-        double x, y, z, q0, qx, qy, qz;
         std::stringstream ss(str);
         ss >> x >> y >> z >> q0 >> qx >> qy >> qz;
         geometry_msgs::Pose pose;
@@ -90,13 +112,18 @@ class ROSWrapper{
         ss >> js[0] >> js[1] >> js[2] >> js[3] >> js[4] >> js[5];
         abb_node::joints joints;
         std::copy(js, js+6, joints.joint.begin());
-        for(auto &j: joints.joint){
-          j = j/180.0f*M_PI;
+        std::copy(js, js+6, js_msg.position.begin());
+        for(int i=0; i<6; ++i){
+          joints.joint[i] *= M_PI/180.0;
+          js_msg.position[i] *= M_PI/180.0;
         }
+        js_msg.header.stamp = ros::Time::now();
+        pub_js.publish(js_msg);
         pub_joints.publish(joints);
         break;
       }
     }
+    ros::spinOnce();
   }
 };
 

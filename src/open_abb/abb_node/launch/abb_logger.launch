@@ -1,0 +1,7 @@
+<launch>
+  <node pkg="abb_node" type="abb_logger" name="abb_logger" output="screen"/>
+  <param name="robot_description" textfile="$(find irb1660id_urdf)/urdf/irb1660id_urdf.urdf" />
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher">
+  </node>
+  
+</launch>
