@@ -1,4 +1,5 @@
 import numpy as np
+import yaml
 import cv2
 import struct
 import ctypes
@@ -6,9 +7,22 @@ from cv_bridge import CvBridge, CvBridgeError
 import sensor_msgs.point_cloud2 as pc2
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse
 
-workspace_limits = np.asarray([[-0.659, -0.273], [-0.269, 0.117], [-0.01, 0.2]])
+yaml_path = "/home/sean/Documents/flip_obj/src/visual_system/config/param_config.yaml"
+
+with open(yaml_path, "r") as stream:
+	data = yaml.load(stream)
+
+x_lower = data['x_lower']
+x_upper = data['x_upper']
+y_lower = data['y_lower']
+y_upper = data['y_upper']
+z_lower = data['z_lower']
+z_upper = data['z_upper']
+resolution = data['resolution']
+
+workspace_limits = np.asarray([[x_lower, x_upper], [y_lower, y_upper], [z_lower, z_upper]]) # X Y Z
 angle_map = [np.radians(0.), np.radians(-45.), np.radians(-90.), np.radians(45.)]
-heightmap_resolution = (workspace_limits[0][1]-workspace_limits[0][0])/224
+heightmap_resolution = (workspace_limits[0][1]-workspace_limits[0][0])/resolution
 # cv bridge
 br = CvBridge()
 
@@ -24,9 +38,9 @@ br = CvBridge()
 '''
 
 def get_heightmap(pc, img_path, iteration):
-	color_heightmap = np.zeros((224, 224, 3), dtype=np.uint8)
-	depth_heightmap = np.zeros((224, 224))
-	points = np.zeros((224, 224, 3)) 
+	color_heightmap = np.zeros((resolution, resolution, 3), dtype=np.uint8)
+	depth_heightmap = np.zeros((resolution, resolution))
+	points = np.zeros((resolution, resolution, 3)) 
 	gen = pc2.read_points(pc, skip_nans=True)
 	int_data = list(gen)
 	for p in int_data:
