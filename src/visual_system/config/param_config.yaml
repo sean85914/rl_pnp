@@ -1,0 +1,2 @@
+{down_sample: true, factor: 1.0, resolution: 224, use_two_cam: true, verbose: true,
+  x_lower: 0.66, x_upper: 1.06, y_lower: -0.6, y_upper: -0.2, z_lower: -0.1, z_upper: 0.2}
