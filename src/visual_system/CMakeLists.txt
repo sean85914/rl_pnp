@@ -79,6 +79,13 @@ add_executable(pc_transform src/pc_transform.cpp)
 add_dependencies(pc_transform visual_system_gencpp)
 target_link_libraries(pc_transform ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} helper)
 
+add_executable(combine_pc_node src/pc_transform_two_cams.cpp)
+add_dependencies(combine_pc_node visual_system_gencpp)
+target_link_libraries(combine_pc_node ${catkin_LIBRARIES})
+
+add_executable(two_cams_tf src/two_cams_tf.cpp)
+target_link_libraries(two_cams_tf ${catkin_LIBRARIES})
+
 add_library(charuco_detector SHARED src/charuco_detector.cpp)
 set_target_properties(charuco_detector PROPERTIES VERSION "1.0.0" SOVERSION "1")
 target_link_libraries(charuco_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
