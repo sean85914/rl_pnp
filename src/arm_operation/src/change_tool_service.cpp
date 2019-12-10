@@ -42,30 +42,39 @@ class ChangeToolService{
     pnh_.getParam("in_radian", in_radian);
     std::vector<double> arr;
     if(!pnh_.getParam("a_1", arr)){
+      ROS_ERROR("Can't get a_1, exit...");
       exit(EXIT_FAILURE);
     } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
     if(!pnh_.getParam("a_2", arr)){
+      ROS_ERROR("Can't get a_2, exit...");
       exit(EXIT_FAILURE);
     } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
     if(!pnh_.getParam("a_3", arr)){
+      ROS_ERROR("Can't get a_3, exit...");
       exit(EXIT_FAILURE);
     } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
     if(!pnh_.getParam("b_1", arr)){
+      ROS_ERROR("Can't get b_1, exit...");
       exit(EXIT_FAILURE);
     } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
     if(!pnh_.getParam("b_2", arr)){
+      ROS_ERROR("Can't get b_2, exit...");
       exit(EXIT_FAILURE);
     } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
     if(!pnh_.getParam("b_3", arr)){
+      ROS_ERROR("Can't get b_3, exit...");
       exit(EXIT_FAILURE);
     } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
     if(!pnh_.getParam("c_1", arr)){
+      ROS_ERROR("Can't get c_1, exit...");
       exit(EXIT_FAILURE);
     } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
     if(!pnh_.getParam("c_2", arr)){
+      ROS_ERROR("Can't get c_2, exit...");
       exit(EXIT_FAILURE);
     } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
     if(!pnh_.getParam("c_3", arr)){
+      ROS_ERROR("Can't get c_3, exit...");
       exit(EXIT_FAILURE);
     } joints_vector.push_back((in_radian?arr:deg2rad(arr)));
     printInfo();
