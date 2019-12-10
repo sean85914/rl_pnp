@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="visual_system" type="two_cams_tf" name="two_cams_tf">
+    <rosparam command="load" file="$(find visual_system)/config/static_tf_info.yaml"/>
+  </node>
+</launch>

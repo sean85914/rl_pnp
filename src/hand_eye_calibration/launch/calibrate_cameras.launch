@@ -1,0 +1,7 @@
+<launch>
+  <arg name="file_name" default="caemras_calibration"/>
+  <node pkg="hand_eye_calibration" type="cameras_calibration" name="cameras_calibration" output="screen">
+    <param name="tag_mount" value="10"/>
+    <param name="file_name" value="$(arg file_name)"/>
+  </node>
+</launch>

@@ -1,0 +1,10 @@
+<launch>
+  <arg name="cam1" default="camera1"/>
+  <arg name="cam2" default="camera2"/>
+  <include file="$(find visual_system)/launch/static_cams_tf.launch"/>
+  <node pkg="visual_system" type="combine_pc_node" name="combine_pc_node" output="screen" clear_params="true">
+    <rosparam command="load" file="$(find visual_system)/config/param_config.yaml"/>
+    <remap from="~cam1_pc" to="$(arg cam1)/depth_registered/points"/>
+    <remap from="~cam2_pc" to="$(arg cam2)/depth_registered/points"/>
+  </node>
+</launch>

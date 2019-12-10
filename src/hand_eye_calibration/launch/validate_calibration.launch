@@ -1,0 +1,9 @@
+<launch>
+  <include file="$(find visual_system)/launch/dual_cameras_charuco_detection.launch"/>
+  <node pkg="hand_eye_calibration" type="validate_charuco_data" name="validate_calibration" output="screen">
+    <remap from="~info1" to="/camera1/color/camera_info"/>
+    <remap from="~info2" to="/camera2/color/camera_info"/>
+    <remap from="~image1" to="/camera1/color/image_raw"/>
+    <remap from="~image2" to="/camera2/color/image_raw"/>
+  </node>
+</launch>
