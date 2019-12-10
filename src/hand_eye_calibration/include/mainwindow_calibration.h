@@ -71,6 +71,7 @@ private:
     DataPairArray data_pair_array;
     tf::Transform result_transform;
     void setupParams(void);
+    void setUIProperties(int);
     void callback(const sensor_msgs::ImageConstPtr&,
                   const sensor_msgs::CameraInfoConstPtr&);
 

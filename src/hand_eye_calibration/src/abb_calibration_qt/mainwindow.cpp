@@ -42,6 +42,7 @@ MainWindow::MainWindow(ros::NodeHandle nh, ros::NodeHandle pnh, QWidget *parent)
     get_robot_pose_server("/abb/robot_GetCartesian")
 {
     ui->setupUi(this);
+    ui->data_browser->setFontPointSize(8);
     setupParams();
     detector = CharucoDetector(row, col, num, bits, square_len, tag_len);
     connect(ui->record_button, SIGNAL(clicked()), SLOT(record_data(void)));
@@ -105,6 +106,21 @@ void MainWindow::setupParams(void){
     }
 }
 
+void MainWindow::setUIProperties(int height){
+    if(height!=ui->scene_view->height()){
+        // Original size
+        this->resize(1258, 751);
+        ui->scene_view->setGeometry(20, 20, 640, 480);
+        ui->record_button->setGeometry(1040, 20, 191, 81);
+        ui->compute_button->setGeometry(1040, 150, 191, 81);
+        ui->broadcast_button->setGeometry(1040, 290, 191, 81);
+        ui->empty_button->setGeometry(1040, 420, 191, 81);
+        ui->exit_button->setGeometry(1040, 640, 191, 81);
+        ui->textBrowser->setGeometry(20, 540, 1001, 181);
+        ui->data_browser->setGeometry(690, 20, 331, 481);
+    }
+}
+
 // SLOTS
 
 void MainWindow::record_data(void){
@@ -164,9 +180,9 @@ void MainWindow::record_data(void){
       std::string data_str = "["   + std::to_string(corner_point_hand.x) +
                              " ,"  + std::to_string(corner_point_hand.y) + 
                              " ,"  + std::to_string(corner_point_hand.z) + 
-                             "]: " + std::to_string(corner_point_eye.x)  + 
+                             "]: [" + std::to_string(corner_point_eye.x)  + 
                              " ,"  + std::to_string(corner_point_eye.y)  + 
-                             " ,"  + std::to_string(corner_point_eye.z)  + "\n";
+                             " ,"  + std::to_string(corner_point_eye.z)  + "]\n";
       ui->data_browser->append(QString::fromUtf8(data_str.c_str()));
     }
     ui->data_browser->append("=========================\n");
@@ -234,6 +250,11 @@ void MainWindow::exit_program(void){
 
 void MainWindow::callback(const sensor_msgs::ImageConstPtr      &image, 
                           const sensor_msgs::CameraInfoConstPtr &info){
+    if(first){
+        setUIProperties(info->height);
+        first = false;
+        return;
+    }
     camera_frame = info->header.frame_id;
     double fx = info->K[0],
            fy = info->K[4],
@@ -252,6 +273,7 @@ void MainWindow::callback(const sensor_msgs::ImageConstPtr      &image,
     cv::Mat draw_img;
     id_corner_map = detector.getCornersPosition(draw_img, rvec, tvec); // Position w.r.t color_optical_frame
     cv::cvtColor(draw_img, draw_img, CV_BGR2RGB);
+    //ui->scene_view->adjustSize();
     ui->scene_view->setPixmap(QPixmap::fromImage(QImage(draw_img.data, \
                                                         draw_img.cols, \
                                                         draw_img.rows, \
