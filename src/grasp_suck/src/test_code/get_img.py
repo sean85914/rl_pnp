@@ -11,9 +11,9 @@ from visual_system.srv import get_pc, get_pcRequest
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 import utils
 
-s = rospy.ServiceProxy("/pc_transform/get_pc", get_pc)
+s = rospy.ServiceProxy("/combine_pc_node/get_pc", get_pc)
 req = get_pcRequest()
-req.file_name = "/home/arg/sean/flip_object/src/grasp_suck/src/test.pcd"
+req.file_name = "/home/sean/Documents/flip_obj/src/grasp_suck/src/test.pcd"
 res = s(req)
 
 color, depth, points, msg = utils.get_heightmap(res.pc, "", 100)
