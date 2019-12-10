@@ -1,12 +1,13 @@
 <?xml version="1.0" ?>
 <launch>
   <arg name="high_res_mode" default="false"/>
-  <arg name="cam1_serial_no"  />
-  <arg name="cam2_serial_no"  />
+  <arg name="cam1_serial_no" default="746612070222"/>
+  <arg name="cam2_serial_no" default="740112071260" />
   <arg name="camera1" default="camera1"/>
   <arg name="cam1_tf_prefix" default="camera1"/>
   <arg name="camera2" default="camera2"/>
   <arg name="cam2_tf_prefix" default="camera2"/>
+  <arg name="enable_cam2" default="true"/>
   <!-- Turn on camera 1 -->
   <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
     <arg name="camera" value="$(arg camera1)"/>
@@ -20,15 +21,17 @@
     <arg name="color_height" value="720" if="$(arg high_res_mode)"/>
   </include>
   <!-- Turn on camera 2 -->
-  <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
-    <arg name="camera" value="$(arg camera2)"/>
-    <arg name="tf_prefix" value="$(arg cam2_tf_prefix)"/>
-    <arg name="serial_no" value="$(arg cam2_serial_no)"/>
-    <arg name="depth_width" value="1280" if="$(arg high_res_mode)"/>
-    <arg name="depth_height" value="720" if="$(arg high_res_mode)"/>
-    <arg name="infra_width" value="1280" if="$(arg high_res_mode)"/>
-    <arg name="infra_height" value="720" if="$(arg high_res_mode)"/>
-    <arg name="color_width" value="1280" if="$(arg high_res_mode)"/>
-    <arg name="color_height" value="720" if="$(arg high_res_mode)"/>
+  <group if="$(arg enable_cam2)">
+    <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
+      <arg name="camera" value="$(arg camera2)"/>
+      <arg name="tf_prefix" value="$(arg cam2_tf_prefix)"/>
+      <arg name="serial_no" value="$(arg cam2_serial_no)"/>
+      <arg name="depth_width" value="1280" if="$(arg high_res_mode)"/>
+      <arg name="depth_height" value="720" if="$(arg high_res_mode)"/>
+      <arg name="infra_width" value="1280" if="$(arg high_res_mode)"/>
+      <arg name="infra_height" value="720" if="$(arg high_res_mode)"/>
+      <arg name="color_width" value="1280" if="$(arg high_res_mode)"/>
+      <arg name="color_height" value="720" if="$(arg high_res_mode)"/>
     </include> 
+  </group>
 </launch>
