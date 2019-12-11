@@ -1,0 +1,22 @@
+<launch>
+  <arg name="initial_tool_id" default="-1"/>
+  <arg name="port" default="/dev/ttyUSB0"/>
+  <arg name="vacuum_thres" default="800"/>
+  <include file="$(find arm_operation)/launch/change_tool_service.launch"/>
+  <param name="curr_tool_id" value="$(arg initial_tool_id)"/>
+  <node pkg="arm_operation" type="agent_server_node" name="agent_server_node" output="screen" clear_params="true">
+    <rosparam param="tool_length">[0.05, 0.084, 0.15]</rosparam>
+    <rosparam param="service_name">["/change_tool_service/change_tool_service",
+                                    "/abb/GetCartesian",
+                                    "/abb/SetCartesian",
+                                    "/abb/GetJoints",
+                                    "/abb/SetJoints",
+                                    "/abb/SetZone",
+                                    "/abb/SetSpeed",
+                                    "/vacuum_pump_control_node/vacuum_control"]</rosparam>
+  </node>
+  <node pkg="vacuum_conveyor_control" type="vacuum_pump_control" name="vacuum_pump_control_node" output="screen">
+    <param name="port" value="$(arg port)"/>
+    <param name="vacuum_thres" value="$(arg vacuum_thres)"/>
+  </node>
+</launch>

@@ -1,0 +1,5 @@
+int16 tool_id # 1 2 3
+geometry_msgs/Point position # in meter
+float32 angle # in radian
+---
+string result

@@ -77,6 +77,7 @@ add_service_files(
   joint_pose.srv
   getTCPPose.srv
   change_tool.srv
+  agent_abb_action.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -274,3 +275,6 @@ target_link_libraries(ur3_ik_solver_ui ${catkin_LIBRARIES} ur3_kin)
 
 add_executable(change_tool_service src/change_tool_service.cpp)
 target_link_libraries(change_tool_service ${catkin_LIBRARIES})
+
+add_executable(agent_server_node src/agent_server.cpp)
+target_link_libraries(agent_server_node ${catkin_LIBRARIES})
