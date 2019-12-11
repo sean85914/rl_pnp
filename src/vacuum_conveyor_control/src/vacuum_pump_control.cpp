@@ -1,7 +1,6 @@
 #include <ros/ros.h>
 #include <serial/serial.h>
 // SRV
-#include <std_srvs/Empty.h>
 #include <std_srvs/SetBool.h>
 
 class ArduinoControl{
@@ -76,17 +75,21 @@ bool ArduinoControl::check_suck_success(std_srvs::SetBool::Request &req, std_srv
 }
 
 void ArduinoControl::checkParameterTimerCallback(const ros::TimerEvent& event){
-  int tmp; pnh_.getParam("vacuum_thres", tmp);
-  if(tmp!=vacuum_thres){
-    ROS_INFO("[%s] vacuum_thres changed from %d to %d", ros::this_node::getName().c_str(), vacuum_thres, tmp);
-    vacuum_thres = tmp;
+  int tmp; 
+  if(pnh_.getParam("vacuum_thres", tmp)){
+    if(tmp!=vacuum_thres){
+      ROS_INFO("[%s] vacuum_thres changed from %d to %d", ros::this_node::getName().c_str(), vacuum_thres, tmp);
+      vacuum_thres = tmp;
+    }
   }
-  bool tmp_bool; pnh_.getParam("is_upper", tmp_bool);
-  if(tmp_bool!=is_upper){
-    std::string first  = (is_upper?"upper":"lower"),
-                second = (tmp_bool?"upper":"lower");
-    ROS_INFO("[%s] Vacuum type changes from %s to %s", ros::this_node::getName().c_str(), first.c_str(), second.c_str());
-    is_upper = tmp_bool;
+  bool tmp_bool; 
+  if(pnh_.getParam("is_upper", tmp_bool)){
+    if(tmp_bool!=is_upper){
+      std::string first  = (is_upper?"upper":"lower"),
+                  second = (tmp_bool?"upper":"lower");
+      ROS_INFO("[%s] Vacuum type changes from %s to %s", ros::this_node::getName().c_str(), first.c_str(), second.c_str());
+      is_upper = tmp_bool;
+    }
   }
 }
 
