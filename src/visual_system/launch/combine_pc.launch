@@ -7,4 +7,5 @@
     <remap from="~cam1_pc" to="$(arg cam1)/depth_registered/points"/>
     <remap from="~cam2_pc" to="$(arg cam2)/depth_registered/points"/>
   </node>
+  <node pkg="visualization" type="viz_marker.py" name="viz_marker_node" output="screen"/>
 </launch>

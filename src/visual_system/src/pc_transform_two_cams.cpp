@@ -63,7 +63,7 @@ int main(int argc, char** argv)
   if(!pnh.getParam("z_upper", z_upper)) z_upper =  0.200f;
   if(!pnh.getParam("resolution", resolution)) resolution = 224;
   if(!pnh.getParam("factor", factor)) factor = 1.0f;
-  if(!pnh.getParam("empty_thres", empty_thres)) empty_thres = 1.0f;
+  if(!pnh.getParam("empty_thres", empty_thres)) empty_thres = 0.95f;
   if(!pnh.getParam("verbose", verbose)) verbose = false;
   if(!pnh.getParam("down_sample", down_sample)) down_sample = false;
   if(!pnh.getParam("use_two_cam", use_two_cam)) use_two_cam = true;
