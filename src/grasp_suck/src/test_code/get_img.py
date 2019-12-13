@@ -17,3 +17,4 @@ req.file_name = "/home/sean/Documents/flip_obj/src/grasp_suck/src/test.pcd"
 res = s(req)
 
 color, depth, points, msg = utils.get_heightmap(res.pc, "", 100)
+print points[160][160]

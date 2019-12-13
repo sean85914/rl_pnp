@@ -37,29 +37,32 @@ br = CvBridge()
                         |___/                                       
 '''
 
-def get_heightmap(pc, img_path, iteration):
-	color_heightmap = np.zeros((resolution, resolution, 3), dtype=np.uint8)
-	depth_heightmap = np.zeros((resolution, resolution))
-	points = np.zeros((resolution, resolution, 3)) 
-	gen = pc2.read_points(pc, skip_nans=True)
-	int_data = list(gen)
-	for p in int_data:
-		rgb = p[3]
-		s = struct.pack(">f", rgb)
+def unpack_rgb(rgb_uint32_list):
+	result = np.zeros((len(rgb_uint32_list), 3), dtype=np.uint8)
+	for n in range(len(rgb_uint32_list)):
+		s = struct.pack(">f", rgb_uint32_list[n])
 		i = struct.unpack(">l", s)[0]
 		pack = ctypes.c_uint32(i).value
 		r = (pack & 0x00FF0000) >> 16
 		g = (pack & 0x0000FF00) >> 8
 		b = (pack & 0x000000FF)
-		heightmap_x = np.floor((p[0]-workspace_limits[0][0])/heightmap_resolution).astype(int)
-		heightmap_y = np.floor((p[1]-workspace_limits[1][0])/heightmap_resolution).astype(int)
-		color_heightmap[heightmap_y, heightmap_x, 0] = b
-		color_heightmap[heightmap_y, heightmap_x, 1] = g
-		color_heightmap[heightmap_y, heightmap_x, 2] = r
-		depth_heightmap[heightmap_y, heightmap_x] = p[2]
-		points[heightmap_y, heightmap_x] = np.array([p[0], p[1], p[2]])
-	z_bot = workspace_limits[2][0]
-	depth_heightmap = depth_heightmap - z_bot
+		result[n][:] = b, g, r
+	return result
+
+def get_heightmap(pc, img_path, iteration):
+	color_heightmap = np.zeros((resolution, resolution, 3), dtype=np.uint8)
+	depth_heightmap = np.zeros((resolution, resolution))
+	points = np.zeros((resolution, resolution, 3)) 
+	gen = pc2.read_points(pc, skip_nans=False)
+	int_data = list(gen)
+	np_data = np.array(int_data); np_data = np_data.T
+	heightmap_x = np.floor((workspace_limits[0][1]-np_data[0])/heightmap_resolution).astype(int)
+	heightmap_y = np.floor((workspace_limits[1][1]-np_data[1])/heightmap_resolution).astype(int)
+	rgb         = unpack_rgb(np_data[3])
+	color_heightmap[heightmap_x, heightmap_y, :] = rgb
+	depth_heightmap[heightmap_x, heightmap_y] = np_data[2]
+	points[heightmap_x, heightmap_y] = np_data[:3].T
+	depth_heightmap = depth_heightmap - workspace_limits[2][0]
 	depth_heightmap[depth_heightmap<0] = 0
 	depth_img = np.copy(depth_heightmap)
 	depth_img = (depth_img*1000).astype(np.uint16)
