@@ -37,18 +37,14 @@ class Trainer(object):
 		self.criterion = torch.nn.SmoothL1Loss(reduce = False)
 		if self.use_cuda:
 			self.criterion = self.criterion.cuda()
-		# Set model to train moed
+		# Set model to train mode
 		self.behavior_net.train()
 		self.target_net.train()
 		
 		# Initialize optimizer
 		self.optimizer = torch.optim.SGD(self.behavior_net.parameters(), lr = learning_rate, momentum = 0.9, weight_decay = 2e-5)
 	
-	# Copy network from behavior to target
-	def copyNetwork(self):
-		self.target_net = copy.deepcopy(self.behavior_net)
-		
-	# Forward pass through image, get Q value nad features
+	# Forward pass through image, get Q value and features
 	def forward(self, color_img, depth_img, is_volatile = False, network = "behavior"):
 		# Preprocessing
 		# Zoom 2X
@@ -71,8 +67,8 @@ class Trainer(object):
 		for c in range(3):
 			input_color_img[:, :, c] = (input_color_img[:, :, c] - image_mean[c]) / image_std[c]
 		# Normalize depth image
-		depth_mean = 0.01
-		depth_std  = 0.005
+		depth_mean = 0.07
+		depth_std  = 0.0005
 		tmp = depth_img_2x.astype(float)
 		tmp = (tmp-depth_mean)/depth_std
 		# Duplicate channel to DDD
@@ -93,13 +89,14 @@ class Trainer(object):
 		
 		output_prob = output_prob[0].cpu().detach().numpy()
 		return output_prob, state_feat
-	def get_label_value(self, valid_action, is_success, next_color, next_depth, is_empty):
+	def get_label_value(self, reward, next_color, next_depth, is_empty):
 		# Compute current reward
-		current_reward = 0.0
-		if is_success:
+		current_reward = reward
+		'''if is_success:
 			current_reward = self.reward
 		elif not valid_action:
 			current_reward = -self.reward # Penalty
+		'''
 		# Compute TD target
 		''' 
 		Double DQN 
@@ -116,13 +113,13 @@ class Trainer(object):
 		
 		del next_prediction, next_state_feat
 		
-		return td_target, current_reward
+		return td_target
 		
 	def backprop(self, color_img, depth_img, action_pix_idx, label_value):
 		label = np.zeros((1, 320, 320))
-		label[0, action_pix_idx[0], action_pix_idx[1]] = label_value
+		label[0, action_pix_idx[1], action_pix_idx[2]] = label_value
 		label_weight = np.zeros((1, 320, 320))
-		label_weight[0, action_pix_idx[0], action_pix_idx[1]] = 1
+		label_weight[0, action_pix_idx[1], action_pix_idx[2]] = 1
 		
 		self.optimizer.zero_grad()
 		loss_value = 0.0
