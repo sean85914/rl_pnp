@@ -16,18 +16,18 @@ class reinforcement_net(nn.Module):
 		# Initialize Densenet pretrained on ImageNet
 		self.color_feat_extractor = torchvision.models.densenet.densenet121(pretrained = True)
 		self.depth_feat_extractor = torchvision.models.densenet.densenet121(pretrained = True)
+		# We don't need there fully connected layers
+		del self.color_feat_extractor.classifier, self.depth_feat_extractor.classifier
 		
 		self.primitive_net = nn.Sequential(OrderedDict([
-		  ('suck-norm0', nn.BatchNorm2d(2048)),
-		  ('suck-relu0', nn.ReLU(inplace = True)),
 		  ('suck-conv0', nn.Conv2d(2048, 64, kernel_size = 1, stride = 1, bias = True)),
+		  ('suck-relu0', nn.ReLU(inplace = True)),
+		  ('suck-norm0', nn.BatchNorm2d(64)),
 		  ('suck-upsample0', nn.Upsample(scale_factor = 4, mode = "bilinear")),
-		  ('suck-norm1', nn.BatchNorm2d(64)),
-		  ("suck-relu1", nn.ReLU(inplace = True)),
 		  ("suck-conv1", nn.Conv2d(64, 1, kernel_size = 1, stride = 1, bias = True)),
-		  ("suck-upsample1", nn.Upsample(scale_factor = 4, mode="bilinear")),
-		  ("suck-relu2", nn.ReLU(inplace = True)),
-		  ("suck-norm2", nn.BatchNorm2d(1))
+		  ("suck-relu1", nn.ReLU(inplace = True)),
+		  ('suck-norm1', nn.BatchNorm2d(1)),
+		  ("suck-upsample1", nn.Upsample(scale_factor = 4, mode="bilinear"))
 		]))
 		
 		# Initialize network weights
