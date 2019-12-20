@@ -28,6 +28,7 @@ class AgentServer{
   const double tool_head_length = 0.555f; // Length of spear tool head, roughly measured
   std::vector<double> tool_length; // Length of three tool, from parameter server
   std::vector<double> home_joints; // Joints for home pose
+  std::vector<double> middle_joints; // Middle joint for placing
   std::vector<double> place_joints; // Joints for placing pose
   std::vector<std::string> service_name_vec;
   ros::NodeHandle nh_, pnh_;
@@ -55,6 +56,7 @@ class AgentServer{
   AgentServer(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
     tool_length.resize(3);
     home_joints.resize(6);
+    middle_joints.resize(6);
     place_joints.resize(6);
     service_name_vec.resize(8);
     setupParams();
@@ -105,6 +107,13 @@ void AgentServer::setupParams(void){
   }else{
     ROS_INFO("Home joints: [%f, %f, %f, %f, %f, %f]", home_joints[0], home_joints[1], home_joints[2], home_joints[3], home_joints[4], home_joints[5]);
   }
+  if(!pnh_.getParam("middle_joints", middle_joints)){
+    ROS_ERROR("No middle joints provided, exit...");
+    ros::shutdown();
+    exit(EXIT_FAILURE);
+  }else{
+    ROS_INFO("Middle joints: [%f, %f, %f, %f, %f, %f]", middle_joints[0], middle_joints[1], middle_joints[2], middle_joints[3], middle_joints[4], middle_joints[5]);
+  }
   if(!pnh_.getParam("place_joints", place_joints)){
     ROS_ERROR("No place joints provided, exit...");
     ros::shutdown();
@@ -115,7 +124,7 @@ void AgentServer::setupParams(void){
 }
 
 void AgentServer::getInitialToolID(void){
-  ROS_INFO("No current_tool_id parameter set, please input the ID: (-1, 1, 2, 3)");
+  ROS_INFO("\033[1;31mNo current_tool_id parameter set, please input the ID: (-1, 1, 2, 3)\033[0m");
   bool valid_input = false;
   do{
     std::cin >> curr_tool_id;
@@ -127,7 +136,7 @@ void AgentServer::getInitialToolID(void){
     else{
       ROS_WARN("Invalid number, please input again");
     }
-  } while(!valid_input);
+  } while(!valid_input and ros::ok());
 }
 
 void AgentServer::setupServiceClients(void){
@@ -172,13 +181,27 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   set_cartesian.request.cartesian.resize(3); set_cartesian.request.quaternion.resize(4);
   setTargetPose(set_cartesian, target_ee_position, quat);
   set_cartesian_client.call(set_cartesian);
+  ros::Duration(0.5).sleep();
   // Turn on vacuum suction
   std_srvs::SetBool bool_data; bool_data.request.data = true;
   vacuum_control_client.call(bool_data);
+  // Set zone to fine
+  abb_node::robot_SetZone set_zone;
+  set_zone.request.mode = 0;
+  set_zone_client.call(set_zone);
   // Go to target, downward 2 cm
   target_ee_position.z -= 0.22;
   setTargetPose(set_cartesian, target_ee_position, quat);
   set_cartesian_client.call(set_cartesian);
+  ros::Duration(0.5).sleep();
+  // Set zone to z0
+  set_zone.request.mode = 1;
+  set_zone_client.call(set_zone);
+  // Go to first waypoint
+  target_ee_position.z += 0.22;
+  setTargetPose(set_cartesian, target_ee_position, quat);
+  set_cartesian_client.call(set_cartesian);
+  ros::Duration(0.5).sleep();
   // Go back to original pose
   geometry_msgs::Point original_position;
   original_position.x = get_cartesian.response.x/1000.0;
@@ -206,18 +229,37 @@ bool AgentServer::homeCB(std_srvs::Empty::Request&,
 bool AgentServer::placeCB(std_srvs::Empty::Request&,
                          std_srvs::Empty::Response&){
   ros::Time ts = ros::Time::now();
+  abb_node::robot_SetZone set_zone;
+  abb_node::robot_SetSpeed set_speed;
+  // Set zone to z_10, speed to (300, 100)
+  set_speed.request.tcp = 300.0f;
+  set_speed.request.ori = 100.0f;
+  set_zone.request.mode = 4; // z_10
+  set_zone_client.call(set_zone);
+  set_speed_client.call(set_speed);
   abb_node::robot_SetJoints set_joints;
   set_joints.request.position.resize(6);
-  // First, go to place joints
+  // First, go to middle joints
+  set_joints.request.position.assign(middle_joints.begin(), middle_joints.end());
+  set_joints_client.call(set_joints);
+  // Second, go to place joints
   set_joints.request.position.assign(place_joints.begin(), place_joints.end());
   set_joints_client.call(set_joints);
+  ros::Duration(0.5).sleep();
   // Then turn off suction
   std_srvs::SetBool bool_data;
   bool_data.request.data = false;
   vacuum_control_client.call(bool_data);
+  // Set zone to z_0
+  set_zone.request.mode = 1;
+  set_zone_client.call(set_zone);
   // And then go back
   set_joints.request.position.assign(home_joints.begin(), home_joints.end());
   set_joints_client.call(set_joints);
+  // Speed to original one
+  set_speed.request.tcp = 200.0f;
+  set_speed.request.ori = 100.0f;
+  set_speed_client.call(set_speed);
   ROS_INFO("Go place takes %f seconds", (ros::Time::now()-ts).toSec());
   return true;
 }
