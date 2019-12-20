@@ -1,3 +1,5 @@
+#include <thread> // std::thread
+#include <mutex> // std::mutex
 #include <fstream>
 #include <boost/filesystem.hpp>
 #include <ros/ros.h>
@@ -9,10 +11,12 @@
 #include <pcl/io/pcd_io.h> // pcl::io::savePCDFileASCII, pcl::io::savePCDFileBinary
 #include <pcl/point_types.h> // pcl::PointXYZ
 #include <pcl/filters/passthrough.h> // pcl::passThrough
+#include <pcl/filters/conditional_removal.h> // pcl::ConditionalRemoval
 #include <pcl/common/transforms.h> // pcl::transformPointCloud
 #include <pcl/sample_consensus/method_types.h> // pcl::SAC_RANSAC
 #include <pcl/sample_consensus/model_types.h> // pcl::SACMODEL_PLANE
 #include <pcl/segmentation/sac_segmentation.h> // pcl::SACSegmentation
+#include <pcl_ros/impl/transforms.hpp> // pcl_ros::transformPointCloud
 // SRV
 #include <std_srvs/SetBool.h>
 #include <visual_system/get_pc.h>
@@ -28,6 +32,7 @@ bool verbose; // If save point cloud as pcd
 bool use_two_cam; // If enable camera2
 bool down_sample; // If downsampling
 int resolution; // Heightmap resolution
+const int thread_num = 16; // Number of threads
 double factor; // Voxel grid factor
 double empty_thres; // Threshold rate for determining if the bin is empty
 double x_lower; // X lower bound, in hand coord.
@@ -38,16 +43,21 @@ double z_lower; // Z lower bound, in hand coord.
 double z_upper; // Z upper bound, in hand coord.
 std::string cam1_name, cam2_name; // Camera prefix
 std::string node_ns; // Node namespace
-Eigen::Matrix4f arm2cam1_tf, arm2cam2_tf;
+std::mutex mtx; // Mutex lock for threading
+tf::Transform arm2cam1, arm2cam2;
 pcl::PointCloud<pcl::PointXYZRGB> pc_cam1, pc_cam2;
+std::vector<pcl::PointCloud<pcl::PointXYZRGB>> global_vec; // Pointcloud placeholder for threading
 pcl::VoxelGrid<pcl::PointXYZRGB> vg;
-pcl::PassThrough<pcl::PointXYZRGB> pass_x, pass_y, pass_z;
-Eigen::Matrix4f lookup_transform(std::string target_frame);
+pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond;
+pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem;
+void lookup_transform(std::string target_frame);
+ros::Publisher pub_pc; // Publish plane pointcloud for debuging
 void callback(const sensor_msgs::PointCloud2::ConstPtr);
 bool callback_get_pc(visual_system::get_pc::Request &req,
                      visual_system::get_pc::Response &res);
 bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::pc_is_empty::Response &res);
 void check_param_cb(const ros::TimerEvent&);
+void workers(int id, pcl::PointCloud<pcl::PointXYZRGB> sub_pc); // Thread target
 
 int main(int argc, char** argv)
 {
@@ -69,21 +79,31 @@ int main(int argc, char** argv)
   if(!pnh.getParam("use_two_cam", use_two_cam)) use_two_cam = true;
   if(!pnh.getParam("cam1_name", cam1_name)) cam1_name = "camera1";
   if(!pnh.getParam("cam2_name", cam2_name)) cam2_name = "camera2";
-  arm2cam1_tf = lookup_transform(cam1_name+"_color_optical_frame");
+  lookup_transform(cam1_name+"_color_optical_frame");
   if(verbose)
     ROS_WARN("Save pointcloud for debuging");
   else
     ROS_WARN("Not save pointcloud");
-  if(use_two_cam) arm2cam2_tf = lookup_transform(cam2_name+"_color_optical_frame");
+  global_vec.resize(thread_num*(use_two_cam?2:1));
+  if(use_two_cam) lookup_transform(cam2_name+"_color_optical_frame");
   if(down_sample) 
     vg.setLeafSize((x_upper-x_lower)/resolution/factor, (x_upper-x_lower)/resolution/factor, (x_upper-x_lower)/resolution/factor);
-  // Setup pass through filter
-  pass_x.setFilterFieldName("x");
-  pass_x.setFilterLimits(x_lower, x_upper);
-  pass_y.setFilterFieldName("y");
-  pass_y.setFilterLimits(y_lower, y_upper);
-  pass_z.setFilterFieldName("z");
-  pass_z.setFilterLimits(z_lower, z_upper);
+  // Setup conditions
+  range_cond = pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr (new pcl::ConditionAnd<pcl::PointXYZRGB> ());
+  range_cond->addComparison (pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new
+      pcl::FieldComparison<pcl::PointXYZRGB> ("x", pcl::ComparisonOps::GT, x_lower)));
+  range_cond->addComparison (pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new
+      pcl::FieldComparison<pcl::PointXYZRGB> ("x", pcl::ComparisonOps::LT, x_upper)));
+  range_cond->addComparison (pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new
+      pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::GT, y_lower)));
+  range_cond->addComparison (pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new
+      pcl::FieldComparison<pcl::PointXYZRGB> ("y", pcl::ComparisonOps::LT, y_upper)));
+  range_cond->addComparison (pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new
+      pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::GT, z_lower)));
+  range_cond->addComparison (pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new
+      pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, z_upper)));
+  condrem.setCondition(range_cond);
+  pub_pc = pnh.advertise<sensor_msgs::PointCloud2>("plane_pc", 1);
   // Setup subscribers
   ros::Subscriber sub_cam1_pc = pnh.subscribe("cam1_pc", 1, callback),
                   sub_cam2_pc = pnh.subscribe("cam2_pc", 1, callback);
@@ -100,24 +120,23 @@ int main(int argc, char** argv)
   return 0;
 }
 
-Eigen::Matrix4f lookup_transform(std::string target_frame){
+void lookup_transform(std::string target_frame){
   Eigen::Matrix4f eigen_mat = Eigen::Matrix4f::Identity();
   tf::TransformListener listener;
   tf::StampedTransform stf;
   try{
     listener.waitForTransform("base_link", target_frame, ros::Time(0), ros::Duration(1.0));
     listener.lookupTransform("base_link", target_frame, ros::Time(0), stf);
+    if(target_frame=="camera1_color_optical_frame"){
+      arm2cam1 = tf::Transform(stf.getRotation(), stf.getOrigin());
+    } else{
+      arm2cam2 = tf::Transform(stf.getRotation(), stf.getOrigin());
+    }
   } catch(tf::TransformException ex){
     ROS_ERROR("%s", ex.what());
     ROS_ERROR("Can't get transformation, shutdown...");
     ros::shutdown();
   }
-  tf::Matrix3x3 tf_mat(stf.getRotation());
-  eigen_mat(0, 0) = tf_mat[0].getX(); eigen_mat(1, 0) = tf_mat[1].getX(); eigen_mat(2, 0) = tf_mat[2].getX(); 
-  eigen_mat(0, 1) = tf_mat[0].getY(); eigen_mat(1, 1) = tf_mat[1].getY(); eigen_mat(2, 1) = tf_mat[2].getY(); 
-  eigen_mat(0, 2) = tf_mat[0].getZ(); eigen_mat(1, 2) = tf_mat[1].getZ(); eigen_mat(2, 2) = tf_mat[2].getZ(); 
-  eigen_mat(0, 3) = stf.getOrigin().getX(); eigen_mat(1, 3) = stf.getOrigin().getY(); eigen_mat(2, 3) = stf.getOrigin().getZ(); 
-  return eigen_mat;
 }
 
 void callback(const sensor_msgs::PointCloud2::ConstPtr msg){
@@ -137,7 +156,7 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
   seg.setOptimizeCoefficients(true);
   seg.setModelType(pcl::SACMODEL_PLANE);
   seg.setMethodType(pcl::SAC_RANSAC);
-  seg.setDistanceThreshold(0.02);
+  seg.setDistanceThreshold(0.005f);
   pcl::PointCloud<pcl::PointXYZRGB> pc;
   pcl::fromROSMsg(req.input_pc, pc);
   seg.setInputCloud(pc.makeShared());
@@ -147,6 +166,11 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
   if(ratio>=empty_thres){
     res.is_empty.data = true;
   } else res.is_empty.data = false;
+  sensor_msgs::PointCloud2 pc_out;
+  pcl::PointCloud<pcl::PointXYZRGB> plane_pc(pc, inliers->indices);
+  pcl::toROSMsg(plane_pc, pc_out);
+  pc_out.header.frame_id = "base_link";
+  pub_pc.publish(pc_out);
   return true;
 }
 
@@ -154,21 +178,38 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
                      visual_system::get_pc::Response &res)
 {
   ros::Time ts = ros::Time::now();
-  // Transform points to hand coordinate
-  pcl::PointCloud<pcl::PointXYZRGB> pc_in_range, pc_cam1_transformed, pc_cam2_transformed;
-  pcl::transformPointCloud(pc_cam1, pc_cam1_transformed, arm2cam1_tf);
-  pcl::transformPointCloud(pc_cam2, pc_cam2_transformed, arm2cam2_tf);
-  pc_in_range = pc_cam1_transformed + pc_cam2_transformed;
-  // Pass through XYZ
-  pass_x.setInputCloud(pc_in_range.makeShared());
-  pass_x.filter(pc_in_range);
-  pass_y.setInputCloud(pc_in_range.makeShared());
-  pass_y.filter(pc_in_range);
-  pass_z.setInputCloud(pc_in_range.makeShared());
-  pass_z.filter(pc_in_range);
+  // Downsample if necessary
+  pcl::PointCloud<pcl::PointXYZRGB> pc_cam1_vg, pc_cam2_vg;
   if(down_sample){
-    vg.setInputCloud(pc_in_range.makeShared());
-    vg.filter(pc_in_range);
+    vg.setInputCloud(pc_cam1.makeShared());
+    vg.filter(pc_cam1_vg);
+    if(use_two_cam){
+      vg.setInputCloud(pc_cam2.makeShared());
+      vg.filter(pc_cam2_vg);
+    }
+  }else{
+    pc_cam1_vg = pc_cam1;
+    pc_cam2_vg = pc_cam2;
+  }
+  std::thread thread_arr[thread_num*(use_two_cam?2:1)];
+  for(int i=0; i<thread_num; ++i){
+    std::vector<int> indices;
+    int size = pc_cam1_vg.points.size();
+    for(int j=size/thread_num*i; j<size/thread_num*(i+1); ++j){
+      indices.push_back(j);
+    }
+    pcl::PointCloud<pcl::PointXYZRGB> sub_pc(pc_cam1_vg, indices);
+    thread_arr[i] = std::thread(workers, i, sub_pc);
+    if(use_two_cam){
+      pcl::PointCloud<pcl::PointXYZRGB> sub_pc_2(pc_cam2_vg, indices);
+      thread_arr[thread_num+i] = std::thread(workers, thread_num+i, sub_pc);
+    }
+  }
+  pcl::PointCloud<pcl::PointXYZRGB> pc_in_range;
+  for(int i=0; i<thread_num*(use_two_cam?2:1); ++i){
+    thread_arr[i].join();
+    if(global_vec[i].size()>0)
+      pc_in_range += global_vec[i];
   }
   sensor_msgs::PointCloud2 pc2;
   pcl::toROSMsg(pc_in_range, pc2);
@@ -207,4 +248,15 @@ void check_param_cb(const ros::TimerEvent& event){
       empty_thres = tmp;
     }
   }
+}
+
+void workers(int id, pcl::PointCloud<pcl::PointXYZRGB> sub_pc){
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr transform (new pcl::PointCloud<pcl::PointXYZRGB>);
+  // Transform pointcloud
+  pcl_ros::transformPointCloud(sub_pc, *transform, arm2cam1);
+  mtx.lock();
+  // Using conditional removal to filter points and placing into placeholder
+  condrem.setInputCloud(transform);
+  condrem.filter(global_vec[id]);
+  mtx.unlock();
 }
