@@ -1,8 +1,10 @@
 import numpy as np
 import yaml
 import cv2
+import time
 import struct
 import ctypes
+import multiprocessing as mp
 from cv_bridge import CvBridge, CvBridgeError
 import sensor_msgs.point_cloud2 as pc2
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse
@@ -37,16 +39,41 @@ br = CvBridge()
                         |___/                                       
 '''
 
-def unpack_rgb(rgb_uint32_list):
-	result = np.zeros((len(rgb_uint32_list), 3), dtype=np.uint8)
-	for n in range(len(rgb_uint32_list)):
-		s = struct.pack(">f", rgb_uint32_list[n])
+def workers(id, data_list, out_q):
+	outdict = {}
+	counter = 0
+	result_arr = np.zeros((len(data_list), 3), dtype=np.uint8)
+	for data in data_list:
+		s = struct.pack(">f", data)
 		i = struct.unpack(">l", s)[0]
 		pack = ctypes.c_uint32(i).value
 		r = (pack & 0x00FF0000) >> 16
 		g = (pack & 0x0000FF00) >> 8
 		b = (pack & 0x000000FF)
-		result[n][:] = b, g, r
+		result_arr[counter][:] = b, g, r
+		counter += 1
+	outdict[id] = result_arr
+	out_q.put(outdict)
+
+def unpack_rgb(rgb_uint32_list):
+	result = np.zeros((len(rgb_uint32_list), 3), dtype=np.uint8)
+	out_q = mp.Queue()
+	process = []
+	process_num = 16
+	mount = len(rgb_uint32_list)/float(process_num)
+	for i in range(process_num):
+		p = mp.Process(target=workers, \
+		               args=(i, \
+		                     rgb_uint32_list[int(mount*i):int(mount*(i+1))], \
+		                     out_q))
+		process.append(p)
+		p.start()
+	for i in range(process_num):
+		temp = out_q.get()
+		for key in temp:
+			result[int(mount*key):int(mount*(key+1))][:] = temp[key][:]
+	for p in process:
+		p.join()
 	return result
 
 def get_heightmap(pc, img_path, iteration):
@@ -59,11 +86,13 @@ def get_heightmap(pc, img_path, iteration):
 	heightmap_x = np.floor((workspace_limits[0][1]-np_data[0])/heightmap_resolution).astype(int)
 	heightmap_y = np.floor((workspace_limits[1][1]-np_data[1])/heightmap_resolution).astype(int)
 	rgb         = unpack_rgb(np_data[3])
+	heightmap_x[heightmap_x>=resolution] = resolution-1
+	heightmap_y[heightmap_y>=resolution] = resolution-1
 	color_heightmap[heightmap_x, heightmap_y, :] = rgb
 	depth_heightmap[heightmap_x, heightmap_y] = np_data[2]
 	points[heightmap_x, heightmap_y] = np_data[:3].T
 	depth_heightmap = depth_heightmap - workspace_limits[2][0]
-	depth_heightmap[depth_heightmap<0] = 0
+	depth_heightmap[depth_heightmap==-workspace_limits[2][0]] = 0
 	depth_img = np.copy(depth_heightmap)
 	depth_img = (depth_img*1000).astype(np.uint16)
 	depth_img_msg = br.cv2_to_imgmsg(depth_img)
