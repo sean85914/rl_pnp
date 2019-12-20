@@ -232,7 +232,7 @@ def getLoggerPath(testing, root_path, episode):
 			os.makedirs(path)
 	return csv_path, image_path, depth_path, mixed_path, feat_path, pc_path, model_path, vis_path, diff_path
 
-def saveFiles(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, path):
+def saveFiles(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path):
 	np.savetxt(path+"action_primitive.csv", action_list, delimiter=",")
 	np.savetxt(path+"action_target.csv", target_list, delimiter=",")
 	np.savetxt(path+"action_result.csv", result_list, delimiter=",")
@@ -240,6 +240,7 @@ def saveFiles(action_list, target_list, result_list, loss_list, explore_list, re
 	np.savetxt(path+"explore.csv", explore_list, delimiter=",")
 	np.savetxt(path+"return.csv", return_list, delimiter=",")
 	np.savetxt(path+"episode.csv", episode_list, delimiter=",")
+	np.savetxt(path+"position.csv", position_list, delimiter=",")
 
 def check_if_valid(position):
 	if (position[0] > x_lower and position[0] < x_upper) and \
