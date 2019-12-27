@@ -4,6 +4,8 @@
 #include <abb_node/robot_SetCartesian.h>
 #include <abb_node/robot_GetJoints.h>
 #include <abb_node/robot_GetCartesian.h>
+#include <abb_node/robot_SetSpeed.h>
+#include <abb_node/robot_SetZone.h>
 #include <arm_operation/change_tool.h>
 
 inline std::vector<double> deg2rad(const std::vector<double> in){
@@ -29,7 +31,9 @@ class ChangeToolService{
   ros::ServiceClient getCartesian,
                      getJoints,
                      setCartesian,
-                     setJoints;
+                     setJoints,
+                     setSpeed,
+                     setZone;
   void printInfo(void){
     for(auto x: joints_vector){
       for(auto data: x){
@@ -100,7 +104,16 @@ class ChangeToolService{
     abb_node::robot_SetJoints set_joints_srv;
     abb_node::robot_GetCartesian get_cartesian_srv;
     abb_node::robot_SetCartesian set_cartesian_srv;
+    abb_node::robot_SetSpeed set_speed_srv;
+    abb_node::robot_SetZone set_zone_srv;
     set_joints_srv.request.position.resize(6); // Seg. fault if not resize to correct size  
+    // Set zone to Z1
+    set_zone_srv.request.mode = 2;
+    setZone.call(set_zone_srv);
+    // Set speed to (400, 150)
+    set_speed_srv.request.tcp = 400.0f;
+    set_speed_srv.request.ori = 150.0f;
+    setSpeed.call(set_speed_srv);
     // Get current joints and put it into buffer
     getJoints.call(get_joints_srv);
     std::vector<double> original_pose{get_joints_srv.response.j1, 
@@ -137,6 +150,13 @@ class ChangeToolService{
     std::copy(original_pose.begin(), original_pose.end(), set_joints_srv.request.position.begin());
     setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
     res.result = "success";
+    // Set speed back to (200, 100)
+    set_speed_srv.request.tcp = 200.0f;
+    set_speed_srv.request.ori = 100.0f;
+    setSpeed.call(set_speed_srv);
+    // Set zone back to Z0
+    set_zone_srv.request.mode = 1;
+    setZone.call(set_zone_srv);
     double time_response = (ros::Time::now()-ts).toSec();
     ROS_INFO("Service response complete, takes %f seconds", time_response);
     return true;
@@ -148,7 +168,9 @@ class ChangeToolService{
     std::vector<std::string> service_name{"/abb/GetCartesian",
                                           "/abb/GetJoints",
                                           "/abb/SetCartesian",
-                                          "/abb/SetJoints"};
+                                          "/abb/SetJoints",
+                                          "/abb/SetSpeed",
+                                          "/abb/SetZone"};
     for(auto name: service_name){
       while(!ros::service::waitForService(name, ros::Duration(3.0)) and ros::ok()){
         ROS_WARN("Waiting for service: %s", name.c_str());
@@ -158,6 +180,8 @@ class ChangeToolService{
     getJoints = nh_.serviceClient<abb_node::robot_GetJoints>(service_name[1]);
     setCartesian = nh_.serviceClient<abb_node::robot_SetCartesian>(service_name[2]);
     setJoints = nh_.serviceClient<abb_node::robot_SetJoints>(service_name[3]);
+    setSpeed = nh_.serviceClient<abb_node::robot_SetSpeed>(service_name[4]);
+    setZone = nh_.serviceClient<abb_node::robot_SetZone>(service_name[5]);
   }
 };
 
