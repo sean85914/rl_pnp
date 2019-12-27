@@ -1,5 +1,5 @@
 <launch>
-  <arg name="port" default="/dev/ttyUSB0"/>
+  <arg name="port" default="/dev/ttyvacuum"/>
   <arg name="vacuum_thres" default="560"/>
   <include file="$(find arm_operation)/launch/change_tool_service.launch"/>
   <node pkg="arm_operation" type="agent_server_node" name="agent_server_node" output="screen" clear_params="true">
