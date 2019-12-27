@@ -184,7 +184,7 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   ros::Duration(0.5).sleep();
   // Turn on vacuum suction
   std_srvs::SetBool bool_data; bool_data.request.data = true;
-  vacuum_control_client.call(bool_data);
+  if(req.tool_id!=1) vacuum_control_client.call(bool_data);
   // Set zone to fine
   abb_node::robot_SetZone set_zone;
   set_zone.request.mode = 0;
@@ -193,6 +193,8 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   target_ee_position.z -= 0.22;
   setTargetPose(set_cartesian, target_ee_position, quat);
   set_cartesian_client.call(set_cartesian);
+  // Grasp when gripper reach the target
+  if(req.tool_id==1) vacuum_control_client.call(bool_data);
   ros::Duration(0.5).sleep();
   // Set zone to z0
   set_zone.request.mode = 1;
