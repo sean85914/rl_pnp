@@ -25,9 +25,11 @@ def service_cb(req):
 	else: # SUCK
 		marker.color.r = marker.color.a = 1.0 # RED for sucking
 	text_marker.color.r = text_marker.color.g = text_marker.color.b = text_marker.color.a = 1.0
-	if req.primitive and req.valid: # SUCK
-		text_marker.text = "suck"
-	elif not req.primitive and req.valid: # GRASP
+	if req.primitive == 0 and req.valid: # suck 1
+		text_marker.text = "suck_1"
+	elif req.primitive == 1 and req.valid: # suck 2
+		text_marker.text = "suck_2"
+	elif req.primitive == 2 and req.valid: # GRASP
 		angle = round(req.angle * 180 / pi)
 		text_marker.text = "grasp, " + str(angle)
 	elif not req.valid: # INVALID

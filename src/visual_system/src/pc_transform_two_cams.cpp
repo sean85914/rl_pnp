@@ -230,7 +230,6 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
       create_directories(p);
     pcl::io::savePCDFileBinary(pc_name, pc_in_range);
   }
-  ROS_INFO("Done, %d points in range, spent %f seconds to process", (int)pc_in_range.size(), (ros::Time::now()-ts).toSec());
   return true;
 }
 
