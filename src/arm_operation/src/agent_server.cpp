@@ -158,6 +158,10 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
     res.result = "Invalid ID given";
     return true;
   }
+  abb_node::robot_SetJoints set_joints;
+  set_joints.request.position.resize(6);
+  set_joints.request.position.assign(home_joints.begin(), home_joints.end());
+  set_joints_client.call(set_joints);
   if(curr_tool_id!=req.tool_id){
     // Change tool
     arm_operation::change_tool change_tool_req;
@@ -167,15 +171,19 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
     curr_tool_id = req.tool_id;
     nh_.setParam("curr_tool_id", curr_tool_id);
   }
-  tf::Quaternion quat(0.0, 1.0, 0.0, 0.0), // [-1, 0, 0; 0, 1, 0; 0, 0, -1]
+  // Get current pose and store it into buffer
+  abb_node::robot_GetCartesian get_cartesian;
+  get_cartesian_client.call(get_cartesian);
+  double qx = get_cartesian.response.qx,
+         qy = get_cartesian.response.qy,
+         qz = get_cartesian.response.qz,
+         qw = get_cartesian.response.q0;
+  tf::Quaternion quat(qx, qy, qz, qw), // Current orientation
                  quat_compensate;
   quat_compensate.setRPY(0.0, 0.0, req.angle);
   quat *= quat_compensate;
   geometry_msgs::Point target_ee_position(req.position);
   target_ee_position.z += (tool_length[req.tool_id-1] + tool_head_length + 0.2);
-  // Get current pose and store it into buffer
-  abb_node::robot_GetCartesian get_cartesian;
-  get_cartesian_client.call(get_cartesian);
   // Go to first waypoint, 20 cm above target position
   abb_node::robot_SetCartesian set_cartesian;
   set_cartesian.request.cartesian.resize(3); set_cartesian.request.quaternion.resize(4);
