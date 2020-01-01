@@ -1,3 +1,3 @@
-{down_sample: false, empty_thres: 0.975, factor: 0.75, resolution: 224, use_two_cam: false,
-  verbose: true, x_lower: 0.72, x_upper: 1.02, y_lower: -0.54, y_upper: -0.24, z_lower: -0.1,
-  z_upper: 0.2}
+{down_sample: false, empty_thres: 0.975, factor: 0.75, resolution: 224, success_thres: 0.1,
+  use_two_cam: false, verbose: true, x_lower: 0.72, x_upper: 1.02, y_lower: -0.54,
+  y_upper: -0.24, z_lower: -0.1, z_upper: 0.2}

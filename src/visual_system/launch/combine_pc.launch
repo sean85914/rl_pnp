@@ -7,4 +7,5 @@
     <remap from="~cam1_pc" to="$(arg cam1)/depth_registered/points"/>
     <remap from="~cam2_pc" to="$(arg cam2)/depth_registered/points"/>
   </node>
+  <include file="$(find apriltags_ros)/launch/calibrate_gripper.launch"/>
 </launch>

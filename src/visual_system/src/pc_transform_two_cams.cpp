@@ -12,6 +12,7 @@
 #include <pcl/point_types.h> // pcl::PointXYZ
 #include <pcl/filters/passthrough.h> // pcl::passThrough
 #include <pcl/filters/conditional_removal.h> // pcl::ConditionalRemoval
+#include <pcl/kdtree/kdtree_flann.h> // pcl::KdTreeFLANN
 #include <pcl/common/transforms.h> // pcl::transformPointCloud
 #include <pcl/sample_consensus/method_types.h> // pcl::SAC_RANSAC
 #include <pcl/sample_consensus/model_types.h> // pcl::SACMODEL_PLANE
@@ -21,6 +22,7 @@
 #include <std_srvs/SetBool.h>
 #include <visual_system/get_pc.h>
 #include <visual_system/pc_is_empty.h>
+#include <visual_system/check_grasp_success.h>
 // MSG
 #include <geometry_msgs/Point.h>
 #include <sensor_msgs/Image.h>
@@ -35,6 +37,7 @@ int resolution; // Heightmap resolution
 const int thread_num = 16; // Number of threads
 double factor; // Voxel grid factor
 double empty_thres; // Threshold rate for determining if the bin is empty
+double success_thres; // Threshold rate for determining if the grasp is successful
 double x_lower; // X lower bound, in hand coord.
 double x_upper; // X upper bound, in hand coord.
 double y_lower; // Y lower bound, in hand coord.
@@ -58,6 +61,8 @@ bool callback_get_pc(visual_system::get_pc::Request &req,
 bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::pc_is_empty::Response &res);
 void check_param_cb(const ros::TimerEvent&);
 void workers(int id, pcl::PointCloud<pcl::PointXYZRGB> sub_pc); // Thread target
+bool callback_grasp_success(visual_system::check_grasp_success::Request  &req,
+                            visual_system::check_grasp_success::Response &res);
 
 int main(int argc, char** argv)
 {
@@ -74,6 +79,7 @@ int main(int argc, char** argv)
   if(!pnh.getParam("resolution", resolution)) resolution = 224;
   if(!pnh.getParam("factor", factor)) factor = 1.0f;
   if(!pnh.getParam("empty_thres", empty_thres)) empty_thres = 0.95f;
+  if(!pnh.getParam("success_thres", success_thres)) success_thres = 0.10f;
   if(!pnh.getParam("verbose", verbose)) verbose = false;
   if(!pnh.getParam("down_sample", down_sample)) down_sample = false;
   if(!pnh.getParam("use_two_cam", use_two_cam)) use_two_cam = true;
@@ -110,6 +116,7 @@ int main(int argc, char** argv)
   // Setup service server
   ros::ServiceServer pc_service = pnh.advertiseService("get_pc", callback_get_pc);
   ros::ServiceServer check_empty_service = pnh.advertiseService("empty_state", callback_is_empty);
+  ros::ServiceServer check_grasp_success_service = pnh.advertiseService("grasp_state", callback_grasp_success);
   ros::Timer check_param_timer = pnh.createTimer(ros::Duration(1.0), check_param_cb);
   ros::spin();
   // Save YAML after terminating
@@ -247,6 +254,12 @@ void check_param_cb(const ros::TimerEvent& event){
       empty_thres = tmp;
     }
   }
+  if(ros::param::get(node_ns+"/success_thres", tmp)){
+    if(tmp!=success_thres){
+      ROS_INFO("success_thres set from %f to %f", success_thres, tmp);
+      success_thres = tmp;
+    }
+  }
 }
 
 void workers(int id, pcl::PointCloud<pcl::PointXYZRGB> sub_pc){
@@ -258,4 +271,31 @@ void workers(int id, pcl::PointCloud<pcl::PointXYZRGB> sub_pc){
   condrem.setInputCloud(transform);
   condrem.filter(global_vec[id]);
   mtx.unlock();
+}
+
+bool callback_grasp_success(visual_system::check_grasp_success::Request  &req,
+                            visual_system::check_grasp_success::Response &res)
+{
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr prior_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+                                         post_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+  pcl::io::loadPCDFile<pcl::PointXYZRGB>(req.prior_pcd_str, *prior_cloud);
+  pcl::io::loadPCDFile<pcl::PointXYZRGB>(req.post_pcd_str,  *post_cloud);
+  pcl::KdTreeFLANN<pcl::PointXYZRGB> prior_tree(false), post_tree(false);
+  prior_tree.setInputCloud(prior_cloud);
+  post_tree.setInputCloud(post_cloud);
+  pcl::PointXYZRGB searchPoint;
+  searchPoint.x = req.operated_position.x;
+  searchPoint.y = req.operated_position.y;
+  searchPoint.z = req.operated_position.z;
+  std::vector<int> prior_inliers, post_inliers;
+  std::vector<float> _;
+  double radius = 0.02; // 2cm
+  prior_tree.radiusSearch(searchPoint, radius, prior_inliers, _);
+  post_tree.radiusSearch(searchPoint, radius, post_inliers, _);
+  double rate = post_inliers.size()/(double)prior_inliers.size();
+  if(rate<=success_thres){
+    res.is_success = true;
+  } else res.is_success = false;
+  ROS_INFO("Prior: %d \t Posterior: %d \t Success: %s", (int)prior_inliers.size(), (int)post_inliers.size(), (res.is_success?"True":"False"));
+  return true;
 }
