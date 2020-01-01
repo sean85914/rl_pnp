@@ -12,12 +12,14 @@ import pickle
 import serial
 from trainer import Trainer
 from collections import namedtuple, deque
+from prioritized_memory import Memory
 # srv
 from std_srvs.srv import SetBool, SetBoolRequest, SetBoolResponse, \
                          Empty, EmptyRequest, EmptyResponse
 from arm_operation.srv import agent_abb_action, agent_abb_actionRequest, agent_abb_actionResponse
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
-                              pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse
+                              pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse, \
+                              check_grasp_success, check_grasp_successRequest, check_grasp_successResponse
 from visualization.srv import viz_marker, viz_markerRequest, viz_markerResponse
 
 # Define transition tuple
@@ -32,7 +34,7 @@ parser.add_argument("--model", type=str, default="", help="If provided, continue
 parser.add_argument("--buffer_file", type=str, default="", help="If provided, will read the given file to construct the experience buffer, default is empty string")
 parser.add_argument("--epsilon", type=float, default=0.5, help="Probability to choose random action")
 parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alram lamp, default is /dev/ttylight")
-parser.add_argument("--buffer_size", type=int, default=50, help="Experience buffer size, default is 50") # N
+parser.add_argument("--buffer_size", type=int, default=500, help="Experience buffer size, default is 500") # N
 parser.add_argument("--learning_freq", type=int, default=10, help="Frequency for updating behavior network, default is 10") # M
 parser.add_argument("--updating_freq", type=int, default=40, help="Frequency for updating target network, default is 40") # C
 parser.add_argument("--mini_batch_size", type=int, default=4, help="How many transitions should used for learning, default is 4") # K
@@ -62,18 +64,15 @@ t = 0
 return_ = 0.0
 z_thres = -0.017
 program_ts = time.time()
+memory = Memory(buffer_size)
 arduino = serial.Serial(port, 115200)
 
 if model_str == "" and testing: # TEST SHOULD PROVIDE MODEL
 	print "\033[0;31mNo model provided, exit!\033[0m"
 	os._exit(0)
-
-experience_buffer = deque(maxlen=buffer_size)
+	
 if buffer_str != "":
-	print "\033[0;33mReading buffer file...\033[0m"
-	with open(buffer_str, 'rb') as file:
-		experience_buffer = pickle.load(file)
-	print "Loaded {} transitions".format(len(experience_buffer))
+	memory.load_memory(buffer_file)
 
 # trainer
 trainer = Trainer(reward, discount_factor, use_cpu, learning_rate)
@@ -86,7 +85,7 @@ if testing:
 if model_str != "":
 	print "[%f]: Loading provided model..." %(time.time())
 	trainer.behavior_net.load_state_dict(torch.load(model_str))
-	trainer.target_net = trainer.behavior_net
+	trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
 	
 # Get logger path
 r = rospkg.RosPack()
@@ -98,6 +97,7 @@ check_suck_success       = rospy.ServiceProxy("/vacuum_pump_control_node/check_s
 agent_take_action_client = rospy.ServiceProxy("/agent_server_node/agent_take_action", agent_abb_action)
 get_pc_client            = rospy.ServiceProxy("/combine_pc_node/get_pc", get_pc)
 empty_checker            = rospy.ServiceProxy("/combine_pc_node/empty_state", pc_is_empty)
+check_grasp_success      = rospy.ServiceProxy("/combine_pc_node/grasp_state", check_grasp_success)
 go_home                  = rospy.ServiceProxy("/agent_server_node/go_home", Empty)
 go_place                 = rospy.ServiceProxy("/agent_server_node/go_place", Empty)
 viz                      = rospy.ServiceProxy("/viz_marker_node/viz_marker", viz_marker)
@@ -122,16 +122,13 @@ try:
 		if cmd == 'E' or cmd == 'e':
 			utils.saveFiles(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path)
 			# Save experience buffer
-			buffer_file_name = csv_path + "buffer.file"
-			f = open(buffer_file_name, 'wb')
-			pickle.dump(experience_buffer, f)
-			f.close()
+			memory.save_memory(csv_path)
 			print "Regular shutdown"
 			sys.exit(0)
 		elif cmd == 'S' or cmd == 's':
 			episode_list.append(t)
 			t = 0
-			return_list.append(return_)
+			if iteration is not 0: return_list.append(return_)
 			return_ = 0.0
 			is_empty = False
 			while is_empty is not True:
@@ -208,10 +205,19 @@ try:
 					go_home()
 				else: # invalid
 					action_list.append(-1); arduino.write("r 1000") # Red
-				if is_valid:
-					action_success = check_suck_success().success
-				else:
 					action_success = False
+				if is_valid:
+					if action < 2: # suction cup
+						action_success = check_suck_success().success
+					else: # parallel-jaw gripper TODO
+						check_grasp_success_request = check_grasp_successRequest()
+						check_grasp_success_request.prior_pcd_str = pc_path + "{:06}_before.pcd".format(iteration)
+						# Get temporary pc and save file
+						get_pc_req.file_name = pc_path + "{:06}_after.pcd".format(iteration)
+						tmp_response = get_pc_client(get_pc_req)
+						check_grasp_success_request.post_pcd_str = pc_path + "{:06}_after.pcd".format(iteration)
+						check_grasp_success_request.operated_position = viz_req.point
+						action_success = check_grasp_success(check_grasp_success_request).is_success
 				result_list.append(action_success)
 				if action_success: go_place(); arduino.write("g 1000") # Green
 				else: vacuum_pump_control(SetBoolRequest(False)); arduino.write("o 1000") # Orange
@@ -244,56 +250,48 @@ try:
 				next_color_name = image_path + "next_color_{:06}.jpg".format(iteration)
 				next_depth_name = depth_path + "next_depth_data_{:06}.txt".format(iteration)
 				transition = Transition(color_name, depth_name, pixel_index, current_reward, next_color_name, next_depth_name, is_empty)
-				experience_buffer.append(transition)
+				# Compute TD error
+				td_target = trainer.get_label_value(current_reward, next_color, next_depth, is_empty)
+				rotation_idx = pixel_index[0]-2 if "grasp" in action_str else -1
+				old_value = trainer.forward(color, depth, action_str, False, rotation_idx)[0, pixel_index[1], pixel_index[2]]
+				memory.add((td_target-old_value)**2, transition)
 				iteration += 1
 				t += 1
-				if iteration % learning_freq == 0:
+				if iteration % learning_freq == 0: # Update parameters
 					arduino.write("b 1000")
-					print "[%f] Computing TD error array with length %d..." %(time.time()-program_ts, len(experience_buffer))
-					td_target_array = np.zeros(len(experience_buffer))
-					td_error_array  = np.zeros(len(experience_buffer))
-					iter_array      = np.zeros(len(experience_buffer))
-					ts = time.time()
-					for i in range(len(experience_buffer)):
-						color = cv2.imread(experience_buffer[i].color)
-						iter_str = experience_buffer[i].color[experience_buffer[i].color.find("color_")+6:-4] # Find iteration string ({:06})
-						iter_array[i] = int(iter_str)
-						depth = np.loadtxt(experience_buffer[i].depth)
-						pixel_index = experience_buffer[i].pixel_idx
-						next_color = cv2.imread(experience_buffer[i].next_color)
-						next_depth = np.loadtxt(experience_buffer[i].next_depth)
-						td_target = trainer.get_label_value(experience_buffer[i].reward, \
-						                                    next_color, next_depth, \
-						                                    experience_buffer[i].is_empty)
-						suck_1_prediction, suck_2_prediction, grasp_prediction = trainer.forward(color, depth, is_volatile=True)
+					mini_batch, idxs, is_weight = memory.sample(mini_batch_size)
+					sampled_iter = []
+					for i in range(mini_batch_size):
+						iter_str = mini_batch[i].color[mini_batch[i].color.find("color_")+6:-4]
+						sampled_iter.append(int(iter_str))
+						color = cv2.imread(mini_batch[i].color)
+						depth = np.loadtxt(mini_batch[i].depth)
+						pixel_index = mini_batch[i].pixel_idx
+						next_color = cv2.imread(mini_batch[i].next_color)
+						next_depth = np.loadtxt(mini_batch[i].next_depth)
+						td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
+						trainer.backprop(color, depth, pixel_index, td_target, is_weight)
+					print "Sampled at iteration: ", sampled_iter
+					# After parameter updated, update prioirites tree
+					for i in range(mini_batch_size):
+						color = cv2.imread(mini_batch[i].color)
+						depth = np.loadtxt(mini_batch[i].depth)
+						pixel_index = mini_batch[i].pixel_idx
+						next_color = cv2.imread(mini_batch[i].next_color)
+						next_depth = np.loadtxt(mini_batch[i].next_depth)
+						td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
 						if pixel_index[0] == 0:
-							last_q = suck_1_prediction[0, pixel_index[1], pixel_index[2]]
+							action_str = "suck_1"; rotate_idx = -1
 						elif pixel_index[0] == 1:
-							last_q = suck_2_prediction[0, pixel_index[1], pixel_index[2]]
+							action_str = "suck_2"; rotate_idx = -1
 						else:
-							last_q = grasp_prediction[pixel_index[0]-2, pixel_index[1], pixel_index[2]]
-						td_error = (td_target - last_q)**2
-						del suck_1_prediction, suck_2_prediction, grasp_prediction
-						sys.stdout.write("\r")
-						sys.stdout.write("\033[1;31m[%f] (%d/%d)  %.2f%%\033[0m" %(time.time()-ts, i+1, len(experience_buffer), float(i+1)/len(experience_buffer)*100))
-						sys.stdout.flush()
-						td_target_array[i] = td_target
-						td_error_array[i] = td_error
+							action_str = "grasp"; rotate_idx = pixel_index[0] -2
+						old_value = trainer.forward(color, depth, action_str, False, rotate_idx)[0, pixel_index[1], pixel_index[2]]
+						memory.update(idxs[i], (td_target-old_value)**2)
 					arduino.write("b 1000"); print "\n[%f] Complete" %(time.time()-program_ts)
-					sampling_weight = utils.softmax(np.absolute(td_error_array))
-					sample_indices = np.random.choice(list(range(len(experience_buffer))), mini_batch_size, replace=False, p=sampling_weight)
-					print "Sample at iteration: ", iter_array[sample_indices]
-					for j in range(mini_batch_size):
-						sample_idx = sample_indices[j]
-						color = cv2.imread(experience_buffer[sample_idx].color)
-						depth = np.loadtxt(experience_buffer[sample_idx].depth)
-						action_pix_idx = experience_buffer[sample_idx].pixel_idx
-						label_value = td_target_array[sample_idx]
-						loss_value = trainer.backprop(color, depth, action_pix_idx, label_value)
-						loss_list.append(loss_value)
 				if iteration % updating_freq == 0:
 					print "[%f] Replace target network to behavior network" %(time.time()-program_ts)
-					trainer.target_net = trainer.behavior_net
+					trainer.target_net.load_state_dict(trainer.behavior_net.state_dict)
 				if iteration % save_every == 0 and not testing:
 					model_name = model_path + "{}.pth".format(iteration)
 					torch.save(trainer.behavior_net.state_dict(), model_name)
@@ -302,12 +300,10 @@ try:
 except KeyboardInterrupt:
 	utils.saveFiles(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path)
 	# Save experience buffer
-	buffer_file_name = csv_path + "buffer.file"
-	f = open(buffer_file_name, 'wb')
-	pickle.dump(experience_buffer, f)
-	f.close()
+	memory.save_memory(csv_path)
 	model_name = model_path + "interrupt_{}.pth".format(iteration)
 	torch.save(trainer.behavior_net.state_dict(), model_name)
+	utils.saveFiles(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path)
 	print "[%f] Model: %s saved" %(time.time()-program_ts, model_name)
 	print "Shutdown since keyboard interrupt"
 	sys.exit(0)

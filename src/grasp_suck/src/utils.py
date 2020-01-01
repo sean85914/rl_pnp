@@ -210,12 +210,12 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 		dilate_name = loggerPath + "diff_{:06}.jpg".format(iteration)
 		cv2.imwrite(dilate_name, dilate)
 		idx = np.random.choice(np.arange(resolution*resolution), p=get_prob(dilate))
-		primitive = np.random.choice(np.arange(3))
+		primitive = np.random.choice(np.arange(3)) # suck_1, suck_2, grasp
 		if primitive == 1:
 			action = 1
 			action_str = "suck_2"
 		if primitive == 2:
-			rotate_idx = np.random.choice(np.arange(4))
+			rotate_idx = np.random.choice(np.arange(4)) # grasp_-90, grasp_-45, grasp_0, grasp_45
 			angle = -90.0+45.0*rotate_idx
 			primitive += rotate_idx
 			action = primitive

@@ -22,7 +22,8 @@ class Trainer(object):
 			print "No CUDA detected, use CPU"
 			self.use_cuda = False
 		self.behavior_net = reinforcement_net(self.use_cuda)
-		self.target_net   = self.behavior_net
+		self.target_net   = reinforcement_net(self.use_cuda)
+		self.target_net.load_state_dict(self.behavior_net.state_dict())
 		# Huber Loss
 		self.criterion = nn.SmoothL1Loss(reduce = False)
 		if self.use_cuda:
@@ -131,7 +132,7 @@ class Trainer(object):
 		del next_prediction
 		return td_target
 	# Do backwardpropagation
-	def backprop(self, color_img, depth_img, action_pix_idx, label_value):
+	def backprop(self, color_img, depth_img, action_pix_idx, label_value, is_weight):
 		label = np.zeros((1, 320, 320))
 		label[0, action_pix_idx[1], action_pix_idx[2]] = label_value
 		label_weight = np.zeros((1, 320, 320))
@@ -156,10 +157,11 @@ class Trainer(object):
 			prediction = self.forward(color_img, depth_img, action_str="grasp", is_volatile = False, specific_rotation = rotation, network = "behavior", clear_grad = False)
 		if self.use_cuda:
 			loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
-					Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)
+					Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(is_weight).cuda()
 		else:
 			loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float()))* \
-					Variable(torch.from_numpy(label_weight).float(), requires_grad = False)
+					Variable(torch.from_numpy(label_weight).float(), requires_grad = False)*torch.FloatTensor(is_weight)
+		loss 
 		loss = loss.sum()
 		loss.backward()
 		loss_value = loss.cpu().data.numpy()
