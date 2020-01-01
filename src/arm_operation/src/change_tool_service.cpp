@@ -93,8 +93,13 @@ class ChangeToolService{
       res.result = "request tool out of range";
       return true;
     } else if(req.now == req.togo){
-      res.result = "same tool, abort request";
-      return true;
+      if(req.now!=1){
+        res.result = "same tool, abort request";
+       return true;
+     } else{ // Calibrate gripper
+       calibrate_gripper();
+       return true;
+     }
     }
     ros::Time ts = ros::Time::now();
     std::string info = "Receive new request: ";
@@ -110,7 +115,7 @@ class ChangeToolService{
     abb_node::robot_SetCartesian set_cartesian_srv;
     abb_node::robot_SetSpeed set_speed_srv;
     abb_node::robot_SetZone set_zone_srv;
-    set_joints_srv.request.position.resize(6); // Seg. fault if not resize to correct size  
+    set_joints_srv.request.position.resize(6); // Seg. fault if not resize to correct size
     // Set zone to Z1
     set_zone_srv.request.mode = 2;
     setZone.call(set_zone_srv);
@@ -165,78 +170,88 @@ class ChangeToolService{
     ROS_INFO("Service response complete, takes %f seconds", time_response);
     // Make gripper in zero degree
     if(req.togo==1){
-      // Save current cartesian position
-      getCartesian.call(get_cartesian_srv);
-      double original_x = get_cartesian_srv.response.x,
-             original_y = get_cartesian_srv.response.y,
-             original_z = get_cartesian_srv.response.z;
-      ROS_INFO("Save position: [%f, %f, %f]", original_x, original_y, original_z);
-      set_cartesian_srv.request.cartesian[0] = original_x;
-      set_cartesian_srv.request.cartesian[1] = original_y;
-      set_cartesian_srv.request.cartesian[2] = original_z - 85.0;
-      set_cartesian_srv.request.quaternion[0] = get_cartesian_srv.response.q0;
-      set_cartesian_srv.request.quaternion[1] = get_cartesian_srv.response.qx;
-      set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
-      set_cartesian_srv.request.quaternion[3] = get_cartesian_srv.response.qz;
-      setCartesian.call(set_cartesian_srv); ros::Duration(0.6).sleep();
-      while(1){
-        // Check if detected
-        ros::Time ts = ros::Time::now();
-        apriltags_ros::AprilTagDetectionArrayConstPtr detections;
-        while((ros::Time::now()-ts).toSec()<=2.0){
-          detections = ros::topic::waitForMessage<apriltags_ros::AprilTagDetectionArray>("/tag_detections", ros::Duration(1.0));
-          if(detections->detections.size()!=0) break;
-        }
-        if(detections->detections.size()!=0) break;
-        // Get current joints and put it into buffer
-        getJoints.call(get_joints_srv);
-        ROS_INFO("Rotating joint 6 -15 degree...");
-        set_joints_srv.request.position[0] = get_joints_srv.response.j1;
-        set_joints_srv.request.position[1] = get_joints_srv.response.j2;
-        set_joints_srv.request.position[2] = get_joints_srv.response.j3;
-        set_joints_srv.request.position[3] = get_joints_srv.response.j4;
-        set_joints_srv.request.position[4] = get_joints_srv.response.j5;
-        set_joints_srv.request.position[5] = get_joints_srv.response.j6 - 15.0/180.0*M_PI;
-        if(set_joints_srv.request.position[5]<=-400.0/180.0*M_PI){
-          ROS_ERROR("Over joint6 max range, failed");
-          return true;
-        }
-        setJoints.call(set_joints_srv); ros::Duration(0.6).sleep();
-      } // End while
-      tf::StampedTransform stf;
-      for(int i=0; i<2; ++i){ // Do twice
-        try{
-          listener.waitForTransform("base_link", "gripper", ros::Time(0), ros::Duration(1.0f));
-          listener.lookupTransform("base_link", "gripper", ros::Time(0), stf);
-          tf::Matrix3x3 gripper_mat(stf.getRotation());
-          tf::Vector3 gripper_z = gripper_mat.getColumn(2), base_neg_x(-1.0f, 0.0f, 0.0f);
-          double theta = gripper_z.angle(base_neg_x); if(theta<0.0) theta = -theta;
-          getJoints.call(get_joints_srv);
-          double theta_deg = theta*180.0/M_PI;
-          ROS_INFO("Rotating joint 6 %f degree...", theta_deg);
-          set_joints_srv.request.position[0] = get_joints_srv.response.j1;
-          set_joints_srv.request.position[1] = get_joints_srv.response.j2;
-          set_joints_srv.request.position[2] = get_joints_srv.response.j3;
-          set_joints_srv.request.position[3] = get_joints_srv.response.j4;
-          set_joints_srv.request.position[4] = get_joints_srv.response.j5;
-          set_joints_srv.request.position[5] = get_joints_srv.response.j6 - theta;
-          setJoints.call(set_joints_srv); ros::Duration(0.3).sleep();
-        }
-        catch(tf::TransformException &ex){
-          ROS_ERROR("%s", ex.what());
-        }
-      }
-      getCartesian.call(get_cartesian_srv);
-      set_cartesian_srv.request.cartesian[0] = original_x;
-      set_cartesian_srv.request.cartesian[1] = original_y;
-      set_cartesian_srv.request.cartesian[2] = original_z;
-      set_cartesian_srv.request.quaternion[0] = get_cartesian_srv.response.q0;
-      set_cartesian_srv.request.quaternion[1] = get_cartesian_srv.response.qx;
-      set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
-      set_cartesian_srv.request.quaternion[3] = get_cartesian_srv.response.qz;
-      setCartesian.call(set_cartesian_srv); ros::Duration(0.3).sleep();
+      calibrate_gripper();
     }
     return true;
+  }
+  void calibrate_gripper(void){
+    ros::Time ts = ros::Time::now();
+    abb_node::robot_GetJoints get_joints_srv;
+    abb_node::robot_SetJoints set_joints_srv;
+    abb_node::robot_GetCartesian get_cartesian_srv;
+    abb_node::robot_SetCartesian set_cartesian_srv;
+    set_joints_srv.request.position.resize(6); // Seg. fault if not resize to correct size
+    set_cartesian_srv.request.cartesian.resize(3);
+    set_cartesian_srv.request.quaternion.resize(4);
+    // Save current cartesian position
+    getCartesian.call(get_cartesian_srv);
+    double original_x = get_cartesian_srv.response.x,
+           original_y = get_cartesian_srv.response.y,
+           original_z = get_cartesian_srv.response.z;
+    ROS_INFO("Save position: [%f, %f, %f]", original_x, original_y, original_z);
+    set_cartesian_srv.request.cartesian[0] = original_x;
+    set_cartesian_srv.request.cartesian[1] = original_y;
+    set_cartesian_srv.request.cartesian[2] = original_z - 85.0;
+    set_cartesian_srv.request.quaternion[0] = get_cartesian_srv.response.q0;
+    set_cartesian_srv.request.quaternion[1] = get_cartesian_srv.response.qx;
+    set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
+    set_cartesian_srv.request.quaternion[3] = get_cartesian_srv.response.qz;
+    setCartesian.call(set_cartesian_srv); ros::Duration(0.6).sleep();
+    while(ros::ok()){
+      // Check if detected
+      ros::Time ts = ros::Time::now();
+      apriltags_ros::AprilTagDetectionArrayConstPtr detections;
+      while((ros::Time::now()-ts).toSec()<=1.5){
+        detections = ros::topic::waitForMessage<apriltags_ros::AprilTagDetectionArray>("/tag_detections", ros::Duration(1.0));
+        if(detections->detections.size()!=0) break;
+      }
+      if(detections->detections.size()!=0) break;
+      // Get current joints and put it into buffer
+      getJoints.call(get_joints_srv);
+      ROS_INFO("Rotating joint 6 -30 degree...");
+      set_joints_srv.request.position[0] = get_joints_srv.response.j1;
+      set_joints_srv.request.position[1] = get_joints_srv.response.j2;
+      set_joints_srv.request.position[2] = get_joints_srv.response.j3;
+      set_joints_srv.request.position[3] = get_joints_srv.response.j4;
+      set_joints_srv.request.position[4] = get_joints_srv.response.j5;
+      set_joints_srv.request.position[5] = get_joints_srv.response.j6 - 30.0/180.0*M_PI;
+      if(set_joints_srv.request.position[5]<=-400.0/180.0*M_PI){
+        ROS_ERROR("Over joint6 max range, failed");
+        return;
+      }
+      setJoints.call(set_joints_srv); ros::Duration(0.3).sleep();
+    }// End while
+    tf::StampedTransform stf;
+    try{
+      listener.waitForTransform("base_link", "gripper", ros::Time(0), ros::Duration(1.0f));
+      listener.lookupTransform("base_link", "gripper", ros::Time(0), stf);
+      tf::Matrix3x3 gripper_mat(stf.getRotation());
+      tf::Vector3 gripper_z = gripper_mat.getColumn(2), base_neg_x(-1.0f, 0.0f, 0.0f);
+      double theta = gripper_z.angle(base_neg_x); if(theta<0.0) theta = -theta;
+      getJoints.call(get_joints_srv);
+      double theta_deg = theta*180.0/M_PI;
+      ROS_INFO("Rotating joint 6 %f degree...", theta_deg);
+      set_joints_srv.request.position[0] = get_joints_srv.response.j1;
+      set_joints_srv.request.position[1] = get_joints_srv.response.j2;
+      set_joints_srv.request.position[2] = get_joints_srv.response.j3;
+      set_joints_srv.request.position[3] = get_joints_srv.response.j4;
+      set_joints_srv.request.position[4] = get_joints_srv.response.j5;
+      set_joints_srv.request.position[5] = get_joints_srv.response.j6 - theta;
+      setJoints.call(set_joints_srv); ros::Duration(0.3).sleep();
+    }
+    catch(tf::TransformException &ex){
+      ROS_ERROR("%s", ex.what());
+    }
+    getCartesian.call(get_cartesian_srv);
+    set_cartesian_srv.request.cartesian[0] = original_x;
+    set_cartesian_srv.request.cartesian[1] = original_y;
+    set_cartesian_srv.request.cartesian[2] = original_z;
+    set_cartesian_srv.request.quaternion[0] = get_cartesian_srv.response.q0;
+    set_cartesian_srv.request.quaternion[1] = get_cartesian_srv.response.qx;
+    set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
+    set_cartesian_srv.request.quaternion[3] = get_cartesian_srv.response.qz;
+    setCartesian.call(set_cartesian_srv); ros::Duration(0.3).sleep();
+    ROS_INFO("Gripper calibration spend %f seconds", (ros::Time::now()-ts).toSec());
   }
  public:
   ChangeToolService(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
