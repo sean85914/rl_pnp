@@ -1,5 +1,7 @@
 import numpy as np
 
+# Revised from: https://github.com/rlcode/per
+
 class SumTree:
 	write = 0
 	'''
@@ -37,6 +39,7 @@ class SumTree:
 		else:
 			return self._retrieve(right, target - self.tree[left])
 	
+	@property
 	def total(self):
 		return self.tree[0]
 		
