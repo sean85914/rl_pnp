@@ -1,13 +1,21 @@
 import os
+import sys
 import numpy as np
 import yaml
 import cv2
 import struct
 import ctypes
 import multiprocessing as mp
+from scipy import ndimage
+from collections import namedtuple
+import matplotlib.pyplot as plt
 from cv_bridge import CvBridge, CvBridgeError
 import sensor_msgs.point_cloud2 as pc2
+from geometry_msgs.msg import Point
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse
+
+# Define transition tuple
+Transition = namedtuple('Transition', ['color', 'depth', 'pixel_idx', 'reward', 'next_color', 'next_depth', 'is_empty'])
 
 yaml_path = "/home/sean/Documents/flip_obj/src/visual_system/config/param_config.yaml"
 background_data = "/home/sean/Documents/flip_obj/src/grasp_suck/data/background.txt"
@@ -99,6 +107,46 @@ def get_heightmap(pc, img_path, depth_path, iteration):
 	np.savetxt(depth_path+"depth_data_{:06}.txt".format(iteration), depth_heightmap)
 	return color_heightmap, depth_heightmap, points
 
+def _depth_to_heatmap(depth):
+	depth_hm = np.zeros_like(depth, np.uint8)
+	depth_hm = (depth/np.max(depth)*255).astype(np.uint8)
+	depth_hm = cv2.applyColorMap(depth_hm, cv2.COLORMAP_JET)
+	return depth_hm
+	
+def preprocessing(color, depth):
+	# Zoom 2X
+	color_2x = ndimage.zoom(color, zoom=[2, 2, 1], order=0)
+	depth_2x = ndimage.zoom(depth, zoom=[2, 2],    order=0)
+	cv2.imwrite("color_2x.jpg", color_2x)
+	cv2.imwrite("depth_2x.jpg", _depth_to_heatmap(depth_2x))
+	# Zero padding
+	diag_length = float(color_2x.shape[0])*np.sqrt(2)
+	diag_length = np.ceil(diag_length/32)*32
+	padding_width = int((diag_length-color_2x.shape[0])/2)
+	color_padded = cv2.copyMakeBorder(color_2x, padding_width, padding_width, padding_width, padding_width, cv2.BORDER_CONSTANT, 0)
+	depth_padded = cv2.copyMakeBorder(depth_2x, padding_width, padding_width, padding_width, padding_width, cv2.BORDER_CONSTANT, 0)
+	cv2.imwrite("color_padded.jpg", color_padded)
+	cv2.imwrite("depth_padded.jpg", _depth_to_heatmap(depth_padded))
+	# Normalization
+	image_mean = [0.406, 0.456, 0.485] # BGR
+	image_std  = [0.229, 0.224, 0.225]
+	color_float = color_padded.astype(float)/255
+	color_norm = np.zeros_like(color_padded, dtype=float)
+	for i in range(3):
+		color_norm[:, :, i] = (color_float[:, :, i] - image_mean[i]) / image_std[i]
+	color_norm_ = (color_norm*255).astype(np.uint8)
+	depth_mean = 0.07
+	depth_std  = 0.0005
+	depth_norm = (depth_padded - depth_mean) / depth_std
+	fig = plt.figure(figsize=(640./100, 640./100), frameon=False)
+	ax = plt.Axes(fig, [0., 0., 1., 1.])
+	ax.set_axis_off()
+	fig.add_axes(ax)
+	ax.imshow(color_norm_)
+	plt.savefig('color_normalized.jpg', aspect="normal")
+	ax.imshow(depth_norm)
+	plt.savefig('depth_normalized.jpg', aspect="normal")
+	
 # Draw symbols in the color image with different primitive
 def draw_image(image, explore, pixel_index):
 	'''
@@ -171,6 +219,19 @@ def get_prob(mask, ratio=4):
 	prob[mask==0]   = 1
 	prob = prob/np.sum(prob) # Normalized
 	return prob.reshape(-1) # Return flattened array
+	
+def generate_mask(depth):
+	# Constant
+	kernel = np.ones((2, 2), np.uint8) # Kernel for erosion and dilation
+	depth_background = np.loadtxt(background_data)
+	diff_threshold = 0.015
+	diff = depth - depth_background
+	mask = np.empty_like(diff, np.uint8)
+	mask[diff>diff_threshold] = 255; mask[diff<=diff_threshold] = 0
+	cv2.imwrite("raw.jpg", mask)
+	erode  = cv2.erode(mask,  kernel, iterations=3)
+	dilate = cv2.dilate(erode, kernel, iterations=3)
+	return dilate
 
 # Choose action using epsilon-greedy policy
 def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_prediction, depth, loggerPath, iteration):
@@ -178,7 +239,7 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 	action = 0
 	angle = 0
 	action_str = "suck_1"
-	pixel_index = [] # rotate_idx, y, x
+	pixel_index = [] # primitive index, y, x
 	if not explore: # Choose max Q
 		print "|Exploit|"
 		primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction)]
@@ -200,16 +261,10 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 			action = tmp[0][0]+2
 	else: # Random 
 		print "|Explore|"
-		depth_background = np.loadtxt(background_data)
-		diff = depth - depth_background
-		mask = np.empty_like(diff, np.uint8)
-		mask[diff>0.015] = 255; mask[diff<=0.015] = 0
-		kernel = np.ones((2, 2), np.uint8) # Kernel for erosion and dilation
-		erode  = cv2.erode(mask,  kernel, iterations=3)
-		dilate = cv2.dilate(erode, kernel, iterations=3)
-		dilate_name = loggerPath + "diff_{:06}.jpg".format(iteration)
-		cv2.imwrite(dilate_name, dilate)
-		idx = np.random.choice(np.arange(resolution*resolution), p=get_prob(dilate))
+		mask = generate_mask(depth)
+		mask_name = loggerPath + "diff_{:06}.jpg".format(iteration)
+		cv2.imwrite(mask_name, mask)
+		idx = np.random.choice(np.arange(resolution*resolution), p=get_prob(mask))
 		primitive = np.random.choice(np.arange(3)) # suck_1, suck_2, grasp
 		if primitive == 1:
 			action = 1
@@ -260,12 +315,29 @@ def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction):
 '''
 
 def show_args(args):
-	args_list = ['epsilon', 'force_cpu', 'is_testing', 'model', 'buffer_size', 'learning_freq', 'updating_freq', 'mini_batch_size', 'save_every', 'learning_rate', 'episode', 'port']
-	d = vars(args)
+	d = vars(args) # Convert to dictionary
 	print "================================================"
-	for i in range(len(args_list)):
-		print "{}:\t\t {}".format(args_list[i], d[args_list[i]])
+	for key in d:
+		print "{}:\t\t {}".format(key, d[key])
 	print "================================================"
+
+def parse_input(args):
+	testing = args.is_testing
+	episode = args.episode
+	use_cpu = args.force_cpu
+	model_str = args.model
+	buffer_str = args.buffer_file
+	epsilon = args.epsilon
+	port = args.port
+	buffer_size = args.buffer_size
+	learning_freq = args.learning_freq
+	updating_freq = args.updating_freq
+	mini_batch_size = args.mini_batch_size
+	save_every = args.save_every
+	learning_rate = args.learning_rate
+	return testing, episode, use_cpu, model_str, buffer_str, epsilon, port, \
+	       buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate
+	
 
 def standarization(prediction):
 	mean = np.nanmean(prediction)
@@ -341,3 +413,25 @@ def softmax(x):
 	
 def getModelCapacity(model):
 	return sum(p.numel() for p in model.parameters() if p.requires_grad)
+	
+def print_action(action_str, pixel_index, point):
+	print "Take action [\033[1;31m%s\033[0m] at (%d, %d) -> (%f, %f, %f)" %(action_str, \
+	                                                                        pixel_index[1], pixel_index[2], \
+	                                                                        point[0], point[1], point[2])
+
+def point_np_to_ros(point):
+	return Point(point[0], point[1], point[2])
+	
+def wrap_strings(image_path, depth_path, iteration):
+	color_name = image_path + "color_{:06}.jpg".format(iteration)
+	next_color_name = image_path + "next_color_{:06}.jpg".format(iteration)
+	depth_name = depth_path + "depth_data_{:06}.txt".format(iteration)
+	next_depth_name = depth_path + "next_depth_data_{:06}.txt".format(iteration)
+	return color_name, depth_name, next_color_name, next_depth_name
+
+def shutdown_process(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path, memory, regular=True):
+	saveFiles(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path)
+	memory.save_memory(path)
+	if regular: print "Regular shutdown"
+	else: print "Shutdown since user interrupt"
+	sys.exit(0)
