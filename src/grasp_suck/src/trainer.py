@@ -157,10 +157,10 @@ class Trainer(object):
 			prediction = self.forward(color_img, depth_img, action_str="grasp", is_volatile = False, specific_rotation = rotation, network = "behavior", clear_grad = False)
 		if self.use_cuda:
 			loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
-					Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(is_weight).cuda()
+					Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(np.array([is_weight])).cuda()
 		else:
 			loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float()))* \
-					Variable(torch.from_numpy(label_weight).float(), requires_grad = False)*torch.FloatTensor(is_weight)
+					Variable(torch.from_numpy(label_weight).float(), requires_grad = False)*torch.FloatTensor(np.array([is_weight]))
 		loss 
 		loss = loss.sum()
 		loss.backward()
