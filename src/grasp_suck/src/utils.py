@@ -5,6 +5,7 @@ import yaml
 import cv2
 import struct
 import ctypes
+import argparse
 import multiprocessing as mp
 from scipy import ndimage
 from collections import namedtuple
@@ -313,6 +314,22 @@ def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction):
   \____/ \__|_| |_|\___|_|  |___/
                                                                
 '''
+def create_argparser():
+	parser = argparse.ArgumentParser(prog="reinforcement_grasping", description="Reinforcement learning for robot arm grasping")
+	parser.add_argument("episode", type=int, help="Which episode is this run?")
+	parser.add_argument("--is_testing", action="store_true", default=False, help="True if testing, default is false")
+	parser.add_argument("--force_cpu", action="store_true", default=False, help="True if using CPU, default is false")
+	parser.add_argument("--model", type=str, default="", help="If provided, continue training the model, or using this model for testing, 	default is empty srting")
+	parser.add_argument("--buffer_file", type=str, default="", help="If provided, will read the given file to construct the experience buffer, default is empty string")
+	parser.add_argument("--epsilon", type=float, default=0.5, help="Probability to choose random action")
+	parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alram lamp, default is /dev/ttylight")
+	parser.add_argument("--buffer_size", type=int, default=500, help="Experience buffer size, default is 500") # N
+	parser.add_argument("--learning_freq", type=int, default=10, help="Frequency for updating behavior network, default is 10") # M
+	parser.add_argument("--updating_freq", type=int, default=40, help="Frequency for updating target network, default is 40") # C
+	parser.add_argument("--mini_batch_size", type=int, default=4, help="How many transitions should used for learning, default is 4") # K
+	parser.add_argument("--save_every", type=int, default=10, help="Every how many steps should save the model, default is 10")
+	parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for the trainer, default is 1e-4")
+	return parser
 
 def show_args(args):
 	d = vars(args) # Convert to dictionary
@@ -330,7 +347,7 @@ def parse_input(args):
 	epsilon = args.epsilon
 	port = args.port
 	buffer_size = args.buffer_size
-	learning_freq = args.learning_freq
+	learning_freq = args.learning_freq if not testing else 1e-5 # Still using small learning rate to backpropagate when testing
 	updating_freq = args.updating_freq
 	mini_batch_size = args.mini_batch_size
 	save_every = args.save_every
@@ -340,9 +357,10 @@ def parse_input(args):
 	
 
 def standarization(prediction):
-	mean = np.nanmean(prediction)
-	std  = np.nanstd(prediction)
-	prediction = (prediction-mean)/std
+	for i in range(prediction[0]):
+		mean = np.nanmean(prediction[i])
+		std  = np.nanstd(prediction[i])
+		prediction = (prediction[i]-mean)/std
 	return prediction
 
 def get_file_path(color_img_path_str):
@@ -435,3 +453,28 @@ def shutdown_process(action_list, target_list, result_list, loss_list, explore_l
 	if regular: print "Regular shutdown"
 	else: print "Shutdown since user interrupt"
 	sys.exit(0)
+	
+def get_action_info(pixel_index):
+	if pixel_index[0] == 0:
+		action_str = "suck_1"; rotate_idx = -1
+	elif pixel_index[0] == 1:
+		action_str = "suck_2"; rotate_idx = -1
+	else:
+		action_str = "grasp"; rotate_idx = pixel_index[0]-2
+	return action_str, rotate_idx
+
+def save_heatmap_and_mixed(suck_1_prediction, suck_2_prediction, grasp_predictions, feat_paths, mixed_paths, color, iteration):
+	heatmaps   = []
+	mixed_imgs = []
+	heatmaps.append(vis_affordance(suck_1_prediction[0]))
+	heatmaps.append(vis_affordance(suck_2_prediction[0]))
+	for grasp_prediction in grasp_predictions:
+		heatmaps.append(vis_affordance(grasp_prediction))
+	for heatmap_idx in range(len(heatmap)):
+		img_name = feat_paths[heatmap_idx] + "{:06}.jpg".format(iteration)
+		cv2.imwrite(img_name, heatmaps[heatmap_idx])
+		img_name = mixed_paths[heatmap_idx] + "{:06}.jpg".format(iteration)
+		mixed = cv2.addWeighted(color, 1.0, heatmaps[heatmap_idx], 0.4, 0)
+		mixed_imgs.append(mixed)
+		cv2.imwrite(img_name, mixed)
+	return heatmaps, mixed_imgs

@@ -3,7 +3,6 @@ import sys
 import cv2
 import time
 import numpy as np
-import argparse
 import torch
 import rospy
 import rospkg
@@ -22,21 +21,7 @@ from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
                               check_grasp_success, check_grasp_successRequest, check_grasp_successResponse
 from visualization.srv import viz_marker, viz_markerRequest, viz_markerResponse
 
-# Parse argument
-parser = argparse.ArgumentParser(prog="reinforcement_grasping", description="Reinforcement learning for robot arm grasping")
-parser.add_argument("--is_testing", action="store_true", default=False, help="True if testing, default is false")
-parser.add_argument("--episode", type=int, help="Which episode is this run?")
-parser.add_argument("--force_cpu", action="store_true", default=False, help="True if using CPU, default is false")
-parser.add_argument("--model", type=str, default="", help="If provided, continue training the model, or using this model for testing, default is empty srting")
-parser.add_argument("--buffer_file", type=str, default="", help="If provided, will read the given file to construct the experience buffer, default is empty string")
-parser.add_argument("--epsilon", type=float, default=0.5, help="Probability to choose random action")
-parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alram lamp, default is /dev/ttylight")
-parser.add_argument("--buffer_size", type=int, default=500, help="Experience buffer size, default is 500") # N
-parser.add_argument("--learning_freq", type=int, default=10, help="Frequency for updating behavior network, default is 10") # M
-parser.add_argument("--updating_freq", type=int, default=40, help="Frequency for updating target network, default is 40") # C
-parser.add_argument("--mini_batch_size", type=int, default=4, help="How many transitions should used for learning, default is 4") # K
-parser.add_argument("--save_every", type=int, default=10, help="Every how many steps should save the model, default is 10")
-parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for the trainer, default is 1e-4")
+parser = utils.create_argparser()
 args = parser.parse_args()
 utils.show_args(args)
 testing, episode, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate = utils.parse_input(args)
@@ -45,7 +30,7 @@ testing, episode, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, le
 reward = 1.0
 discount_factor = 0.5
 iteration = 0
-z_thres = -0.017
+z_thres = -0.017 # TODO is this required?
 program_ts = time.time()
 memory = Memory(buffer_size)
 arduino = serial.Serial(port, 115200)
@@ -58,10 +43,6 @@ if buffer_str != "": memory.load_memory(buffer_file)
 
 # trainer
 trainer = Trainer(reward, discount_factor, use_cpu, learning_rate)
-# Still using small learning rate to backpropagate when testing
-if testing:
-	for param_group in trainer.optimizer.param_groups:
-		param_group['lr'] = 1e-5
 
 # Load model if provided
 if model_str != "":
@@ -140,25 +121,11 @@ try:
 				ts = time.time()
 				suck_1_prediction, suck_2_prediction, grasp_prediction = trainer.forward(color, depth, is_volatile=True)
 				print "Forward past: {} seconds".format(time.time()-ts)
-				# Save heatmap and combine with color heightmap
-				heatmaps   = []
-				mixed_imgs = []
-				heatmaps.append(utils.vis_affordance(suck_1_prediction[0]))
-				heatmaps.append(utils.vis_affordance(suck_2_prediction[0]))
-				for grasp_angle_prediction in grasp_prediction:
-					heatmaps.append(utils.vis_affordance(grasp_angle_prediction))
-				for heatmap_idx in range(len(heatmaps)):
-					img_name = feat_paths[heatmap_idx] + "{:06}.jpg".format(iteration)
-					cv2.imwrite(img_name, heatmaps[heatmap_idx])
-					img_name = mixed_paths[heatmap_idx] + "{:06}.jpg".format(iteration)
-					mixed = cv2.addWeighted(color, 1.0, heatmaps[heatmap_idx], 0.4, 0)
-					mixed_imgs.append(mixed)
-					cv2.imwrite(img_name, mixed)
+				heatmaps, mixed_imgs = utils.save_heatmap_and_mixed(suck_1_prediction, suck_2_prediction, grasp_prediction, feat_paths, mixed_paths, color, iteration)
 				# Standarize predictions to avoid bias between them
 				suck_1_prediction = utils.standarization(suck_1_prediction)
 				suck_2_prediction = utils.standarization(suck_2_prediction)
-				for i in range(len(grasp_prediction)):
-					grasp_prediction[i] = utils.standarization(grasp_prediction[i])
+				grasp_prediction = utils.standarization(grasp_prediction)
 				if not testing: # Train
 					explore, action, action_str, pixel_index, angle = utils.epsilon_greedy_policy(epsilon_, suck_1_prediction, suck_2_prediction, grasp_prediction, depth, diff_path, iteration)
 				else: # Testing
@@ -199,8 +166,9 @@ try:
 						action_success = check_grasp_success(check_grasp_success_request).is_success
 				result_list.append(action_success)
 				if action_success: go_place(); arduino.write("g 1000") # Green
-				else: vacuum_pump_control(SetBoolRequest(False))
-				if is_valid: arduino.write("o 1000") # Orange
+				else: 
+					vacuum_pump_control(SetBoolRequest(False))
+					if is_valid: arduino.write("o 1000") # Orange
 				time.sleep(0.5)
 				# Get next images, and check if bin is empty
 				next_pc = _get_pc(iteration, False)
@@ -250,15 +218,11 @@ try:
 						next_color = cv2.imread(mini_batch[i].next_color)
 						next_depth = np.loadtxt(mini_batch[i].next_depth)
 						td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
-						if pixel_index[0] == 0:
-							action_str = "suck_1"; rotate_idx = -1
-						elif pixel_index[0] == 1:
-							action_str = "suck_2"; rotate_idx = -1
-						else:
-							action_str = "grasp"; rotate_idx = pixel_index[0] -2
-						old_value = trainer.forward(color, depth, action_str, False, rotate_idx)[0, pixel_index[1], pixel_index[2]]
+						action_str, rotate_idx = utils.get_actino_info(pixel_index)
+						old_value = trainer.forward(color, depth, action_str, False, rotate_idx, clear_grad=True)[0, pixel_index[1], pixel_index[2]]
 						memory.update(idxs[i], (td_target-old_value)**2)
-					arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds".format(time.time()-back_ts)
+					back_t = time.time()-back_ts
+					arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/mini_batch_size)
 				if iteration % updating_freq == 0:
 					print "[%f] Replace target network to behavior network" %(time.time()-program_ts)
 					trainer.target_net.load_state_dict(trainer.behavior_net.state_dict)

@@ -161,7 +161,6 @@ class Trainer(object):
 		else:
 			loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float()))* \
 					Variable(torch.from_numpy(label_weight).float(), requires_grad = False)*torch.FloatTensor(np.array([is_weight]))
-		loss 
 		loss = loss.sum()
 		loss.backward()
 		loss_value = loss.cpu().data.numpy()
