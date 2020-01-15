@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
+#include <std_srvs/Empty.h>
 #include <abb_node/robot_SetJoints.h>
 #include <abb_node/robot_SetCartesian.h>
 #include <abb_node/robot_GetJoints.h>
@@ -31,7 +32,7 @@ class ChangeToolService{
   std::vector<std::vector<double>> joints_vector;
   ros::NodeHandle nh_, pnh_;
   tf::TransformListener listener;
-  ros::ServiceServer change_tool_service;
+  ros::ServiceServer change_tool_service, calibrate_gripper_service;
   ros::ServiceClient getCartesian,
                      getJoints,
                      setCartesian,
@@ -97,7 +98,7 @@ class ChangeToolService{
         res.result = "same tool, abort request";
        return true;
      } else{ // Calibrate gripper
-       calibrate_gripper();
+       calibrate_gripper(true);
        return true;
      }
     }
@@ -170,11 +171,21 @@ class ChangeToolService{
     ROS_INFO("Service response complete, takes %f seconds", time_response);
     // Make gripper in zero degree
     if(req.togo==1){
-      calibrate_gripper();
+      calibrate_gripper(true);
     }
     return true;
   }
-  void calibrate_gripper(void){
+  bool calibrate_gripper_cb(std_srvs::Empty::Request  &req,
+                            std_srvs::Empty::Response &res)
+  {
+    int curr_tool_id = -1;
+    nh_.getParam("/curr_tool_id", curr_tool_id);
+    if(curr_tool_id==1){ // Only do if current tool is parallel-jaw gripper
+      calibrate_gripper(false);
+    }
+    return true;
+  }
+  void calibrate_gripper(bool go_back){
     ros::Time ts = ros::Time::now();
     abb_node::robot_GetJoints get_joints_srv;
     abb_node::robot_SetJoints set_joints_srv;
@@ -217,6 +228,7 @@ class ChangeToolService{
       set_joints_srv.request.position[5] = get_joints_srv.response.j6 - 30.0/180.0*M_PI;
       if(set_joints_srv.request.position[5]<=-400.0/180.0*M_PI){
         ROS_ERROR("Over joint6 max range, failed");
+        ros::shutdown();
         return;
       }
       setJoints.call(set_joints_srv); ros::Duration(0.3).sleep();
@@ -225,9 +237,10 @@ class ChangeToolService{
     try{
       listener.waitForTransform("base_link", "gripper", ros::Time(0), ros::Duration(1.0f));
       listener.lookupTransform("base_link", "gripper", ros::Time(0), stf);
-      tf::Matrix3x3 gripper_mat(stf.getRotation());
-      tf::Vector3 gripper_z = gripper_mat.getColumn(2), base_neg_x(-1.0f, 0.0f, 0.0f);
-      double theta = gripper_z.angle(base_neg_x); if(theta<0.0) theta = -theta;
+      tf::Quaternion desired_quat(-0.5f, 0.5f, 0.5f, -0.5f);
+      double theta = 2*desired_quat.angle(stf.getRotation());
+      if(theta>=M_PI) theta -= 2*M_PI;
+      else if(theta<=-M_PI) theta += 2*M_PI;
       getJoints.call(get_joints_srv);
       double theta_deg = theta*180.0/M_PI;
       ROS_INFO("Rotating joint 6 %f degree...", theta_deg);
@@ -242,21 +255,24 @@ class ChangeToolService{
     catch(tf::TransformException &ex){
       ROS_ERROR("%s", ex.what());
     }
-    getCartesian.call(get_cartesian_srv);
-    set_cartesian_srv.request.cartesian[0] = original_x;
-    set_cartesian_srv.request.cartesian[1] = original_y;
-    set_cartesian_srv.request.cartesian[2] = original_z;
-    set_cartesian_srv.request.quaternion[0] = get_cartesian_srv.response.q0;
-    set_cartesian_srv.request.quaternion[1] = get_cartesian_srv.response.qx;
-    set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
-    set_cartesian_srv.request.quaternion[3] = get_cartesian_srv.response.qz;
-    setCartesian.call(set_cartesian_srv); ros::Duration(0.3).sleep();
+    if(go_back){
+      getCartesian.call(get_cartesian_srv);
+      set_cartesian_srv.request.cartesian[0] = original_x;
+      set_cartesian_srv.request.cartesian[1] = original_y;
+      set_cartesian_srv.request.cartesian[2] = original_z;
+      set_cartesian_srv.request.quaternion[0] = get_cartesian_srv.response.q0;
+      set_cartesian_srv.request.quaternion[1] = get_cartesian_srv.response.qx;
+      set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
+      set_cartesian_srv.request.quaternion[3] = get_cartesian_srv.response.qz;
+      setCartesian.call(set_cartesian_srv); ros::Duration(0.3).sleep();
+    }
     ROS_INFO("Gripper calibration spend %f seconds", (ros::Time::now()-ts).toSec());
   }
  public:
   ChangeToolService(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
     setupParameters();
     change_tool_service = pnh_.advertiseService("change_tool_service", &ChangeToolService::service_cb, this);
+    calibrate_gripper_service = pnh_.advertiseService("calibrate_gripper", &ChangeToolService::calibrate_gripper_cb, this);
     std::vector<std::string> service_name{"/abb/GetCartesian",
                                           "/abb/GetJoints",
                                           "/abb/SetCartesian",
