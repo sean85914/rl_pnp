@@ -34,16 +34,23 @@ bool verbose; // If save point cloud as pcd
 bool use_two_cam; // If enable camera2
 bool down_sample; // If downsampling
 int resolution; // Heightmap resolution
+int thres_point; // Threshold points number for determining if grasp success
 const int thread_num = 16; // Number of threads
 double factor; // Voxel grid factor
 double empty_thres; // Threshold rate for determining if the bin is empty
-double success_thres; // Threshold rate for determining if the grasp is successful
 double x_lower; // X lower bound, in hand coord.
 double x_upper; // X upper bound, in hand coord.
 double y_lower; // Y lower bound, in hand coord.
 double y_upper; // Y upper bound, in hand coord.
 double z_lower; // Z lower bound, in hand coord.
 double z_upper; // Z upper bound, in hand coord.
+/* For detect if grasp success */
+double detect_x_lower;
+double detect_x_upper;
+double detect_y_lower;
+double detect_y_upper;
+double detect_z_lower;
+double detect_z_upper;
 std::string cam1_name, cam2_name; // Camera prefix
 std::string node_ns; // Node namespace
 std::mutex mtx; // Mutex lock for threading
@@ -53,6 +60,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZRGB>> global_vec; // Pointcloud placeho
 pcl::VoxelGrid<pcl::PointXYZRGB> vg;
 pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond;
 pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem;
+pcl::PassThrough<pcl::PointXYZRGB> detect_pass_x, detect_pass_y, detect_pass_z;
 void lookup_transform(std::string target_frame);
 ros::Publisher pub_pc; // Publish plane pointcloud for debuging
 void callback(const sensor_msgs::PointCloud2::ConstPtr);
@@ -76,10 +84,16 @@ int main(int argc, char** argv)
   if(!pnh.getParam("y_upper", y_upper)) y_upper = -0.200f;
   if(!pnh.getParam("z_lower", z_lower)) z_lower = -0.100f;
   if(!pnh.getParam("z_upper", z_upper)) z_upper =  0.200f;
+  if(!pnh.getParam("detect_x_lower", detect_x_lower)) detect_x_lower =  0.870f;
+  if(!pnh.getParam("detect_x_upper", detect_x_upper)) detect_x_upper =  0.950f;
+  if(!pnh.getParam("detect_y_lower", detect_y_lower)) detect_y_lower = -0.420f;
+  if(!pnh.getParam("detect_y_upper", detect_y_upper)) detect_y_upper = -0.320f;
+  if(!pnh.getParam("detect_z_lower", detect_z_lower)) detect_z_lower =  0.150f;
+  if(!pnh.getParam("detect_z_upper", detect_z_upper)) detect_z_upper =  0.250f;
   if(!pnh.getParam("resolution", resolution)) resolution = 224;
+  if(!pnh.getParam("thres_point", thres_point)) thres_point = 3000;
   if(!pnh.getParam("factor", factor)) factor = 1.0f;
   if(!pnh.getParam("empty_thres", empty_thres)) empty_thres = 0.95f;
-  if(!pnh.getParam("success_thres", success_thres)) success_thres = 0.10f;
   if(!pnh.getParam("verbose", verbose)) verbose = false;
   if(!pnh.getParam("down_sample", down_sample)) down_sample = false;
   if(!pnh.getParam("use_two_cam", use_two_cam)) use_two_cam = true;
@@ -109,6 +123,9 @@ int main(int argc, char** argv)
   range_cond->addComparison (pcl::FieldComparison<pcl::PointXYZRGB>::ConstPtr (new
       pcl::FieldComparison<pcl::PointXYZRGB> ("z", pcl::ComparisonOps::LT, z_upper)));
   condrem.setCondition(range_cond);
+  detect_pass_x.setFilterFieldName("x"); detect_pass_x.setFilterLimits(detect_x_lower, detect_x_upper);
+  detect_pass_y.setFilterFieldName("y"); detect_pass_y.setFilterLimits(detect_y_lower, detect_y_upper);
+  detect_pass_z.setFilterFieldName("z"); detect_pass_z.setFilterLimits(detect_z_lower, detect_z_upper);
   pub_pc = pnh.advertise<sensor_msgs::PointCloud2>("plane_pc", 1);
   // Setup subscribers
   ros::Subscriber sub_cam1_pc = pnh.subscribe("cam1_pc", 1, callback),
@@ -254,10 +271,11 @@ void check_param_cb(const ros::TimerEvent& event){
       empty_thres = tmp;
     }
   }
-  if(ros::param::get(node_ns+"/success_thres", tmp)){
-    if(tmp!=success_thres){
-      ROS_INFO("success_thres set from %f to %f", success_thres, tmp);
-      success_thres = tmp;
+  int tmp_int;
+  if(ros::param::get(node_ns+"/thres_point", tmp_int)){
+    if(tmp_int!=thres_point){
+      ROS_INFO("thres_point set from %d to %d", thres_point, tmp_int);
+      thres_point = tmp_int;
     }
   }
 }
@@ -276,26 +294,15 @@ void workers(int id, pcl::PointCloud<pcl::PointXYZRGB> sub_pc){
 bool callback_grasp_success(visual_system::check_grasp_success::Request  &req,
                             visual_system::check_grasp_success::Response &res)
 {
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr prior_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
-                                         post_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-  pcl::io::loadPCDFile<pcl::PointXYZRGB>(req.prior_pcd_str, *prior_cloud);
-  pcl::io::loadPCDFile<pcl::PointXYZRGB>(req.post_pcd_str,  *post_cloud);
-  pcl::KdTreeFLANN<pcl::PointXYZRGB> prior_tree(false), post_tree(false);
-  prior_tree.setInputCloud(prior_cloud);
-  post_tree.setInputCloud(post_cloud);
-  pcl::PointXYZRGB searchPoint;
-  searchPoint.x = req.operated_position.x;
-  searchPoint.y = req.operated_position.y;
-  searchPoint.z = req.operated_position.z;
-  std::vector<int> prior_inliers, post_inliers;
-  std::vector<float> _;
-  double radius = 0.02; // 2cm
-  prior_tree.radiusSearch(searchPoint, radius, prior_inliers, _);
-  post_tree.radiusSearch(searchPoint, radius, post_inliers, _);
-  double rate = post_inliers.size()/(double)prior_inliers.size();
-  if(rate<=success_thres){
-    res.is_success = true;
-  } else res.is_success = false;
-  ROS_INFO("Prior: %d \t Posterior: %d \t Success: %s", (int)prior_inliers.size(), (int)post_inliers.size(), (res.is_success?"True":"False"));
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>), 
+                                           tmp(new pcl::PointCloud<pcl::PointXYZRGB>);
+  pcl::io::loadPCDFile<pcl::PointXYZRGB>(req.pcd_str, *cloud);
+  detect_pass_x.setInputCloud(cloud); detect_pass_x.filter(*tmp);
+  detect_pass_y.setInputCloud(tmp);   detect_pass_y.filter(*tmp);
+  detect_pass_z.setInputCloud(tmp);   detect_pass_z.filter(*tmp);
+  if(tmp->points.size()>thres_point){
+    res.is_success = true; // Success
+  } else res.is_success = false; // Failed
+  ROS_INFO("%d points in range \t | Success: %s", int(tmp->points.size()), (res.is_success?"True":"False"));
   return true;
 }
