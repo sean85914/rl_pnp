@@ -357,10 +357,15 @@ def parse_input(args):
 	
 
 def standarization(prediction):
-	for i in range(prediction[0]):
-		mean = np.nanmean(prediction[i])
-		std  = np.nanstd(prediction[i])
-		prediction = (prediction[i]-mean)/std
+	if prediction.shape[0] is not 1:
+		for i in range(prediction.shape[0]):
+			mean = np.nanmean(prediction[i])
+			std  = np.nanstd(prediction[i])
+			prediction[i] = (prediction[i]-mean)/std
+	else:
+		mean = np.nanmean(prediction)
+		std = np.nanstd(prediction)
+		prediction = (prediction-mean)/std
 	return prediction
 
 def get_file_path(color_img_path_str):
@@ -470,7 +475,7 @@ def save_heatmap_and_mixed(suck_1_prediction, suck_2_prediction, grasp_predictio
 	heatmaps.append(vis_affordance(suck_2_prediction[0]))
 	for grasp_prediction in grasp_predictions:
 		heatmaps.append(vis_affordance(grasp_prediction))
-	for heatmap_idx in range(len(heatmap)):
+	for heatmap_idx in range(len(heatmaps)):
 		img_name = feat_paths[heatmap_idx] + "{:06}.jpg".format(iteration)
 		cv2.imwrite(img_name, heatmaps[heatmap_idx])
 		img_name = mixed_paths[heatmap_idx] + "{:06}.jpg".format(iteration)
