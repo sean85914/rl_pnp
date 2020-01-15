@@ -1,5 +1,3 @@
-string prior_pcd_str
-string post_pcd_str
-geometry_msgs/Point operated_position
+string pcd_str
 ---
 bool is_success
