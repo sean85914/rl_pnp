@@ -1,6 +1,6 @@
 <launch>
   <arg name="port" default="/dev/ttyvacuum"/>
-  <arg name="vacuum_thres" default="560"/>
+  <arg name="vacuum_thres" default="470"/>
   <include file="$(find arm_operation)/launch/change_tool_service.launch"/>
   <node pkg="arm_operation" type="agent_server_node" name="agent_server_node" output="screen" clear_params="true">
     <rosparam param="tool_length">[0.15, 0.084, 0.05]</rosparam>
@@ -18,12 +18,12 @@
                                    -0.018849557265639305, 
                                    1.2630947828292847, 
                                    -0.4089306592941284]</rosparam>
-    <rosparam param="middle_joints">[-0.06283184885978699, 
-                                      0.11222466826438904, 
-                                      0.05602506920695305, 
-                                     -0.01745329238474369, 
-                                      1.4076080322265625, 
-                                      0.11990411579608917]</rosparam>
+    <rosparam param="middle_joints">[-0.0626573201609, 
+                                      0.121823981817, 
+                                     -0.100705497863, 
+                                     -0.0178023583744, 
+                                      1.55421569926, 
+                                      0.117809724537]</rosparam>
     <rosparam param="place_joints">[0.18395769596099854, 
                                     0.14468780159950256, 
                                     0.17662732303142548, 
