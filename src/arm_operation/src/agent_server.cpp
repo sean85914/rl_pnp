@@ -43,6 +43,7 @@ class AgentServer{
   ros::ServiceServer agent_action_server;
   ros::ServiceServer go_home_server;
   ros::ServiceServer go_place_server;
+  ros::ServiceServer go_home_fix_orientation_server;
   void setupParams(void);
   void setupServiceClients(void);
   void getInitialToolID(void);
@@ -52,6 +53,8 @@ class AgentServer{
                std_srvs::Empty::Response&);
   bool serviceCB(arm_operation::agent_abb_action::Request&, 
                  arm_operation::agent_abb_action::Response&);
+  bool home_fixCB(std_srvs::Empty::Request&,
+                  std_srvs::Empty::Response&);
  public:
   AgentServer(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
     tool_length.resize(3);
@@ -70,6 +73,7 @@ class AgentServer{
     agent_action_server = pnh_.advertiseService("agent_take_action", &AgentServer::serviceCB, this);
     go_home_server      = pnh_.advertiseService("go_home", &AgentServer::homeCB, this);
     go_place_server     = pnh_.advertiseService("go_place", &AgentServer::placeCB, this);
+    go_home_fix_orientation_server = pnh_.advertiseService("go_home_fix_orientation", &AgentServer::home_fixCB, this);
   }
 };
 
@@ -171,6 +175,7 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
     curr_tool_id = req.tool_id;
     nh_.setParam("curr_tool_id", curr_tool_id);
   }
+  ros::Duration(0.5).sleep();
   // Get current pose and store it into buffer
   abb_node::robot_GetCartesian get_cartesian;
   get_cartesian_client.call(get_cartesian);
@@ -225,8 +230,8 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   return true;
 }
 
-bool AgentServer::homeCB(std_srvs::Empty::Request&,
-                         std_srvs::Empty::Response&){
+bool AgentServer::homeCB(std_srvs::Empty::Request  &req,
+                         std_srvs::Empty::Response &res){
   ros::Time ts = ros::Time::now();
   abb_node::robot_SetJoints set_joints;
   set_joints.request.position.resize(6);
@@ -236,9 +241,12 @@ bool AgentServer::homeCB(std_srvs::Empty::Request&,
   return true;
 }
 
-bool AgentServer::placeCB(std_srvs::Empty::Request&,
-                         std_srvs::Empty::Response&){
+bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
+                          std_srvs::Empty::Response &res){
   ros::Time ts = ros::Time::now();
+  // Get current joint
+  abb_node::robot_GetJoints get_joint;
+  get_joints_client.call(get_joint);
   abb_node::robot_SetZone set_zone;
   abb_node::robot_SetSpeed set_speed;
   // Set zone to z_10, speed to (300, 100)
@@ -263,13 +271,39 @@ bool AgentServer::placeCB(std_srvs::Empty::Request&,
   // Set zone to z_0
   set_zone.request.mode = 1;
   set_zone_client.call(set_zone);
-  // And then go back
-  set_joints.request.position.assign(home_joints.begin(), home_joints.end());
+  // And then middle joints and go back
+  set_joints.request.position.assign(middle_joints.begin(), middle_joints.end());
+  set_joints_client.call(set_joints);
+  set_joints.request.position[0] = get_joint.response.j1;
+  set_joints.request.position[1] = get_joint.response.j2;
+  set_joints.request.position[2] = get_joint.response.j3;
+  set_joints.request.position[3] = get_joint.response.j4;
+  set_joints.request.position[4] = get_joint.response.j5;
+  set_joints.request.position[5] = get_joint.response.j6;
   set_joints_client.call(set_joints);
   // Speed to original one
   set_speed.request.tcp = 200.0f;
   set_speed.request.ori = 100.0f;
   set_speed_client.call(set_speed);
   ROS_INFO("Go place takes %f seconds", (ros::Time::now()-ts).toSec());
+  return true;
+}
+
+bool AgentServer::home_fixCB(std_srvs::Empty::Request  &req,
+                             std_srvs::Empty::Response &res)
+{
+  abb_node::robot_GetCartesian get_cartesian;
+  get_cartesian_client.call(get_cartesian);
+  abb_node::robot_SetCartesian set_cartesian;
+  set_cartesian.request.cartesian.resize(3); set_cartesian.request.quaternion.resize(4);
+  set_cartesian.request.cartesian[0] = 912.52; 
+  set_cartesian.request.cartesian[1] = -365.56; 
+  set_cartesian.request.cartesian[2] = 934.48; 
+  set_cartesian.request.quaternion[0] = get_cartesian.response.q0;
+  set_cartesian.request.quaternion[1] = get_cartesian.response.qx;
+  set_cartesian.request.quaternion[2] = get_cartesian.response.qy;
+  set_cartesian.request.quaternion[3] = get_cartesian.response.qz;
+  set_cartesian_client.call(set_cartesian);
+  ros::Duration(0.5).sleep();
   return true;
 }
