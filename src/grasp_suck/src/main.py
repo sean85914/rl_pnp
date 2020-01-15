@@ -58,11 +58,13 @@ csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, 
 vacuum_pump_control      = rospy.ServiceProxy("/vacuum_pump_control_node/vacuum_control", SetBool)
 check_suck_success       = rospy.ServiceProxy("/vacuum_pump_control_node/check_suck_success", SetBool)
 agent_take_action_client = rospy.ServiceProxy("/agent_server_node/agent_take_action", agent_abb_action)
+calibrate_gripper_client = rospy.ServiceProxy("/change_tool_service/calibrate_gripper", Empty)
 get_pc_client            = rospy.ServiceProxy("/combine_pc_node/get_pc", get_pc)
 empty_checker            = rospy.ServiceProxy("/combine_pc_node/empty_state", pc_is_empty)
 check_grasp_success      = rospy.ServiceProxy("/combine_pc_node/grasp_state", check_grasp_success)
 go_home                  = rospy.ServiceProxy("/agent_server_node/go_home", Empty)
 go_place                 = rospy.ServiceProxy("/agent_server_node/go_place", Empty)
+fixed_home               = rospy.ServiceProxy("/agent_server_node/go_home_fix_orientation", Empty)
 viz                      = rospy.ServiceProxy("/viz_marker_node/viz_marker", viz_marker)
 # Result list
 action_list   = [] # If action valid?
@@ -99,6 +101,15 @@ def _check_if_empty(pc):
 	empty_checker_req = pc_is_emptyRequest()
 	empty_checker_req.input_pc = pc
 	return empty_checker(empty_checker_req).is_empty.data
+def _check_grasp_success():
+	go_home(); rospy.sleep(0.5)
+	calibrate_gripper_client()
+	check_grasp_success_request = check_grasp_successRequest()
+	# Get temporary pc and save file
+	_ = _get_pc(iteration, False)
+	check_grasp_success_request.pcd_str = pc_path + "{:06}_after.pcd".format(iteration)
+	return check_grasp_success(check_grasp_success_request).is_success
+
 
 # Initialize
 go_home()
@@ -139,8 +150,7 @@ try:
 				visual_img = utils.draw_image(mixed_imgs[pixel_index[0]], explore, pixel_index)
 				img_name = vis_path + "vis_{:06}.jpg".format(iteration)
 				cv2.imwrite(img_name, visual_img)
-				cv2.imshow("prediction", visual_img)
-				cv2.waitKey(33)
+				cv2.imshow("prediction", visual_img);cv2.waitKey(33)
 				# Check if action valid (is NAN?)
 				is_valid = utils.check_if_valid(points[pixel_index[1], pixel_index[2]])
 				# Visualize in RViz
@@ -149,7 +159,6 @@ try:
 					# suck_1(0) -> 3, suck_2(1) -> 2, other(2~5) (grasp) -> 1
 					tool_id = (3-pixel_index[0]) if pixel_index[0] < 2 else 1
 					_take_action(tool_id, points[pixel_index[1], pixel_index[2]], angle)
-					go_home()
 				else: # invalid
 					action_list.append(-1); arduino.write("r 1000") # Red
 					action_success = False
@@ -157,16 +166,11 @@ try:
 					if action < 2: # suction cup
 						action_success = check_suck_success().success
 					else: # parallel-jaw gripper TODO
-						check_grasp_success_request = check_grasp_successRequest()
-						check_grasp_success_request.prior_pcd_str = pc_path + "{:06}_before.pcd".format(iteration)
-						# Get temporary pc and save file
-						_ = _get_pc(iteration, False)
-						check_grasp_success_request.post_pcd_str = pc_path + "{:06}_after.pcd".format(iteration)
-						check_grasp_success_request.operated_position = utils.point_np_to_ros(points[pixel_index[1], pixel_index[2]])
-						action_success = check_grasp_success(check_grasp_success_request).is_success
+						action_success = _check_grasp_success()
 				result_list.append(action_success)
-				if action_success: go_place(); arduino.write("g 1000") # Green
+				if action_success: go_place(); fixed_home(); arduino.write("g 1000") # Green
 				else: 
+					fixed_home()
 					vacuum_pump_control(SetBoolRequest(False))
 					if is_valid: arduino.write("o 1000") # Orange
 				time.sleep(0.5)
@@ -218,7 +222,7 @@ try:
 						next_color = cv2.imread(mini_batch[i].next_color)
 						next_depth = np.loadtxt(mini_batch[i].next_depth)
 						td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
-						action_str, rotate_idx = utils.get_actino_info(pixel_index)
+						action_str, rotate_idx = utils.get_action_info(pixel_index)
 						old_value = trainer.forward(color, depth, action_str, False, rotate_idx, clear_grad=True)[0, pixel_index[1], pixel_index[2]]
 						memory.update(idxs[i], (td_target-old_value)**2)
 					back_t = time.time()-back_ts
@@ -230,6 +234,5 @@ try:
 					model_name = model_path + "{}.pth".format(iteration)
 					torch.save(trainer.behavior_net.state_dict(), model_name)
 					print "[%f] Model: %s saved" %(time.time()-program_ts, model_name)
-					
 except KeyboardInterrupt:
 	utils.shutdown_process(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, False)
