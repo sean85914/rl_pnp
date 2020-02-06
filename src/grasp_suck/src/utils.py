@@ -321,7 +321,7 @@ def create_argparser():
 	parser.add_argument("--force_cpu", action="store_true", default=False, help="True if using CPU, default is false")
 	parser.add_argument("--model", type=str, default="", help="If provided, continue training the model, or using this model for testing, 	default is empty srting")
 	parser.add_argument("--buffer_file", type=str, default="", help="If provided, will read the given file to construct the experience buffer, default is empty string")
-	parser.add_argument("--epsilon", type=float, default=0.5, help="Probability to choose random action")
+	parser.add_argument("--epsilon", type=float, default=0.5, help="Probability to choose random action, default is 0.5")
 	parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alram lamp, default is /dev/ttylight")
 	parser.add_argument("--buffer_size", type=int, default=500, help="Experience buffer size, default is 500") # N
 	parser.add_argument("--learning_freq", type=int, default=10, help="Frequency for updating behavior network, default is 10") # M
@@ -483,3 +483,12 @@ def save_heatmap_and_mixed(suck_1_prediction, suck_2_prediction, grasp_predictio
 		mixed_imgs.append(mixed)
 		cv2.imwrite(img_name, mixed)
 	return heatmaps, mixed_imgs
+	
+# Reward shaping
+def reward_judgement(reward_unit, action_valid, action_success):
+	if not action_valid:
+		return -3*reward_unit # Invalid
+	if action_success:
+		return reward_unit # Valid and success
+	else:
+		return -reward_unit # Valid and failed

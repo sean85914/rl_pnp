@@ -30,8 +30,8 @@ testing, episode, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, le
 reward = 1.0
 discount_factor = 0.5
 iteration = 0
-z_thres = -0.017 # TODO is this required?
 program_ts = time.time()
+program_time = 0.0
 memory = Memory(buffer_size)
 arduino = serial.Serial(port, 115200)
 
@@ -118,14 +118,16 @@ vacuum_pump_control(SetBoolRequest(False))
 try:
 	while True:
 		if iteration is not 0: arduino.write("gb 1000") # Green + buzzer for alarming resetting
-		cmd = raw_input("\033[1;34m[%f] Reset environment, if ready, press 's' to start. 'e' to exit: \033[0m" %(time.time()-program_ts))
+		program_time += time.time()-program_ts
+		cmd = raw_input("\033[1;34m[%f] Reset environment, if ready, press 's' to start. 'e' to exit: \033[0m" %(program_time))
+		program_ts = time.time()
 		if cmd == 'E' or cmd == 'e':
 			utils.shutdown_process(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, True)
 		elif cmd == 'S' or cmd == 's':
 			if iteration is not 0: return_list.append(return_); episode_list.append(t)
 			t = 0; return_ = 0.0; is_empty = False
 			while is_empty is not True:
-				print "\033[0;32m[%f] Iteration: %d\033[0m" %(time.time()-program_ts, iteration)
+				print "\033[0;32m[%f] Iteration: %d\033[0m" %(program_time+time.time()-program_ts, iteration)
 				if not testing: epsilon_ = max(epsilon * np.power(0.998, t), 0.1) # half after 350 steps
 				pc_response = _get_pc(iteration, True)
 				color, depth, points = utils.get_heightmap(pc_response.pc, image_path, depth_path, iteration)
@@ -178,20 +180,7 @@ try:
 				next_pc = _get_pc(iteration, False)
 				next_color, next_depth, next_points = utils.get_heightmap(next_pc.pc, image_path + "next_", depth_path + "next_", iteration)
 				is_empty = _check_if_empty(next_pc.pc)
-				# TODO: form a function
-				# Reward shaping
-				# Success -> +R
-				# Fail and z>=z_thres -> -R
-				# Fail and z< z_thres -> -2R
-				# Invalid -> -5R
-				if not is_valid: # NaN point
-					current_reward = -5*reward
-				elif action_success: # Good
-					current_reward = reward
-				elif is_valid and not action_success and points[pixel_index[1], pixel_index[2], 2] >= z_thres: # Bad suction point
-					current_reward = -reward
-				elif not action_success and points[pixel_index[1], pixel_index[2], 2] < z_thres: # Suck on box
-					current_reward = -2*reward
+				current_reward = utils.reward_judgement(reward, is_valid, action_success)
 				return_ += current_reward * np.power(discount_factor, t) 
 				print "\033[1;33mCurrent reward: {} \t Return: {}\033[0m".format(current_reward, return_)
 				# Store transition to experience buffer
@@ -228,11 +217,11 @@ try:
 					back_t = time.time()-back_ts
 					arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/mini_batch_size)
 				if iteration % updating_freq == 0:
-					print "[%f] Replace target network to behavior network" %(time.time()-program_ts)
+					print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
 					trainer.target_net.load_state_dict(trainer.behavior_net.state_dict)
 				if iteration % save_every == 0 and not testing:
 					model_name = model_path + "{}.pth".format(iteration)
 					torch.save(trainer.behavior_net.state_dict(), model_name)
-					print "[%f] Model: %s saved" %(time.time()-program_ts, model_name)
+					print "[%f] Model: %s saved" %(program_time+time.time()-program_ts, model_name)
 except KeyboardInterrupt:
 	utils.shutdown_process(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, False)
