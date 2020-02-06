@@ -173,6 +173,7 @@ class ChangeToolService{
     if(req.togo==1){
       calibrate_gripper(true);
     }
+    nh_.setParam("/curr_tool_id", req.togo);
     return true;
   }
   bool calibrate_gripper_cb(std_srvs::Empty::Request  &req,
@@ -242,7 +243,7 @@ class ChangeToolService{
       if(theta>=M_PI) theta -= 2*M_PI;
       else if(theta<=-M_PI) theta += 2*M_PI;
       getJoints.call(get_joints_srv);
-      if(!in_range(theta, 0.1f, -0.1f)) // If theta less than 0.1, then neglect to rotate
+      if(!in_range(theta, 0.1f, -0.1f)){ // If theta less than 0.1, then neglect to rotate
         double theta_deg = theta*180.0/M_PI;
         ROS_INFO("Rotating joint 6 %f degree...", theta_deg);
         set_joints_srv.request.position[0] = get_joints_srv.response.j1;
@@ -252,6 +253,7 @@ class ChangeToolService{
         set_joints_srv.request.position[4] = get_joints_srv.response.j5;
         set_joints_srv.request.position[5] = get_joints_srv.response.j6 - theta;
         setJoints.call(set_joints_srv); ros::Duration(0.3).sleep();
+      }
     }
     catch(tf::TransformException &ex){
       ROS_ERROR("%s", ex.what());

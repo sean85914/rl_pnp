@@ -166,6 +166,7 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   set_joints.request.position.resize(6);
   set_joints.request.position.assign(home_joints.begin(), home_joints.end());
   set_joints_client.call(set_joints);
+  nh_.getParam("curr_tool_id", curr_tool_id);
   if((curr_tool_id!=req.tool_id) or (curr_tool_id==1 and req.tool_id==1)){
     // Change tool, or calibrate gripper
     arm_operation::change_tool change_tool_req;
