@@ -34,12 +34,15 @@ Usage: ./bag_to_video [bag_name] [output_video_name]\n\033[0m\
   std::vector<cv::Mat> img_vec;
   cv_bridge::CvImagePtr cv_bridge_ptr;
   double bag_duration = (view.getEndTime() - view.getBeginTime()).toSec();
+  std::cout << "Bag duration: " << bag_duration << " seconds\n";
   // Get number of frame
   int img_num = 0, width, height;
+  std::cout << "Counting frames: \n";
   auto s_ts = std::chrono::high_resolution_clock::now();
   foreach(const rosbag::MessageInstance m, view){
     if(m.getDataType()=="sensor_msgs/Image"){
       ++img_num;
+      printf("\r%d", img_num);
       sensor_msgs::Image::ConstPtr img_ptr = m.instantiate<sensor_msgs::Image>();
       width = img_ptr->width;
       height = img_ptr->height;
@@ -54,11 +57,15 @@ Usage: ./bag_to_video [bag_name] [output_video_name]\n\033[0m\
       img_vec.push_back(rgb_img);
     }
   }
+  std::cout << "\nNum of frames: " << img_num << "\nFPS: " << img_num/bag_duration << "\nCounting down...\n";
   std::string output_filename(argv[2]);
   output_filename+=".avi";
   cv::VideoWriter video(output_filename, CV_FOURCC('M', 'J', 'P', 'G'), img_num/bag_duration, cv::Size(width, height));
-  for(int i=0; i<img_vec.size(); ++i)
+  for(int i=0; i<img_vec.size(); ++i){
     video << img_vec[i];
+    printf("\r[%d/%d]", i+1, img_num);
+  }
+  std::cout << "\n";
   auto e_ts = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(e_ts-s_ts).count();
   std::cout << "Conversion time: " << duration*1e-9 << " seconds\n";
