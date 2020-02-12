@@ -40,4 +40,4 @@ add_executable(draw_path src/draw_path.cpp)
 target_link_libraries(draw_path ${catkin_LIBRARIES})
 
 add_executable(bag_to_video src/bag_to_video.cpp)
-target_link_libraries(bag_to_video ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+target_link_libraries(bag_to_video ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} stdc++fs)
