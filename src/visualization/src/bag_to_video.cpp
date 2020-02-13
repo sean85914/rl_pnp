@@ -22,12 +22,15 @@ std::string topic_name;
 
 int main(int argc, char** argv)
 {
-  if(argc!=3){
+  if(argc<3){
     std::cout << "\033[1;31mInsufficient input arguments\n\
-Usage: ./bag_to_video [bag_name] [output_video_name]\n\033[0m\
-\033[1;33mNote: output_video_name without extension\n\033[0m";
+Usage: ./bag_to_video bag_name output_video_name [factor]\n\033[0m";
     exit(EXIT_FAILURE);
   }
+  double factor = 1.0;
+  if(argc==4)
+    factor = atof(argv[3]);
+  std::cout << "Video factor: " << factor << "\n";
   rosbag::Bag bag;
   try{
     bag.open(argv[1], rosbag::bagmode::Read);
@@ -77,8 +80,13 @@ Usage: ./bag_to_video [bag_name] [output_video_name]\n\033[0m\
   }
   std::cout << "\nNum of frames: " << img_num << "\nFPS: " << img_num/bag_duration << "\nCounting down...\n";
   std::string output_filename(argv[2]);
-  output_filename+=".avi";
-  cv::VideoWriter video(output_filename, CV_FOURCC('M', 'J', 'P', 'G'), img_num/bag_duration, cv::Size(width, height));
+  if(output_filename.length()<=4)
+    output_filename+=".mp4";
+  else{
+    if(output_filename.substr(output_filename.length()-4, 4)!=".mp4")
+      output_filename+=".mp4";
+  }
+  cv::VideoWriter video(output_filename, CV_FOURCC('H', '2', '6', '4'), img_num/bag_duration*factor, cv::Size(width, height));
   for(int i=0; i<img_num; ++i){
     std::stringstream ss; ss.width(6); ss.fill('0'); ss << i;
     std::string img_name = "tmp/" + ss.str() + ".jpg";
