@@ -17,23 +17,33 @@
 
 #define foreach BOOST_FOREACH
 
-bool has_data = false;
-std::string topic_name;
-
 int main(int argc, char** argv)
 {
+  bool has_data = false;
+  std::string topic_name;
+  double speed = 1.0;
+  int width, height, img_num = 0;
   if(argc<3){
     std::cout << "\033[1;31mInsufficient input arguments\n\
-Usage: ./bag_to_video bag_name output_video_name [factor]\n\033[0m";
+Usage: ./bag_to_video bag_name output_video_name [speed]\n\033[0m";
     exit(EXIT_FAILURE);
   }
-  double factor = 1.0;
+  std::string in_bag(argv[1]),
+              out_name(argv[2]);
+  if(out_name.length()<=4) // .mp4
+    out_name+=".mp4";
+  else{
+    if(out_name.substr(out_name.length()-4, 4)!=".mp4")
+      out_name+=".mp4";
+  }
   if(argc==4)
-    factor = atof(argv[3]);
-  std::cout << "Video factor: " << factor << "\n";
+    speed = atof(argv[3]);
+  std::cout << "Input bag: " << in_bag << "\n";
+  std::cout << "Output video: " << out_name << "\n";
+  std::cout << "Video speed: " << speed << "\n";
   rosbag::Bag bag;
   try{
-    bag.open(argv[1], rosbag::bagmode::Read);
+    bag.open(in_bag, rosbag::bagmode::Read);
   } catch(const rosbag::BagIOException& e){
     std::cout << "\033[1;31mProvided bag name unopenable, please make sure you provide correct name, exiting...\033[0m\n";
     exit(EXIT_FAILURE);
@@ -43,7 +53,6 @@ Usage: ./bag_to_video bag_name output_video_name [factor]\n\033[0m";
   double bag_duration = (view.getEndTime() - view.getBeginTime()).toSec();
   std::cout << "Bag duration: " << bag_duration << " seconds\n";
   // Get number of frame
-  int img_num = 0, width, height;
   std::cout << "Counting frames: \n";
   auto s_ts = std::chrono::high_resolution_clock::now();
   std::experimental::filesystem::create_directory("tmp");  // Temporary directory for saving images
@@ -63,6 +72,7 @@ Usage: ./bag_to_video bag_name output_video_name [factor]\n\033[0m";
       }
       // Make sure is the same topic
       if(m.getTopic()!=topic_name) continue;
+      double read_ratio = ((m.getTime() - view.getBeginTime()).toSec())/bag_duration;
       width = img_ptr->width;
       height = img_ptr->height;
       cv::Mat rgb_img;
@@ -70,7 +80,7 @@ Usage: ./bag_to_video bag_name output_video_name [factor]\n\033[0m";
       std::stringstream ss; ss.width(6); ss.fill('0'); ss << img_num;
       std::string img_name = "tmp/" + ss.str() + ".jpg";
       cv::imwrite(img_name, rgb_img);
-      printf("\r%d", img_num+1);
+      printf("\r[%05.1f%%] %d", read_ratio*100, img_num+1);
       ++img_num;
     }
   }
@@ -79,14 +89,7 @@ Usage: ./bag_to_video bag_name output_video_name [factor]\n\033[0m";
     exit(EXIT_FAILURE);
   }
   std::cout << "\nNum of frames: " << img_num << "\nFPS: " << img_num/bag_duration << "\nCounting down...\n";
-  std::string output_filename(argv[2]);
-  if(output_filename.length()<=4)
-    output_filename+=".mp4";
-  else{
-    if(output_filename.substr(output_filename.length()-4, 4)!=".mp4")
-      output_filename+=".mp4";
-  }
-  cv::VideoWriter video(output_filename, CV_FOURCC('H', '2', '6', '4'), img_num/bag_duration*factor, cv::Size(width, height));
+  cv::VideoWriter video(out_name, CV_FOURCC('H', '2', '6', '4'), img_num/bag_duration*speed, cv::Size(width, height));
   for(int i=0; i<img_num; ++i){
     std::stringstream ss; ss.width(6); ss.fill('0'); ss << i;
     std::string img_name = "tmp/" + ss.str() + ".jpg";
