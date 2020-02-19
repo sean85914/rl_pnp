@@ -28,6 +28,7 @@ class AgentServer{
   const double tool_head_length = 0.555f; // Length of spear tool head, roughly measured
   std::vector<double> tool_length; // Length of three tool, from parameter server
   std::vector<double> home_joints; // Joints for home pose
+  std::vector<double> home_xyz; // XYZ coordinate of home
   std::vector<double> middle_joints; // Middle joint for placing
   std::vector<double> place_joints; // Joints for placing pose
   std::vector<std::string> service_name_vec;
@@ -40,13 +41,18 @@ class AgentServer{
   ros::ServiceClient set_zone_client;
   ros::ServiceClient set_speed_client;
   ros::ServiceClient vacuum_control_client;
+  ros::ServiceClient check_suck_success_client;
   ros::ServiceServer agent_action_server;
   ros::ServiceServer go_home_server;
   ros::ServiceServer go_place_server;
   ros::ServiceServer go_home_fix_orientation_server;
+  ros::ServiceServer fast_vibrate_server;
   void setupParams(void);
   void setupServiceClients(void);
   void getInitialToolID(void);
+  void _home(void);
+  void _home_fix_ori(void);
+  void _fast_vibrate(void);
   bool homeCB(std_srvs::Empty::Request&,
               std_srvs::Empty::Response&);
   bool placeCB(std_srvs::Empty::Request&,
@@ -55,13 +61,16 @@ class AgentServer{
                  arm_operation::agent_abb_action::Response&);
   bool home_fixCB(std_srvs::Empty::Request&,
                   std_srvs::Empty::Response&);
+  bool vibrateCB(std_srvs::Empty::Request&,
+                 std_srvs::Empty::Response&);
  public:
   AgentServer(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
     tool_length.resize(3);
+    home_xyz.resize(3);
     home_joints.resize(6);
     middle_joints.resize(6);
     place_joints.resize(6);
-    service_name_vec.resize(8);
+    service_name_vec.resize(9);
     setupParams();
     // Wait all services to arise
     for(int i=0; i<service_name_vec.size(); ++i){
@@ -74,6 +83,7 @@ class AgentServer{
     go_home_server      = pnh_.advertiseService("go_home", &AgentServer::homeCB, this);
     go_place_server     = pnh_.advertiseService("go_place", &AgentServer::placeCB, this);
     go_home_fix_orientation_server = pnh_.advertiseService("go_home_fix_orientation", &AgentServer::home_fixCB, this);
+    fast_vibrate_server = pnh_.advertiseService("fast_vibrate", &AgentServer::vibrateCB, this);
   }
 };
 
@@ -98,6 +108,13 @@ void AgentServer::setupParams(void){
     exit(EXIT_FAILURE);
   }else{
     ROS_INFO("\nTool 1 length: %f\nTool 2 length: %f\nTool 3 length: %f", tool_length[0], tool_length[1], tool_length[2]);
+  }
+  if(!pnh_.getParam("home_xyz", home_xyz)){
+    ROS_ERROR("No home coordinate given, exit...");
+    ros::shutdown();
+    exit(EXIT_FAILURE);
+  }else{
+    ROS_INFO("Home X: %f| Y: %f | Z: %f", home_xyz[0], home_xyz[1], home_xyz[2]);
   }
   if(!pnh_.getParam("service_name", service_name_vec)){
     ROS_ERROR("No service name vector given, exit...");
@@ -152,6 +169,7 @@ void AgentServer::setupServiceClients(void){
   set_zone_client = pnh_.serviceClient<abb_node::robot_SetZone>(service_name_vec[5]);
   set_speed_client = pnh_.serviceClient<abb_node::robot_SetSpeed>(service_name_vec[6]);
   vacuum_control_client = pnh_.serviceClient<std_srvs::SetBool>(service_name_vec[7]);
+  check_suck_success_client = pnh_.serviceClient<std_srvs::SetBool>(service_name_vec[8]);
 }
 
 bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req, 
@@ -196,15 +214,15 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   setTargetPose(set_cartesian, target_ee_position, quat);
   set_cartesian_client.call(set_cartesian);
   ros::Duration(0.5).sleep();
-  // Turn on vacuum suction
+  // Turn on vacuum if using suction cup
   std_srvs::SetBool bool_data; bool_data.request.data = true;
   if(req.tool_id!=1) vacuum_control_client.call(bool_data);
   // Set zone to fine
   abb_node::robot_SetZone set_zone;
   set_zone.request.mode = 0;
   set_zone_client.call(set_zone);
-  // Go to target, downward 2 cm
-  target_ee_position.z -= 0.22;
+  // Go to target, downward 3 cm
+  target_ee_position.z -= 0.23;
   setTargetPose(set_cartesian, target_ee_position, quat);
   set_cartesian_client.call(set_cartesian);
   // Grasp when gripper reach the target
@@ -213,41 +231,104 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   // Set zone to z0
   set_zone.request.mode = 1;
   set_zone_client.call(set_zone);
-  // Go to first waypoint
-  target_ee_position.z += 0.22;
+  // Go to first waypoint, and check if success (only for suction cup)
+  target_ee_position.z += 0.2;
   setTargetPose(set_cartesian, target_ee_position, quat);
   set_cartesian_client.call(set_cartesian);
+  bool is_success;
+  if(req.tool_id!=1){
+    check_suck_success_client.call(bool_data);
+    is_success = bool_data.response.success;
+    if(is_success){ // If suck success, raise the object up to prevent collsion with the box during placing
+      target_ee_position.z = get_cartesian.response.z/1000.0 + 0.2;
+      setTargetPose(set_cartesian, target_ee_position, quat);
+      set_cartesian_client.call(set_cartesian);
+    }
+  }else{ // Gripper
+    _home_fix_ori();
+  }
+  // Move slower to prevent droping
+  /*abb_node::robot_SetSpeed set_speed;
+  set_speed.request.tcp = 150.0f;
+  set_speed.request.ori = 100.0f;
+  set_speed_client.call(set_speed);*/
   ros::Duration(0.5).sleep();
-  // Go back to original pose
-  geometry_msgs::Point original_position;
-  original_position.x = get_cartesian.response.x/1000.0;
-  original_position.y = get_cartesian.response.y/1000.0;
-  original_position.z = get_cartesian.response.z/1000.0;
-  tf::Quaternion original_orientation(get_cartesian.response.qx, get_cartesian.response.qy, get_cartesian.response.qz, get_cartesian.response.q0);
-  setTargetPose(set_cartesian, original_position, original_orientation);
-  set_cartesian_client.call(set_cartesian);
   double time = (ros::Time::now()-ts).toSec();
   res.result = "success, action takes " + std::to_string(time) + " seconds"; 
   return true;
 }
 
-bool AgentServer::homeCB(std_srvs::Empty::Request  &req,
-                         std_srvs::Empty::Response &res){
-  ros::Time ts = ros::Time::now();
+void AgentServer::_home(void){
   abb_node::robot_SetJoints set_joints;
   set_joints.request.position.resize(6);
   set_joints.request.position.assign(home_joints.begin(), home_joints.end());
   set_joints_client.call(set_joints);
+  set_joints_client.call(set_joints);
+}
+
+void AgentServer::_home_fix_ori(void){
+  // Get current cartesian pose
+  abb_node::robot_GetCartesian get_cartesian;
+  get_cartesian_client.call(get_cartesian);
+  abb_node::robot_SetCartesian set_cartesian;
+  set_cartesian.request.cartesian.resize(3); set_cartesian.request.quaternion.resize(4);
+  set_cartesian.request.cartesian.assign(home_xyz.begin(), home_xyz.end());
+  set_cartesian.request.quaternion[0] = get_cartesian.response.q0;
+  set_cartesian.request.quaternion[1] = get_cartesian.response.qx;
+  set_cartesian.request.quaternion[2] = get_cartesian.response.qy;
+  set_cartesian.request.quaternion[3] = get_cartesian.response.qz;
+  set_cartesian_client.call(set_cartesian);
+}
+
+void AgentServer::_fast_vibrate(void){
+  // Get current cartesian pose
+  abb_node::robot_GetCartesian get_cartesian;
+  get_cartesian_client.call(get_cartesian);
+  // Set high speed
+  abb_node::robot_SetSpeed set_speed;
+  set_speed.request.tcp = 900.0f; set_speed.request.ori = 100.0f;
+  set_speed_client.call(set_speed);
+  abb_node::robot_SetCartesian set_cartesian;
+  // Move up 5 cm
+  set_cartesian.request.cartesian.resize(3); set_cartesian.request.quaternion.resize(4);
+  set_cartesian.request.cartesian[0] = get_cartesian.response.x;
+  set_cartesian.request.cartesian[1] = get_cartesian.response.y;
+  set_cartesian.request.cartesian[2] = get_cartesian.response.z + 50.0;
+  set_cartesian.request.quaternion[0] = get_cartesian.response.q0;
+  set_cartesian.request.quaternion[1] = get_cartesian.response.qx;
+  set_cartesian.request.quaternion[2] = get_cartesian.response.qy;
+  set_cartesian.request.quaternion[3] = get_cartesian.response.qz;
+  set_cartesian_client.call(set_cartesian);
+  // Then move down 5 cm
+  set_cartesian.request.cartesian[2] = get_cartesian.response.z - 100.0;
+  set_cartesian_client.call(set_cartesian);
+  // Then return to original pose and speed
+  set_cartesian.request.cartesian[2] = get_cartesian.response.z;
+  set_cartesian_client.call(set_cartesian);
+  set_speed.request.tcp = 200.0f;
+  set_speed_client.call(set_speed);
+}
+
+bool AgentServer::homeCB(std_srvs::Empty::Request  &req,
+                         std_srvs::Empty::Response &res){
+  ros::Time ts = ros::Time::now();
+  _home();
   ROS_INFO("Go home takes %f seconds", (ros::Time::now()-ts).toSec());
+  return true;
+}
+
+bool AgentServer::home_fixCB(std_srvs::Empty::Request  &req,
+                             std_srvs::Empty::Response &res)
+{
+  ros::Time ts = ros::Time::now();
+  _home_fix_ori();
+  ROS_INFO("Go home with fixed orientation takes %f seconds", (ros::Time::now()-ts).toSec());
   return true;
 }
 
 bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
                           std_srvs::Empty::Response &res){
   ros::Time ts = ros::Time::now();
-  // Get current joint
-  abb_node::robot_GetJoints get_joint;
-  get_joints_client.call(get_joint);
   abb_node::robot_SetZone set_zone;
   abb_node::robot_SetSpeed set_speed;
   // Set zone to z_10, speed to (300, 100)
@@ -261,7 +342,6 @@ bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
   // First, go to middle joints
   set_joints.request.position.assign(middle_joints.begin(), middle_joints.end());
   set_joints_client.call(set_joints);
-  // Second, go to place joints
   set_joints.request.position.assign(place_joints.begin(), place_joints.end());
   set_joints_client.call(set_joints);
   ros::Duration(0.5).sleep();
@@ -269,19 +349,17 @@ bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
   std_srvs::SetBool bool_data;
   bool_data.request.data = false;
   vacuum_control_client.call(bool_data);
+  int curr_tool_id; nh_.getParam("curr_tool_id", curr_tool_id);
+  if(curr_tool_id==1){
+    _fast_vibrate();
+  }
   // Set zone to z_0
   set_zone.request.mode = 1;
   set_zone_client.call(set_zone);
-  // And then middle joints and go back
+  // And then middle joints and go home
   set_joints.request.position.assign(middle_joints.begin(), middle_joints.end());
   set_joints_client.call(set_joints);
-  set_joints.request.position[0] = get_joint.response.j1;
-  set_joints.request.position[1] = get_joint.response.j2;
-  set_joints.request.position[2] = get_joint.response.j3;
-  set_joints.request.position[3] = get_joint.response.j4;
-  set_joints.request.position[4] = get_joint.response.j5;
-  set_joints.request.position[5] = get_joint.response.j6;
-  set_joints_client.call(set_joints);
+  _home();
   // Speed to original one
   set_speed.request.tcp = 200.0f;
   set_speed.request.ori = 100.0f;
@@ -290,21 +368,10 @@ bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
   return true;
 }
 
-bool AgentServer::home_fixCB(std_srvs::Empty::Request  &req,
-                             std_srvs::Empty::Response &res)
-{
-  abb_node::robot_GetCartesian get_cartesian;
-  get_cartesian_client.call(get_cartesian);
-  abb_node::robot_SetCartesian set_cartesian;
-  set_cartesian.request.cartesian.resize(3); set_cartesian.request.quaternion.resize(4);
-  set_cartesian.request.cartesian[0] = 912.52; 
-  set_cartesian.request.cartesian[1] = -365.56; 
-  set_cartesian.request.cartesian[2] = 934.48; 
-  set_cartesian.request.quaternion[0] = get_cartesian.response.q0;
-  set_cartesian.request.quaternion[1] = get_cartesian.response.qx;
-  set_cartesian.request.quaternion[2] = get_cartesian.response.qy;
-  set_cartesian.request.quaternion[3] = get_cartesian.response.qz;
-  set_cartesian_client.call(set_cartesian);
-  ros::Duration(0.5).sleep();
+bool AgentServer::vibrateCB(std_srvs::Empty::Request&,
+                            std_srvs::Empty::Response&){
+  ros::Time ts = ros::Time::now();
+  _fast_vibrate();
+  ROS_INFO("Fast vibrate takes %f seconds", (ros::Time::now()-ts).toSec());
   return true;
 }

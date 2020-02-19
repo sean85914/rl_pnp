@@ -1,3 +1,10 @@
+import utils
+
+parser = utils.create_argparser()
+args = parser.parse_args()
+utils.show_args(args)
+testing, episode, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate = utils.parse_input(args)
+
 import os
 import sys
 import cv2
@@ -6,8 +13,6 @@ import numpy as np
 import torch
 import rospy
 import rospkg
-import utils
-import pickle
 import serial
 from trainer import Trainer
 from prioritized_memory import Memory
@@ -20,11 +25,6 @@ from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
                               pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse, \
                               check_grasp_success, check_grasp_successRequest, check_grasp_successResponse
 from visualization.srv import viz_marker, viz_markerRequest, viz_markerResponse
-
-parser = utils.create_argparser()
-args = parser.parse_args()
-utils.show_args(args)
-testing, episode, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate = utils.parse_input(args)
 
 # Constant
 reward = 1.0
@@ -117,14 +117,15 @@ vacuum_pump_control(SetBoolRequest(False))
 
 try:
 	while True:
-		if iteration is not 0: arduino.write("gb 1000") # Green + buzzer for alarming resetting
+		if iteration is not 0: 
+			arduino.write("gb 1000") # Green + buzzer for alarming resetting
+			return_list.append(return_); episode_list.append(t) # Update data
 		program_time += time.time()-program_ts
 		cmd = raw_input("\033[1;34m[%f] Reset environment, if ready, press 's' to start. 'e' to exit: \033[0m" %(program_time))
 		program_ts = time.time()
 		if cmd == 'E' or cmd == 'e':
-			utils.shutdown_process(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, True)
+			utils.shutdown_process(program_time, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, True)
 		elif cmd == 'S' or cmd == 's':
-			if iteration is not 0: return_list.append(return_); episode_list.append(t)
 			t = 0; return_ = 0.0; is_empty = False
 			while is_empty is not True:
 				print "\033[0;32m[%f] Iteration: %d\033[0m" %(program_time+time.time()-program_ts, iteration)
@@ -160,6 +161,7 @@ try:
 				if is_valid: # Only take action if valid
 					# suck_1(0) -> 3, suck_2(1) -> 2, other(2~5) (grasp) -> 1
 					tool_id = (3-pixel_index[0]) if pixel_index[0] < 2 else 1
+					action_list.append(pixel_index[0])
 					_take_action(tool_id, points[pixel_index[1], pixel_index[2]], angle)
 				else: # invalid
 					action_list.append(-1); arduino.write("r 1000") # Red
@@ -201,7 +203,8 @@ try:
 						next_color = cv2.imread(mini_batch[i].next_color)
 						next_depth = np.loadtxt(mini_batch[i].next_depth)
 						td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
-						trainer.backprop(color, depth, pixel_index, td_target, is_weight[i])
+						loss_ = trainer.backprop(color, depth, pixel_index, td_target, is_weight[i])
+						loss_list.append(loss_)
 					print "Sampled at iteration: ", sampled_iter
 					# After parameter updated, update prioirites tree
 					for i in range(mini_batch_size):
@@ -218,10 +221,10 @@ try:
 					arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/mini_batch_size)
 				if iteration % updating_freq == 0:
 					print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
-					trainer.target_net.load_state_dict(trainer.behavior_net.state_dict)
+					trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
 				if iteration % save_every == 0 and not testing:
 					model_name = model_path + "{}.pth".format(iteration)
 					torch.save(trainer.behavior_net.state_dict(), model_name)
 					print "[%f] Model: %s saved" %(program_time+time.time()-program_ts, model_name)
 except KeyboardInterrupt:
-	utils.shutdown_process(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, False)
+	utils.shutdown_process(program_time, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, False)

@@ -414,7 +414,9 @@ def getLoggerPath(testing, root_path, episode):
 			os.makedirs(diff_path)
 	return csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path
 
-def saveFiles(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path):
+def saveFiles(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path):
+	action_list = np.array(action_list)
+	result_list = np.array(result_list)
 	np.savetxt(path+"action_primitive.csv", action_list, delimiter=",")
 	np.savetxt(path+"action_target.csv", target_list, delimiter=",")
 	np.savetxt(path+"action_result.csv", result_list, delimiter=",")
@@ -423,6 +425,52 @@ def saveFiles(action_list, target_list, result_list, loss_list, explore_list, re
 	np.savetxt(path+"return.csv", return_list, delimiter=",")
 	np.savetxt(path+"episode.csv", episode_list, delimiter=",")
 	np.savetxt(path+"position.csv", position_list, delimiter=",")
+	f = open(path+"episode_result.txt", "w")
+	total_iter = action_list.size
+	invalid_iter = np.where(action_list==-1)[0].size
+	success_iter = np.where(result_list==1)[0].size
+	gripper_usage_iter = np.where(action_list>=2)[0]
+	suction_1_usage_iter = np.where(action_list==0)[0]
+	suction_2_usage_iter = np.where(action_list==1)[0]
+	gripper_success = _count_success(gripper_usage_iter, result_list)
+	suction_1_success = _count_success(suction_1_usage_iter, result_list)
+	suction_2_success = _count_success(suction_2_usage_iter, result_list)
+	valid_iter = total_iter-invalid_iter
+	invalid_action_rate = _get_rate(invalid_iter, total_iter)
+	success_rate = _get_rate(success_iter, total_iter)
+	gripper_success_rate = _get_rate(gripper_success, gripper_usage_iter.size)
+	suction_1_success_rate = _get_rate(suction_1_success, suction_1_usage_iter.size)
+	suction_2_success_rate = _get_rate(suction_2_success, suction_2_usage_iter.size)
+	gripper_usage_rate = _get_rate(gripper_usage_iter.size, valid_iter)
+	suction_1_usage_rate = _get_rate(suction_1_usage_iter.size, valid_iter)
+	suction_2_usage_rate = _get_rate(suction_2_usage_iter.size, valid_iter)
+	# Write data
+	f.write("runtime: {}".format(runtime))
+	f.write("return: {}".format(return_list[0]))
+	f.write("mean loss: {}".format(np.mean(loss_list)))
+	f.write("invalid action rate: {}\n".format(invalid_action_rate))
+	f.write("success_rate: {}\n".format(success_rate))
+	f.write("gripper success rate: {}\n".format(gripper_success_rate))
+	f.write("suction I success rate: {}\n".format(suction_1_success_rate))
+	f.write("suction II success rate: {}\n".format(suction_2_success_rate))
+	f.write("gripper usage rate: {}\n".format(gripper_usage_rate))
+	f.write("suction I usage rate: {}\n".format(suction_1_usage_rate))
+	f.write("suction II usage rate: {}\n".format(suction_2_usage_rate))
+	f.close()
+
+def _count_success(usage_iter, result_list):
+	num = 0
+	for idx in usage_iter:
+		if result_list[idx]==1:
+			num+=1
+	return num
+	
+def _get_rate(num, den):
+	try:
+		rate = float(num)/den
+	except ZeroDivisionError:
+		rate = float('nan')
+	return rate
 
 def check_if_valid(position):
 	if (position[0] > x_lower and position[0] < x_upper) and \
@@ -452,8 +500,8 @@ def wrap_strings(image_path, depth_path, iteration):
 	next_depth_name = depth_path + "next_depth_data_{:06}.txt".format(iteration)
 	return color_name, depth_name, next_color_name, next_depth_name
 
-def shutdown_process(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path, memory, regular=True):
-	saveFiles(action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path)
+def shutdown_process(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path, memory, regular=True):
+	saveFiles(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path)
 	memory.save_memory(path)
 	if regular: print "Regular shutdown"
 	else: print "Shutdown since user interrupt"

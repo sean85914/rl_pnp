@@ -7,7 +7,8 @@ class ArduinoControl{
  private:
   bool is_upper; // Deciding type, true means that if suck success, the value reported from the sensor will be higher than the threshold, false otherwise
   int baudrate;
-  int vacuum_thres; // Value from sensor higher/lower than this value will consider as fail
+  int vacuum_thres_tool_3; // Value from sensor higher/lower than this value will consider as fail, for tool 3 (small suction cup)
+  int vacuum_thres_tool_2; // Value from sensor higher/lower than this value will consider as fail, for tool 2 (bag cup suction cup)
   const int TO = 50; // Serial timeout, not sure what is this
   std::string port;
   serial::Serial mySerial;
@@ -27,10 +28,12 @@ ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh)
   // Get parameters
   if(!pnh_.getParam("is_upper", is_upper)) is_upper = true;
   if(!pnh_.getParam("port", port)) port = "/dev/ttyACM0";
-  if(!pnh_.getParam("vacuum_thres", vacuum_thres)) vacuum_thres = 800;
+  if(!pnh_.getParam("vacuum_thres_tool_2", vacuum_thres_tool_2)) vacuum_thres_tool_2 = 350;
+  if(!pnh_.getParam("vacuum_thres_tool_3", vacuum_thres_tool_3)) vacuum_thres_tool_3 = 465;
   // Show parameters
   ROS_INFO("[%s] port: %s", ros::this_node::getName().c_str(), port.c_str());
-  ROS_INFO("[%s] vacuum_thres: %d", ros::this_node::getName().c_str(), vacuum_thres);
+  ROS_INFO("[%s] vacuum_thres_tool_2: %d", ros::this_node::getName().c_str(), vacuum_thres_tool_2);
+  ROS_INFO("[%s] vacuum_thres_tool_3: %d", ros::this_node::getName().c_str(), vacuum_thres_tool_3);
   ROS_INFO("[%s] type: %s", ros::this_node::getName().c_str(), (is_upper?"upper":"lower"));
   checkParameterTimer = pnh_.createTimer(ros::Duration(1.0), &ArduinoControl::checkParameterTimerCallback, this);
   // Open serial
@@ -61,6 +64,19 @@ bool ArduinoControl::check_suck_success(std_srvs::SetBool::Request &req, std_srv
   ros::Duration(0.1).sleep();
   auto result = mySerial.readline();
   int voltage = atoi(result.c_str());
+  int curr_tool_id;
+  if(!nh_.getParam("/curr_tool_id", curr_tool_id)){
+    ROS_ERROR("No current tool id parameter set, exit...");
+    ros::shutdown();
+    exit(EXIT_FAILURE);
+  }
+  int vacuum_thres;
+  if(curr_tool_id==2) vacuum_thres = vacuum_thres_tool_2;
+  else if(curr_tool_id==3) vacuum_thres = vacuum_thres_tool_3;
+  else{
+    ROS_ERROR("Current tool is not suction cup, abort request...");
+    return true;
+  }
   ROS_INFO("Voltage received: %d", voltage);
   if(is_upper){
     if(voltage >= vacuum_thres)
@@ -76,10 +92,16 @@ bool ArduinoControl::check_suck_success(std_srvs::SetBool::Request &req, std_srv
 
 void ArduinoControl::checkParameterTimerCallback(const ros::TimerEvent& event){
   int tmp; 
-  if(pnh_.getParam("vacuum_thres", tmp)){
-    if(tmp!=vacuum_thres){
-      ROS_INFO("[%s] vacuum_thres changed from %d to %d", ros::this_node::getName().c_str(), vacuum_thres, tmp);
-      vacuum_thres = tmp;
+  if(pnh_.getParam("vacuum_thres_tool_2", tmp)){
+    if(tmp!=vacuum_thres_tool_2){
+      ROS_INFO("[%s] vacuum_thres_tool_2 changed from %d to %d", ros::this_node::getName().c_str(), vacuum_thres_tool_2, tmp);
+      vacuum_thres_tool_2 = tmp;
+    }
+  }
+  if(pnh_.getParam("vacuum_thres_tool_3", tmp)){
+    if(tmp!=vacuum_thres_tool_3){
+      ROS_INFO("[%s] vacuum_thres_tool_3 changed from %d to %d", ros::this_node::getName().c_str(), vacuum_thres_tool_3, tmp);
+      vacuum_thres_tool_3 = tmp;
     }
   }
   bool tmp_bool; 

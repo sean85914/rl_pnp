@@ -1,4 +1,4 @@
 {detect_x_lower: 0.87, detect_x_upper: 0.95, detect_y_lower: -0.42, detect_y_upper: -0.32,
-  detect_z_lower: 0.15, detect_z_upper: 0.25, down_sample: false, empty_thres: 0.975,
+  detect_z_lower: 0.15, detect_z_upper: 0.25, down_sample: false, empty_thres: 0.955,
   factor: 0.75, resolution: 224, thres_point: 4000, use_two_cam: false, verbose: true,
   x_lower: 0.72, x_upper: 1.02, y_lower: -0.54, y_upper: -0.24, z_lower: -0.1, z_upper: 0.2}

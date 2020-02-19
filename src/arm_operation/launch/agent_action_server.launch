@@ -1,6 +1,5 @@
 <launch>
   <arg name="port" default="/dev/ttyvacuum"/>
-  <arg name="vacuum_thres" default="470"/>
   <include file="$(find arm_operation)/launch/change_tool_service.launch"/>
   <node pkg="arm_operation" type="agent_server_node" name="agent_server_node" output="screen" clear_params="true">
     <rosparam param="tool_length">[0.15, 0.084, 0.05]</rosparam>
@@ -11,7 +10,8 @@
                                     "/abb/SetJoints",
                                     "/abb/SetZone",
                                     "/abb/SetSpeed",
-                                    "/vacuum_pump_control_node/vacuum_control"]</rosparam>
+                                    "/vacuum_pump_control_node/vacuum_control",
+                                    "/vacuum_pump_control_node/check_suck_success"]</rosparam>
     <rosparam param="home_joints">[-0.37856191396713257, 
                                    0.2209586799144745, 
                                    0.08604472875595093, 
@@ -30,9 +30,11 @@
                                     -0.016406094655394554, 
                                     1.2583823204040527, 
                                     0.15271630883216858]</rosparam>
+    <rosparam param="home_xyz">[912.52, -365.56, 934.48]</rosparam>
   </node>
   <node pkg="vacuum_conveyor_control" type="vacuum_pump_control" name="vacuum_pump_control_node" output="screen">
     <param name="port" value="$(arg port)"/>
-    <param name="vacuum_thres" value="$(arg vacuum_thres)"/>
+    <param name="vacuum_thres_tool_2" value="360"/>
+    <param name="vacuum_thres_tool_3" value="470"/>
   </node>
 </launch>

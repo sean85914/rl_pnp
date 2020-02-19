@@ -10,6 +10,7 @@
 #include <abb_node/robot_SetZone.h>
 #include <arm_operation/change_tool.h>
 #include <apriltags_ros/AprilTagDetectionArray.h>
+#define IRB1660ID_JOINT6_LIMIT 400.0
 
 inline std::vector<double> deg2rad(const std::vector<double> in){
   assert(in.size()==6);
@@ -157,8 +158,10 @@ class ChangeToolService{
     set_cartesian_srv.request.quaternion.push_back(get_cartesian_srv.response.qz);
     setCartesian.call(set_cartesian_srv); ros::Duration(0.5).sleep();
     // Return to original pose
-    std::copy(original_pose.begin(), original_pose.end(), set_joints_srv.request.position.begin());
-    setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
+    if(req.togo==1){
+      std::copy(original_pose.begin(), original_pose.end(), set_joints_srv.request.position.begin());
+      setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
+    }
     res.result = "success";
     // Set speed back to (200, 100)
     set_speed_srv.request.tcp = 200.0f;
@@ -209,6 +212,8 @@ class ChangeToolService{
     set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
     set_cartesian_srv.request.quaternion[3] = get_cartesian_srv.response.qz;
     setCartesian.call(set_cartesian_srv); ros::Duration(0.6).sleep();
+    int direction = -1;
+    const double rotating_unit_angle = 30.0;
     while(ros::ok()){
       // Check if detected
       ros::Time ts = ros::Time::now();
@@ -220,19 +225,19 @@ class ChangeToolService{
       if(detections->detections.size()!=0) break;
       // Get current joints and put it into buffer
       getJoints.call(get_joints_srv);
-      ROS_INFO("Rotating joint 6 -30 degree...");
+      ROS_INFO("Rotating joint 6 %s30 degree...", (direction==1?"+":"-"));
       set_joints_srv.request.position[0] = get_joints_srv.response.j1;
       set_joints_srv.request.position[1] = get_joints_srv.response.j2;
       set_joints_srv.request.position[2] = get_joints_srv.response.j3;
       set_joints_srv.request.position[3] = get_joints_srv.response.j4;
       set_joints_srv.request.position[4] = get_joints_srv.response.j5;
-      set_joints_srv.request.position[5] = get_joints_srv.response.j6 - 30.0/180.0*M_PI;
-      if(set_joints_srv.request.position[5]<=-400.0/180.0*M_PI){
-        ROS_ERROR("Over joint6 max range, failed");
-        ros::shutdown();
-        return;
-      }
-      setJoints.call(set_joints_srv); ros::Duration(0.3).sleep();
+      set_joints_srv.request.position[5] = get_joints_srv.response.j6 + rotating_unit_angle/180.0*M_PI*direction;
+      if(set_joints_srv.request.position[5]<=-IRB1660ID_JOINT6_LIMIT/180.0*M_PI or 
+         set_joints_srv.request.position[5]>= IRB1660ID_JOINT6_LIMIT/180.0*M_PI){
+         direction *= -1;
+         ROS_WARN("Change direction from %s to %s for rotating", (direction==1?"-":"+"), (direction==1?"+":"-"));
+      }else
+        setJoints.call(set_joints_srv); ros::Duration(0.3).sleep();
     }// End while
     tf::StampedTransform stf;
     try{
@@ -251,7 +256,12 @@ class ChangeToolService{
         set_joints_srv.request.position[2] = get_joints_srv.response.j3;
         set_joints_srv.request.position[3] = get_joints_srv.response.j4;
         set_joints_srv.request.position[4] = get_joints_srv.response.j5;
-        set_joints_srv.request.position[5] = get_joints_srv.response.j6 - theta;
+        set_joints_srv.request.position[5] = get_joints_srv.response.j6 - theta; // Have to check bound
+        if(set_joints_srv.request.position[5]>=IRB1660ID_JOINT6_LIMIT/180.0*M_PI){
+          set_joints_srv.request.position[5]-=2*M_PI;
+        }else if(set_joints_srv.request.position[5]<=-IRB1660ID_JOINT6_LIMIT/180.0*M_PI){
+          set_joints_srv.request.position[5]+=2*M_PI;
+        }
         setJoints.call(set_joints_srv); ros::Duration(0.3).sleep();
       }
     }
