@@ -1,7 +1,8 @@
 // STD
 #include <experimental/filesystem>
 #include <chrono>
-#include <sstream>
+#include <utility>
+#include <thread>
 // Boost
 #include <boost/foreach.hpp>
 // ROS
@@ -17,30 +18,50 @@
 
 #define foreach BOOST_FOREACH
 
+typedef std::pair<cv::Mat, ros::Time> data_pair;
+bool read_complete = false;
+int width, height;
+double speed = 1.0;
+std::string out_name;
+
+void write_video(std::vector<data_pair> &data_vec){
+  while(data_vec.size()<2){usleep(100000);} // Wait until more than 2 data
+  double estimated_fps = 1/(data_vec[1].second - data_vec[0].second).toSec();
+  cv::VideoWriter video(out_name, CV_FOURCC('H', '2', '6', '4'), estimated_fps*speed, cv::Size(width, height));
+  while(not read_complete or data_vec.size()!=0){
+    video << data_vec[0].first;
+    data_vec.erase(data_vec.begin());
+  }
+}
+
+
 int main(int argc, char** argv)
 {
+  // Parse input argument
   bool has_data = false;
-  std::string topic_name;
-  double speed = 1.0;
-  int width, height, img_num = 0;
+  std::string topic_name="";
   if(argc<3){
     std::cout << "\033[1;31mInsufficient input arguments\n\
 Usage: ./bag_to_video bag_name output_video_name [speed]\n\033[0m";
     exit(EXIT_FAILURE);
   }
-  std::string in_bag(argv[1]),
-              out_name(argv[2]);
+  std::string in_bag(argv[1]);
+  out_name = std::string(argv[2]);
   if(out_name.length()<=4) // .mp4
     out_name+=".mp4";
   else{
-    if(out_name.substr(out_name.length()-4, 4)!=".mp4")
+    size_t pos;
+    out_name.find(".");
+    if(pos==std::string::npos){
       out_name+=".mp4";
+    }
   }
   if(argc==4)
     speed = atof(argv[3]);
   std::cout << "Input bag: " << in_bag << "\n";
   std::cout << "Output video: " << out_name << "\n";
   std::cout << "Video speed: " << speed << "\n";
+  // Open bag
   rosbag::Bag bag;
   try{
     bag.open(in_bag, rosbag::bagmode::Read);
@@ -50,12 +71,14 @@ Usage: ./bag_to_video bag_name output_video_name [speed]\n\033[0m";
   }
   rosbag::View view(bag);
   cv_bridge::CvImagePtr cv_bridge_ptr;
+  std::vector<data_pair> data_vec;
   double bag_duration = (view.getEndTime() - view.getBeginTime()).toSec();
   std::cout << "Bag duration: " << bag_duration << " seconds\n";
-  // Get number of frame
-  std::cout << "Counting frames: \n";
+  std::cout << "Converting...\n";
+  // Start writing thread
+  std::thread writing_thread(write_video, std::ref(data_vec));
+  // Start reading
   auto s_ts = std::chrono::high_resolution_clock::now();
-  std::experimental::filesystem::create_directory("tmp");  // Temporary directory for saving images
   foreach(const rosbag::MessageInstance m, view){
     if(m.getDataType()=="sensor_msgs/Image"){
       sensor_msgs::Image::ConstPtr img_ptr = m.instantiate<sensor_msgs::Image>();
@@ -77,33 +100,21 @@ Usage: ./bag_to_video bag_name output_video_name [speed]\n\033[0m";
       height = img_ptr->height;
       cv::Mat rgb_img;
       cv::cvtColor(cv_bridge_ptr->image, rgb_img, CV_BGR2RGB);
-      std::stringstream ss; ss.width(6); ss.fill('0'); ss << img_num;
-      std::string img_name = "tmp/" + ss.str() + ".jpg";
-      cv::imwrite(img_name, rgb_img);
-      printf("\r[%05.1f%%] %d", read_ratio*100, img_num+1);
-      ++img_num;
+      //printf("\r[%05.1f%%]", read_ratio*100);
+      data_pair pair = std::make_pair(rgb_img, m.getTime());
+      data_vec.push_back(pair);
     }
   }
-  if(!has_data){
-    std::cout << "\033[1;31mNo color image detected in provided bag, abort...\033[0m\n";
+  read_complete = true;
+  if(topic_name.empty()){
+    std::cout << "\033[0;31mNo RGB image detected in the bag, exiting...\n\033[0m";
     exit(EXIT_FAILURE);
   }
-  std::cout << "\nNum of frames: " << img_num << "\nFPS: " << img_num/bag_duration << "\nCounting down...\n";
-  cv::VideoWriter video(out_name, CV_FOURCC('H', '2', '6', '4'), img_num/bag_duration*speed, cv::Size(width, height));
-  for(int i=0; i<img_num; ++i){
-    std::stringstream ss; ss.width(6); ss.fill('0'); ss << i;
-    std::string img_name = "tmp/" + ss.str() + ".jpg";
-    cv::Mat img = cv::imread(img_name);
-    if(!img.empty()){
-      video << img;
-      printf("\r[%d/%d]", i+1, img_num);
-      remove(img_name.c_str());
-    }
-  }
-  std::cout << "\n";
-  std::experimental::filesystem::remove("tmp");
+  // Wait writing thread to stop
+  std::cout << "\nWriting video...\n";
+  writing_thread.join();
+  std::cout << "Complete!\n";
   auto e_ts = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(e_ts-s_ts).count();
   std::cout << "Conversion time: " << duration*1e-9 << " seconds\n";
-  return 0;
 }
