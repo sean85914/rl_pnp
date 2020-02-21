@@ -31,6 +31,9 @@ void write_video(std::vector<data_pair> &data_vec){
   while(not read_complete or data_vec.size()!=0){
     video << data_vec[0].first;
     data_vec.erase(data_vec.begin());
+    if(read_complete){
+      std::cout << "\r" << data_vec.size() << " images remaining...";
+    }
   }
 }
 
