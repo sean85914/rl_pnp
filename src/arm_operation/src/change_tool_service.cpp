@@ -136,6 +136,7 @@ class ChangeToolService{
     // Put `now` to its home
     if(req.now!=-1){
       std::copy(joints_vector[(req.now-1)*3].begin(), joints_vector[(req.now-1)*3].end(), set_joints_srv.request.position.begin());
+      joint_6_coterminal(set_joints_srv);
       setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
       std::copy(joints_vector[(req.now-1)*3+1].begin(), joints_vector[(req.now-1)*3+1].end(), set_joints_srv.request.position.begin());
       setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
@@ -160,6 +161,7 @@ class ChangeToolService{
     // Return to original pose
     if(req.togo==1){
       std::copy(original_pose.begin(), original_pose.end(), set_joints_srv.request.position.begin());
+      joint_6_coterminal(set_joints_srv);
       setJoints.call(set_joints_srv); ros::Duration(0.5).sleep();
     }
     res.result = "success";
@@ -206,13 +208,18 @@ class ChangeToolService{
     ROS_INFO("Save position: [%f, %f, %f]", original_x, original_y, original_z);
     set_cartesian_srv.request.cartesian[0] = original_x;
     set_cartesian_srv.request.cartesian[1] = original_y;
-    set_cartesian_srv.request.cartesian[2] = original_z - 85.0;
+    set_cartesian_srv.request.cartesian[2] = original_z - 80.0;
     set_cartesian_srv.request.quaternion[0] = get_cartesian_srv.response.q0;
     set_cartesian_srv.request.quaternion[1] = get_cartesian_srv.response.qx;
     set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
     set_cartesian_srv.request.quaternion[3] = get_cartesian_srv.response.qz;
     setCartesian.call(set_cartesian_srv); ros::Duration(0.6).sleep();
-    int direction = -1;
+    // Rotate more quickly
+    abb_node::robot_SetSpeed set_speed_srv;
+    set_speed_srv.request.tcp = 200.0;
+    set_speed_srv.request.ori = 400.0;
+    setSpeed.call(set_speed_srv);
+    int direction = -1; // -1: CCW; 1: CW
     const double rotating_unit_angle = 30.0;
     while(ros::ok()){
       // Check if detected
@@ -258,11 +265,11 @@ class ChangeToolService{
         set_joints_srv.request.position[4] = get_joints_srv.response.j5;
         set_joints_srv.request.position[5] = get_joints_srv.response.j6 - theta; // Have to check bound
         if(set_joints_srv.request.position[5]>=IRB1660ID_JOINT6_LIMIT/180.0*M_PI){
-          set_joints_srv.request.position[5]-=2*M_PI;
+          set_joints_srv.request.position[5]-=/*2**/M_PI;
         }else if(set_joints_srv.request.position[5]<=-IRB1660ID_JOINT6_LIMIT/180.0*M_PI){
-          set_joints_srv.request.position[5]+=2*M_PI;
+          set_joints_srv.request.position[5]+=/*2**/M_PI;
         }
-        setJoints.call(set_joints_srv); ros::Duration(0.3).sleep();
+        setJoints.call(set_joints_srv); ros::Duration(0.25).sleep();
       }
     }
     catch(tf::TransformException &ex){
@@ -277,10 +284,22 @@ class ChangeToolService{
       set_cartesian_srv.request.quaternion[1] = get_cartesian_srv.response.qx;
       set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
       set_cartesian_srv.request.quaternion[3] = get_cartesian_srv.response.qz;
-      setCartesian.call(set_cartesian_srv); ros::Duration(0.3).sleep();
+      setCartesian.call(set_cartesian_srv); ros::Duration(0.25).sleep();
     }
+    set_speed_srv.request.ori = 100.0;
+    setSpeed.call(set_speed_srv);
     ROS_INFO("Gripper calibration spend %f seconds", (ros::Time::now()-ts).toSec());
   }
+  void joint_6_coterminal(abb_node::robot_SetJoints &joint_req){
+    abb_node::robot_GetJoints get_joints;
+    getJoints.call(get_joints);
+    double j6_equivalent = (joint_req.request.position[5]>0?joint_req.request.position[5]-2*M_PI:joint_req.request.position[5]+2*M_PI);
+    double dist_1 = fabs(get_joints.response.j6-joint_req.request.position[5]),
+           dist_2 = fabs(get_joints.response.j6-j6_equivalent);
+    if(dist_1>dist_2){ // Choose smaller
+      joint_req.request.position[5] = j6_equivalent;
+    }
+}
  public:
   ChangeToolService(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
     setupParameters();
