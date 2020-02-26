@@ -55,5 +55,6 @@ class Memory:
 		f.close()
 	
 	def load_memory(self, file_path):
-		with open(buffer_str, 'rb') as file:
+		with open(file_path, 'rb') as file:
 			self.tree = pickle.load(file)
+			print "Loaded {} data".format(self.tree.length)
