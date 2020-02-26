@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   message_generation
   cv_bridge
+  arm_operation
 )
 
 find_package(OpenCV REQUIRED)
@@ -41,3 +42,6 @@ target_link_libraries(draw_path ${catkin_LIBRARIES})
 
 add_executable(bag_to_video src/bag_to_video.cpp)
 target_link_libraries(bag_to_video ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} stdc++fs)
+
+add_executable(bag_to_data src/bag_to_data.cpp)
+target_link_libraries(bag_to_data ${catkin_LIBRARIES})
