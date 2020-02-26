@@ -20,10 +20,12 @@ def service_cb(req):
 	marker.scale.x = marker.scale.y = marker.scale.z = 0.02
 	text_marker.pose.position.y = 0.4
 	text_marker.scale.z = 0.06
-	if not req.primitive: # GRASP
-		marker.color.b = marker.color.a = 1.0 # BLUE for grasping
-	else: # SUCK
-		marker.color.r = marker.color.a = 1.0 # RED for sucking
+	if req.primitive==0: # suck 1
+		marker.color.b = marker.color.a = 1.0 # blue
+	elif req.primitive==1: # suck 2
+		marker.color.g = marker.color.a = 1.0 # green
+	else: # grasp
+		marker.color.r = marker.color.a = 1.0
 	text_marker.color.r = text_marker.color.g = text_marker.color.b = text_marker.color.a = 1.0
 	if req.primitive == 0 and req.valid: # suck 1
 		text_marker.text = "suck_1"

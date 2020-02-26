@@ -1,5 +1,5 @@
 geometry_msgs/Point point
-int16 primitive # 0: grasp, 1: suck
+int16 primitive # 0: suck 1, 1: suck 2, 2~5: grasp
 float32 angle
 bool valid
 ---
