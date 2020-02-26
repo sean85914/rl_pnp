@@ -33,8 +33,6 @@
     <rosparam param="home_xyz">[912.52, -365.56, 934.48]</rosparam>
   </node>
   <node pkg="vacuum_conveyor_control" type="vacuum_pump_control" name="vacuum_pump_control_node" output="screen">
-    <param name="port" value="$(arg port)"/>
-    <param name="vacuum_thres_tool_2" value="360"/>
-    <param name="vacuum_thres_tool_3" value="470"/>
+    <rosparam command="load" file="$(find vacuum_conveyor_control)/config/vacuum_data.yaml"/>
   </node>
 </launch>

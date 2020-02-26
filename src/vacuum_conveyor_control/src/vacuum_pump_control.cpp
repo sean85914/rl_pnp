@@ -1,7 +1,12 @@
+// STD
+#include <experimental/filesystem>
+// ROS
 #include <ros/ros.h>
-#include <serial/serial.h>
+#include <ros/package.h>
 // SRV
 #include <std_srvs/SetBool.h>
+// Serial
+#include <serial/serial.h>
 
 class ArduinoControl{
  private:
@@ -21,7 +26,7 @@ class ArduinoControl{
   void checkParameterTimerCallback(const ros::TimerEvent& event);
  public:
   ArduinoControl(ros::NodeHandle, ros::NodeHandle);
-  ~ArduinoControl(){mySerial.close();}
+  ~ArduinoControl();
 };
 
 ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh), baudrate(115200){
@@ -49,6 +54,20 @@ ArduinoControl::ArduinoControl(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh)
   // Advertise services
   vacuum_srv = pnh_.advertiseService("vacuum_control", &ArduinoControl::vacuum_control_cb, this);
   check_success_srv = pnh_.advertiseService("check_suck_success", &ArduinoControl::check_suck_success, this);
+}
+
+ArduinoControl::~ArduinoControl(){
+  std::string node_ns = pnh_.getNamespace(),
+              package_path = ros::package::getPath("vacuum_conveyor_control"),
+              yaml_path = package_path + "/config/vacuum_data.yaml",
+              cmd_str = "rosparam dump " + yaml_path + " " + node_ns;
+  std::experimental::filesystem::path path(package_path+"/config");
+  if(!std::experimental::filesystem::exists(path)){
+    std::experimental::filesystem::create_directory(path);
+  }
+  system(cmd_str.c_str());
+  mySerial.write("c");
+  mySerial.close();
 }
 
 bool ArduinoControl::vacuum_control_cb(std_srvs::SetBool::Request  &req, 
