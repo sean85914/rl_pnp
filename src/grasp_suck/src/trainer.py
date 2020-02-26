@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from model import reinforcement_net
+from model_v2 import reinforcement_net
 from scipy import ndimage
 
 class Trainer(object):

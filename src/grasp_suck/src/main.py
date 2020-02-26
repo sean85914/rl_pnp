@@ -20,18 +20,17 @@ from utils import Transition
 # srv
 from std_srvs.srv import SetBool, SetBoolRequest, SetBoolResponse, \
                          Empty, EmptyRequest, EmptyResponse
-from arm_operation.srv import agent_abb_action, agent_abb_actionRequest, agent_abb_actionResponse
+from arm_operation.srv import agent_abb_action, agent_abb_actionRequest, agent_abb_actionResponse, \
+                              publish_info, publish_infoRequest, publish_infoResponse
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
                               pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse, \
                               check_grasp_success, check_grasp_successRequest, check_grasp_successResponse
 from visualization.srv import viz_marker, viz_markerRequest, viz_markerResponse
 
 # Constant
-reward = 1.0
+reward = 5.0
 discount_factor = 0.5
 iteration = 0
-program_ts = time.time()
-program_time = 0.0
 memory = Memory(buffer_size)
 arduino = serial.Serial(port, 115200)
 
@@ -39,7 +38,7 @@ if model_str == "" and testing: # TEST SHOULD PROVIDE MODEL
 	print "\033[0;31mNo model provided, exit!\033[0m"
 	os._exit(0)
 	
-if buffer_str != "": memory.load_memory(buffer_file)
+if buffer_str != "": memory.load_memory(buffer_str)
 
 # trainer
 trainer = Trainer(reward, discount_factor, use_cpu, learning_rate)
@@ -53,7 +52,7 @@ if model_str != "":
 # Get logger path
 r = rospkg.RosPack()
 package_path = r.get_path("grasp_suck")
-csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path = utils.getLoggerPath(testing, package_path, episode)
+csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path, check_grasp_path = utils.getLoggerPath(testing, package_path, episode)
 # Service clients
 vacuum_pump_control      = rospy.ServiceProxy("/vacuum_pump_control_node/vacuum_control", SetBool)
 check_suck_success       = rospy.ServiceProxy("/vacuum_pump_control_node/check_suck_success", SetBool)
@@ -65,7 +64,10 @@ check_grasp_success      = rospy.ServiceProxy("/combine_pc_node/grasp_state", ch
 go_home                  = rospy.ServiceProxy("/agent_server_node/go_home", Empty)
 go_place                 = rospy.ServiceProxy("/agent_server_node/go_place", Empty)
 fixed_home               = rospy.ServiceProxy("/agent_server_node/go_home_fix_orientation", Empty)
+check_if_collide_client  = rospy.ServiceProxy("/agent_server_node/check_if_collide", agent_abb_action)
+publish_data_client      = rospy.ServiceProxy("/agent_server_node/publish_data", publish_info)
 viz                      = rospy.ServiceProxy("/viz_marker_node/viz_marker", viz_marker)
+
 # Result list
 action_list   = [] # If action valid?
 target_list   = [] # Takes action at which `pixel`
@@ -77,9 +79,11 @@ return_list   = [] # Episode return
 episode_list  = [] # Episode step length
 
 # Code for calling service
-def _get_pc(iteration, is_before):
+def _get_pc(iteration, is_before, check_grasp=False):
 	get_pc_req = get_pcRequest()
-	if is_before:
+	if check_grasp:
+		get_pc_req.file_name = check_grasp_path + "{:06}.pcd".format(iteration)
+	elif is_before:
 		get_pc_req.file_name = pc_path + "{:06}_before.pcd".format(iteration)
 	else:
 		get_pc_req.file_name = pc_path + "{:06}_after.pcd".format(iteration)
@@ -97,6 +101,16 @@ def _take_action(tool_id, point, angle):
 	agent_action.position = utils.point_np_to_ros(point)
 	agent_action.angle = angle
 	_ = agent_take_action_client(agent_action)
+def _check_collide(point, angle):
+	agent_action = agent_abb_actionRequest()
+	agent_action.tool_id = 1
+	agent_action.position = utils.point_np_to_ros(point)
+	agent_action.angle = angle
+	res = check_if_collide_client(agent_action)
+	if res.result == "true":
+		return True # Will collide
+	else:
+		return False # Won't collide
 def _check_if_empty(pc):
 	empty_checker_req = pc_is_emptyRequest()
 	empty_checker_req.input_pc = pc
@@ -106,11 +120,12 @@ def _check_grasp_success():
 	calibrate_gripper_client()
 	check_grasp_success_request = check_grasp_successRequest()
 	# Get temporary pc and save file
-	_ = _get_pc(iteration, False)
-	check_grasp_success_request.pcd_str = pc_path + "{:06}_after.pcd".format(iteration)
+	_ = _get_pc(iteration, False, True)
+	check_grasp_success_request.pcd_str = check_grasp_path + "{:06}.pcd".format(iteration)
 	return check_grasp_success(check_grasp_success_request).is_success
 
-
+program_ts = time.time()
+program_time = 0.0
 # Initialize
 go_home()
 vacuum_pump_control(SetBoolRequest(False))
@@ -158,25 +173,53 @@ try:
 				is_valid = utils.check_if_valid(points[pixel_index[1], pixel_index[2]])
 				# Visualize in RViz
 				_viz(points[pixel_index[1], pixel_index[2]], action, angle, is_valid)
+				will_collide = None
 				if is_valid: # Only take action if valid
 					# suck_1(0) -> 3, suck_2(1) -> 2, other(2~5) (grasp) -> 1
 					tool_id = (3-pixel_index[0]) if pixel_index[0] < 2 else 1
 					action_list.append(pixel_index[0])
-					_take_action(tool_id, points[pixel_index[1], pixel_index[2]], angle)
+					if tool_id==1:
+						will_collide = _check_collide(points[pixel_index[1], pixel_index[2]], angle)
+					if not will_collide or tool_id!=1:
+						_take_action(tool_id, points[pixel_index[1], pixel_index[2]], angle)
+					else:
+						print "Will collide, abort request!"
 				else: # invalid
 					action_list.append(-1); arduino.write("r 1000") # Red
 					action_success = False
 				if is_valid:
 					if action < 2: # suction cup
 						action_success = check_suck_success().success
-					else: # parallel-jaw gripper TODO
-						action_success = _check_grasp_success()
+					else: # parallel-jaw gripper
+						if not will_collide:
+							action_success = _check_grasp_success()
+						else:
+							action_success = False
 				result_list.append(action_success)
 				if action_success: go_place(); fixed_home(); arduino.write("g 1000") # Green
 				else: 
 					fixed_home()
 					vacuum_pump_control(SetBoolRequest(False))
 					if is_valid: arduino.write("o 1000") # Orange
+				info = publish_infoRequest()
+				info.execution.iteration = iteration
+				if not is_valid:
+					info.execution.primitive = "invalid"
+				else:
+					if pixel_index[0]==0:
+						info.execution.primitive = "suck_1"
+					elif pixel_index[0]==1:
+						info.execution.primitive = "suck_2"
+					elif pixel_index[0]==2:
+						info.execution.primitive = "grasp_neg_90"
+					elif pixel_index[0]==2:
+						info.execution.primitive = "grasp_neg_45"
+					elif pixel_index[0]==2:
+						info.execution.primitive = "grasp_0"
+					else:
+						info.execution.primitive = "grasp_45"
+				info.execution.is_success = action_success
+				publish_data_client(info)
 				time.sleep(0.5)
 				# Get next images, and check if bin is empty
 				next_pc = _get_pc(iteration, False)

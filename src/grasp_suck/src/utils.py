@@ -193,7 +193,7 @@ def vis_affordance(predictions):
 	tmp[tmp<0] = 0
 	tmp[tmp>1] = 1
 	tmp = (tmp*255).astype(np.uint8)
-	tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
+	tmp.shape = (224, 224, 1)
 	heatmap = cv2.applyColorMap(tmp, cv2.COLORMAP_JET)
 	return heatmap
 
@@ -208,7 +208,7 @@ def vis_affordance(predictions):
                       |___/                                  
 '''
 # Return probability for sampling
-def get_prob(mask, ratio=4):
+def get_prob(mask, ratio=9):
 	# ratio: ratio of sampling on white and on black is `ratio`:1
 	# Greater than threshold will be considered as white (255)
 	mask[mask>=126] = 255
@@ -266,7 +266,7 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 		mask_name = loggerPath + "diff_{:06}.jpg".format(iteration)
 		cv2.imwrite(mask_name, mask)
 		idx = np.random.choice(np.arange(resolution*resolution), p=get_prob(mask))
-		primitive = np.random.choice(np.arange(3)) # suck_1, suck_2, grasp
+		primitive = np.random.choice(np.arange(3), p=[0.4, 0.4, 0.2]) # suck_1: suck_2: grasp = 2:2:1
 		if primitive == 1:
 			action = 1
 			action_str = "suck_2"
@@ -323,10 +323,10 @@ def create_argparser():
 	parser.add_argument("--buffer_file", type=str, default="", help="If provided, will read the given file to construct the experience buffer, default is empty string")
 	parser.add_argument("--epsilon", type=float, default=0.5, help="Probability to choose random action, default is 0.5")
 	parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alram lamp, default is /dev/ttylight")
-	parser.add_argument("--buffer_size", type=int, default=500, help="Experience buffer size, default is 500") # N
+	parser.add_argument("--buffer_size", type=int, default=1000, help="Experience buffer size, default is 1000") # N
 	parser.add_argument("--learning_freq", type=int, default=10, help="Frequency for updating behavior network, default is 10") # M
 	parser.add_argument("--updating_freq", type=int, default=40, help="Frequency for updating target network, default is 40") # C
-	parser.add_argument("--mini_batch_size", type=int, default=4, help="How many transitions should used for learning, default is 4") # K
+	parser.add_argument("--mini_batch_size", type=int, default=5, help="How many transitions should used for learning, default is 4") # K
 	parser.add_argument("--save_every", type=int, default=10, help="Every how many steps should save the model, default is 10")
 	parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for the trainer, default is 1e-4")
 	return parser
@@ -395,6 +395,7 @@ def getLoggerPath(testing, root_path, episode):
 	model_path       = csv_path + "models/"
 	vis_path         = csv_path + "vis/"
 	diff_path        = csv_path + "diff/"
+	check_grasp_path = csv_path + "grasp/"
 	mixed_paths      = []
 	feat_paths       = []
 	primitives       = ["suck_1/", "suck_2/", "grasp_0/", "grasp_1/", "grasp_2/", "grasp_3/"]
@@ -406,13 +407,13 @@ def getLoggerPath(testing, root_path, episode):
 		if not os.path.exists(feat_paths[-1]):
 			os.makedirs(feat_paths[-1])
 	# Check if directionary exist
-	for path in list([csv_path, image_path, depth_path, pc_path, model_path, vis_path]):
+	for path in list([csv_path, image_path, depth_path, pc_path, model_path, vis_path, check_grasp_path]):
 		if not os.path.exists(path):
 			os.makedirs(path)
 	if not testing:
 		if not os.path.exists(diff_path):
 			os.makedirs(diff_path)
-	return csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path
+	return csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path, check_grasp_path
 
 def saveFiles(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path):
 	action_list = np.array(action_list)
@@ -445,9 +446,9 @@ def saveFiles(runtime, action_list, target_list, result_list, loss_list, explore
 	suction_1_usage_rate = _get_rate(suction_1_usage_iter.size, valid_iter)
 	suction_2_usage_rate = _get_rate(suction_2_usage_iter.size, valid_iter)
 	# Write data
-	f.write("runtime: {}".format(runtime))
-	f.write("return: {}".format(return_list[0]))
-	f.write("mean loss: {}".format(np.mean(loss_list)))
+	f.write("runtime: {}\n".format(runtime))
+	f.write("return: {}\n".format(return_list[0]))
+	f.write("mean loss: {}\n".format(np.mean(loss_list)))
 	f.write("invalid action rate: {}\n".format(invalid_action_rate))
 	f.write("success_rate: {}\n".format(success_rate))
 	f.write("gripper success rate: {}\n".format(gripper_success_rate))
