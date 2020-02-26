@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="vacuum_conveyor_control" type="vacuum_pump_control" name="vacuum_pump_control_node" output="screen">
+    <rosparam command="load" file="$(find vacuum_conveyor_control)/config/vacuum_data.yaml"/>
+  </node>
+</launch>
