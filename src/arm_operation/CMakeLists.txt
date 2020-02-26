@@ -68,6 +68,7 @@ find_package(Qt5 COMPONENTS Widgets Gui Core REQUIRED)
 add_message_files(
   FILES
   joint_value.msg
+  execution.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -78,6 +79,7 @@ add_service_files(
   getTCPPose.srv
   change_tool.srv
   agent_abb_action.srv
+  publish_info.srv
 )
 
 ## Generate actions in the 'action' folder
