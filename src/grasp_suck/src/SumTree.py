@@ -42,6 +42,10 @@ class SumTree:
 	@property
 	def total(self):
 		return self.tree[0]
+	
+	@property
+	def length(self):
+		return self.n_entries
 		
 	# store priority and sample
 	def add(self, p, data):
