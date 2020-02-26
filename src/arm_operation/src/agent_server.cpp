@@ -11,6 +11,14 @@
 #include <std_srvs/SetBool.h> // Vacuum
 #include <std_srvs/Empty.h> // Go home and go place
 #include <arm_operation/agent_abb_action.h>
+#include <arm_operation/execution.h>
+#include <arm_operation/publish_info.h>
+
+bool in_range(double data, double lower, double upper){
+  if(data<=upper and data>=lower) return true;
+  else
+    return false;
+}
 
 void setTargetPose(abb_node::robot_SetCartesian& srv, geometry_msgs::Point position, tf::Quaternion quat){
   srv.request.cartesian[0] = position.x*1000.0; // x, m to mm
@@ -33,6 +41,7 @@ class AgentServer{
   std::vector<double> place_joints; // Joints for placing pose
   std::vector<std::string> service_name_vec;
   ros::NodeHandle nh_, pnh_;
+  ros::Publisher pub_execution_info;
   ros::ServiceClient change_tool_client;
   ros::ServiceClient get_cartesian_client;
   ros::ServiceClient set_cartesian_client;
@@ -47,12 +56,15 @@ class AgentServer{
   ros::ServiceServer go_place_server;
   ros::ServiceServer go_home_fix_orientation_server;
   ros::ServiceServer fast_vibrate_server;
+  ros::ServiceServer publish_data_server;
+  ros::ServiceServer check_if_collide_server;
   void setupParams(void);
   void setupServiceClients(void);
   void getInitialToolID(void);
   void _home(void);
   void _home_fix_ori(void);
   void _fast_vibrate(void);
+  void joint_6_coterminal(abb_node::robot_SetJoints&);
   bool homeCB(std_srvs::Empty::Request&,
               std_srvs::Empty::Response&);
   bool placeCB(std_srvs::Empty::Request&,
@@ -63,6 +75,10 @@ class AgentServer{
                   std_srvs::Empty::Response&);
   bool vibrateCB(std_srvs::Empty::Request&,
                  std_srvs::Empty::Response&);
+  bool publishCB(arm_operation::publish_info::Request&,
+                 arm_operation::publish_info::Response&);
+  bool check_if_collision(arm_operation::agent_abb_action::Request&, 
+                          arm_operation::agent_abb_action::Response&);
  public:
   AgentServer(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
     tool_length.resize(3);
@@ -79,11 +95,14 @@ class AgentServer{
       }
     }
     setupServiceClients();
+    pub_execution_info = pnh_.advertise<arm_operation::execution>("execution_info", 1);
     agent_action_server = pnh_.advertiseService("agent_take_action", &AgentServer::serviceCB, this);
     go_home_server      = pnh_.advertiseService("go_home", &AgentServer::homeCB, this);
     go_place_server     = pnh_.advertiseService("go_place", &AgentServer::placeCB, this);
     go_home_fix_orientation_server = pnh_.advertiseService("go_home_fix_orientation", &AgentServer::home_fixCB, this);
     fast_vibrate_server = pnh_.advertiseService("fast_vibrate", &AgentServer::vibrateCB, this);
+    publish_data_server = pnh_.advertiseService("publish_data", &AgentServer::publishCB, this);
+    check_if_collide_server = pnh_.advertiseService("check_if_collide", &AgentServer::check_if_collision, this);
   }
 };
 
@@ -172,6 +191,17 @@ void AgentServer::setupServiceClients(void){
   check_suck_success_client = pnh_.serviceClient<std_srvs::SetBool>(service_name_vec[8]);
 }
 
+void AgentServer::joint_6_coterminal(abb_node::robot_SetJoints &joint_req){
+  abb_node::robot_GetJoints get_joints;
+  get_joints_client.call(get_joints);
+  double j6_equivalent = (joint_req.request.position[5]>0?joint_req.request.position[5]-2*M_PI:joint_req.request.position[5]+2*M_PI);
+  double dist_1 = fabs(get_joints.response.j6-joint_req.request.position[5]),
+         dist_2 = fabs(get_joints.response.j6-j6_equivalent);
+  if(dist_1>dist_2){ // Choose smaller
+    joint_req.request.position[5] = j6_equivalent;
+  }
+}
+
 bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req, 
                             arm_operation::agent_abb_action::Response& res){
   ros::Time ts = ros::Time::now();
@@ -183,6 +213,7 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   abb_node::robot_SetJoints set_joints;
   set_joints.request.position.resize(6);
   set_joints.request.position.assign(home_joints.begin(), home_joints.end());
+  joint_6_coterminal(set_joints);
   set_joints_client.call(set_joints);
   nh_.getParam("curr_tool_id", curr_tool_id);
   if((curr_tool_id!=req.tool_id) or (curr_tool_id==1 and req.tool_id==1)){
@@ -237,6 +268,7 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   set_cartesian_client.call(set_cartesian);
   bool is_success;
   if(req.tool_id!=1){
+    ros::Duration(0.1).sleep();
     check_suck_success_client.call(bool_data);
     is_success = bool_data.response.success;
     if(is_success){ // If suck success, raise the object up to prevent collsion with the box during placing
@@ -259,11 +291,20 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
 }
 
 void AgentServer::_home(void){
-  abb_node::robot_SetJoints set_joints;
+  /*abb_node::robot_SetJoints set_joints;
   set_joints.request.position.resize(6);
   set_joints.request.position.assign(home_joints.begin(), home_joints.end());
   set_joints_client.call(set_joints);
-  set_joints_client.call(set_joints);
+  set_joints_client.call(set_joints);*/
+  abb_node::robot_SetCartesian set_cartesian;
+  set_cartesian.request.cartesian.resize(3);
+  set_cartesian.request.quaternion.resize(4);
+  set_cartesian.request.cartesian.assign(home_xyz.begin(), home_xyz.end());
+  set_cartesian.request.quaternion[0] = 0.0;
+  set_cartesian.request.quaternion[1] = 0.0;
+  set_cartesian.request.quaternion[2] = -1.0;
+  set_cartesian.request.quaternion[3] = 0.0;
+  set_cartesian_client.call(set_cartesian);
 }
 
 void AgentServer::_home_fix_ori(void){
@@ -358,6 +399,7 @@ bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
   set_zone_client.call(set_zone);
   // And then middle joints and go home
   set_joints.request.position.assign(middle_joints.begin(), middle_joints.end());
+  joint_6_coterminal(set_joints);
   set_joints_client.call(set_joints);
   _home();
   // Speed to original one
@@ -373,5 +415,40 @@ bool AgentServer::vibrateCB(std_srvs::Empty::Request&,
   ros::Time ts = ros::Time::now();
   _fast_vibrate();
   ROS_INFO("Fast vibrate takes %f seconds", (ros::Time::now()-ts).toSec());
+  return true;
+}
+
+bool AgentServer::publishCB(arm_operation::publish_info::Request &req,
+                            arm_operation::publish_info::Response &res)
+{
+  req.execution.header.stamp = ros::Time::now();
+  pub_execution_info.publish(req.execution);
+  return true;
+}
+
+bool AgentServer::check_if_collision(arm_operation::agent_abb_action::Request &req, 
+                                     arm_operation::agent_abb_action::Response &res)
+{
+  const double gripper_width = 0.11/2;
+  const double radius = 0.08/2;
+  // Only for gripper
+  if(req.tool_id!=1){
+    res.result = "false";
+    return true;
+  }
+  double x_lower, x_upper, y_lower, y_upper;
+  double theta = M_PI/2-req.angle;
+  bool will_collide;
+  nh_.getParam("/combine_pc_node/x_lower", x_lower);
+  x_lower -= 0.04f;
+  // Lower body (parallel-jaw part)
+  bool x_lower_collide = in_range((x_lower-req.position.x+gripper_width*cos(theta))/(2*gripper_width*cos(theta)), 0, 1);
+  if(x_lower_collide) std::cout << "x_lower collide | lower body\n";
+  will_collide = x_lower_collide;
+  // Upper body (circle part)
+  x_lower_collide = (fabs(x_lower-req.position.x)<=radius);
+  if(x_lower_collide) std::cout << "x_lower collide | upper body\n";
+  will_collide = x_lower_collide or will_collide;
+  res.result = (will_collide?"true":"false");
   return true;
 }
