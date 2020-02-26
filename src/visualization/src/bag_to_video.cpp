@@ -5,6 +5,7 @@
 #include <thread>
 // Boost
 #include <boost/foreach.hpp>
+#include <boost/thread.hpp>
 // ROS
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
@@ -23,12 +24,15 @@ bool read_complete = false;
 int width, height;
 double speed = 1.0;
 std::string out_name;
+boost::shared_mutex _access;
 
 void write_video(std::vector<data_pair> &data_vec){
-  while(data_vec.size()<2){usleep(100000);} // Wait until more than 2 data
+  while(data_vec.size()<2){usleep(10000);} // Wait until more than 2 data
   double estimated_fps = 1/(data_vec[1].second - data_vec[0].second).toSec();
   cv::VideoWriter video(out_name, CV_FOURCC('H', '2', '6', '4'), estimated_fps*speed, cv::Size(width, height));
-  while(not read_complete or data_vec.size()!=0){
+  while(true){
+    if(read_complete and data_vec.empty()) break; // Stop
+    if(data_vec.empty()) continue; // Consume too fast
     video << data_vec[0].first;
     data_vec.erase(data_vec.begin());
     if(read_complete){
@@ -103,7 +107,7 @@ Usage: ./bag_to_video bag_name output_video_name [speed]\n\033[0m";
       height = img_ptr->height;
       cv::Mat rgb_img;
       cv::cvtColor(cv_bridge_ptr->image, rgb_img, CV_BGR2RGB);
-      //printf("\r[%05.1f%%]", read_ratio*100);
+      printf("\r[%05.1f%%]", read_ratio*100);
       data_pair pair = std::make_pair(rgb_img, m.getTime());
       data_vec.push_back(pair);
     }
