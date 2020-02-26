@@ -30,6 +30,12 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <visualization_msgs/Marker.h>
 
+double max(double v1, double v2, double v3){
+  double max_ = (v1>=v2?v1:v2);
+  if(v3>=max_) max_ = v3;
+  return max_;
+}
+
 bool verbose; // If save point cloud as pcd
 bool use_two_cam; // If enable camera2
 bool down_sample; // If downsampling
@@ -44,6 +50,7 @@ double y_lower; // Y lower bound, in hand coord.
 double y_upper; // Y upper bound, in hand coord.
 double z_lower; // Z lower bound, in hand coord.
 double z_upper; // Z upper bound, in hand coord.
+double color_thres;
 /* For detect if grasp success */
 double detect_x_lower;
 double detect_x_upper;
@@ -93,6 +100,7 @@ int main(int argc, char** argv)
   if(!pnh.getParam("resolution", resolution)) resolution = 224;
   if(!pnh.getParam("thres_point", thres_point)) thres_point = 3000;
   if(!pnh.getParam("factor", factor)) factor = 1.0f;
+  if(!pnh.getParam("color_thres", color_thres)) color_thres = 0.2;
   if(!pnh.getParam("empty_thres", empty_thres)) empty_thres = 0.95f;
   if(!pnh.getParam("verbose", verbose)) verbose = false;
   if(!pnh.getParam("down_sample", down_sample)) down_sample = false;
@@ -271,6 +279,12 @@ void check_param_cb(const ros::TimerEvent& event){
       empty_thres = tmp;
     }
   }
+  if(ros::param::get(node_ns+"/color_thres", tmp)){
+    if(tmp!=color_thres){
+      ROS_INFO("color_thres set from %f to %f", color_thres, tmp);
+      color_thres = tmp;
+    }
+  }
   int tmp_int;
   if(ros::param::get(node_ns+"/thres_point", tmp_int)){
     if(tmp_int!=thres_point){
@@ -295,14 +309,30 @@ bool callback_grasp_success(visual_system::check_grasp_success::Request  &req,
                             visual_system::check_grasp_success::Response &res)
 {
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>), 
-                                           tmp(new pcl::PointCloud<pcl::PointXYZRGB>);
+                                           tmp(new pcl::PointCloud<pcl::PointXYZRGB>),
+                                         color(new pcl::PointCloud<pcl::PointXYZRGB>);
   pcl::io::loadPCDFile<pcl::PointXYZRGB>(req.pcd_str, *cloud);
   detect_pass_x.setInputCloud(cloud); detect_pass_x.filter(*tmp);
   detect_pass_y.setInputCloud(tmp);   detect_pass_y.filter(*tmp);
   detect_pass_z.setInputCloud(tmp);   detect_pass_z.filter(*tmp);
-  if(tmp->points.size()>thres_point){
+  int num = 0;
+  for(auto it=tmp->begin(); it!=tmp->end(); ++it){ // Gripper is black
+    /*if(it->r>=color_thres and it->g >=color_thres and it->b >=color_thres){
+      ++num;
+    }*/
+    int r = it->r, g = it->g, b = it->b;
+    double r_norm = r/255., g_norm = g/255., b_norm = b/255., v = max(r_norm, g_norm, b_norm); // V = C_{max}
+    if(v>=color_thres){
+      ++num;
+      color->points.push_back(*it);
+    }
+  }
+  color->height = 1; color->width = color->points.size();
+  std::string file_name = req.pcd_str; file_name.replace(file_name.length()-4, 13, "_filtered.pcd");
+  pcl::io::savePCDFileBinary<pcl::PointXYZRGB>(file_name, *color);
+  if(num>thres_point){
     res.is_success = true; // Success
   } else res.is_success = false; // Failed
-  ROS_INFO("%d points in range \t | Success: %s", int(tmp->points.size()), (res.is_success?"True":"False"));
+  ROS_INFO("%d points in range \t | Success: %s", num, (res.is_success?"True":"False"));
   return true;
 }
