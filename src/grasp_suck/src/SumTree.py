@@ -51,6 +51,7 @@ class SumTree:
 	def add(self, p, data):
 		idx = self.write + self.capacity - 1
 		self.data[self.write] = data
+		print "[Memory] Index {} with priority {} add to tree".format(idx, p)
 		self.update(idx, p)
 		self.write += 1
 		if self.write >= self.capacity:
@@ -61,8 +62,8 @@ class SumTree:
 	# update priority
 	def update(self, idx, p):
 		change = p - self.tree[idx]
-		self.tree[idx] = p
-		self._propagate(idx, change)
+		self.tree[idx] = p # Set leaf node priority value
+		self._propagate(idx, change) # Update parent nodes value until root node
 		
 	# get priority and sample
 	def get(self, target):

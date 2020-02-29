@@ -3,7 +3,7 @@ import utils
 parser = utils.create_argparser()
 args = parser.parse_args()
 utils.show_args(args)
-testing, episode, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate = utils.parse_input(args)
+testing, run, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode = utils.parse_input(args)
 
 import os
 import sys
@@ -26,6 +26,7 @@ from visual_system.srv import get_pc, get_pcRequest, get_pcResponse, \
                               pc_is_empty, pc_is_emptyRequest, pc_is_emptyResponse, \
                               check_grasp_success, check_grasp_successRequest, check_grasp_successResponse
 from visualization.srv import viz_marker, viz_markerRequest, viz_markerResponse
+from grasp_suck.srv import recorder, recorderRequest, recorderResponse
 
 # Constant
 reward = 5.0
@@ -52,7 +53,11 @@ if model_str != "":
 # Get logger path
 r = rospkg.RosPack()
 package_path = r.get_path("grasp_suck")
-csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path, check_grasp_path = utils.getLoggerPath(testing, package_path, episode)
+csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path, check_grasp_path = utils.getLoggerPath(testing, package_path, run)
+
+if model_str == "":
+	torch.save(trainer.behavior_net.state_dict(), model_path+"initial.pth")
+	
 # Service clients
 vacuum_pump_control      = rospy.ServiceProxy("/vacuum_pump_control_node/vacuum_control", SetBool)
 check_suck_success       = rospy.ServiceProxy("/vacuum_pump_control_node/check_suck_success", SetBool)
@@ -67,6 +72,8 @@ fixed_home               = rospy.ServiceProxy("/agent_server_node/go_home_fix_or
 check_if_collide_client  = rospy.ServiceProxy("/agent_server_node/check_if_collide", agent_abb_action)
 publish_data_client      = rospy.ServiceProxy("/agent_server_node/publish_data", publish_info)
 viz                      = rospy.ServiceProxy("/viz_marker_node/viz_marker", viz_marker)
+record_bag_client        = rospy.ServiceProxy("/autonomous_recording_node/start_recording", recorder)
+stop_record_client       = rospy.ServiceProxy("/autonomous_recording_node/stop_recording", Empty)
 
 # Result list
 action_list   = [] # If action valid?
@@ -134,7 +141,10 @@ try:
 	while True:
 		if iteration is not 0: 
 			arduino.write("gb 1000") # Green + buzzer for alarming resetting
-			return_list.append(return_); episode_list.append(t) # Update data
+			return_list.append(return_); 
+			episode_list.append(t)
+			stop_record_client()
+			run_episode+=1
 		program_time += time.time()-program_ts
 		cmd = raw_input("\033[1;34m[%f] Reset environment, if ready, press 's' to start. 'e' to exit: \033[0m" %(program_time))
 		program_ts = time.time()
@@ -142,6 +152,7 @@ try:
 			utils.shutdown_process(program_time, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, True)
 		elif cmd == 'S' or cmd == 's':
 			t = 0; return_ = 0.0; is_empty = False
+			record_bag_client(recorderRequest(run_episode))
 			while is_empty is not True:
 				print "\033[0;32m[%f] Iteration: %d\033[0m" %(program_time+time.time()-program_ts, iteration)
 				if not testing: epsilon_ = max(epsilon * np.power(0.998, t), 0.1) # half after 350 steps
@@ -236,10 +247,8 @@ try:
 				if iteration % learning_freq == 0: # Training stage, update parameters
 					back_ts = time.time(); arduino.write("b 1000")
 					mini_batch, idxs, is_weight = memory.sample(mini_batch_size)
-					sampled_iter = []
 					for i in range(mini_batch_size):
-						iter_str = mini_batch[i].color[mini_batch[i].color.find("color_")+6:-4]
-						sampled_iter.append(int(iter_str))
+						episode_, iter_ = utils.parse_string(mini_batch[i].color);
 						color = cv2.imread(mini_batch[i].color)
 						depth = np.loadtxt(mini_batch[i].depth)
 						pixel_index = mini_batch[i].pixel_idx
@@ -248,7 +257,6 @@ try:
 						td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
 						loss_ = trainer.backprop(color, depth, pixel_index, td_target, is_weight[i])
 						loss_list.append(loss_)
-					print "Sampled at iteration: ", sampled_iter
 					# After parameter updated, update prioirites tree
 					for i in range(mini_batch_size):
 						color = cv2.imread(mini_batch[i].color)
@@ -266,7 +274,7 @@ try:
 					print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
 					trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
 				if iteration % save_every == 0 and not testing:
-					model_name = model_path + "{}.pth".format(iteration)
+					model_name = model_path + "{}_{}.pth".format(run, iteration)
 					torch.save(trainer.behavior_net.state_dict(), model_name)
 					print "[%f] Model: %s saved" %(program_time+time.time()-program_ts, model_name)
 except KeyboardInterrupt:

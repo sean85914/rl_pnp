@@ -193,7 +193,7 @@ def vis_affordance(predictions):
 	tmp[tmp<0] = 0
 	tmp[tmp>1] = 1
 	tmp = (tmp*255).astype(np.uint8)
-	tmp.shape = (224, 224, 1)
+	tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
 	heatmap = cv2.applyColorMap(tmp, cv2.COLORMAP_JET)
 	return heatmap
 
@@ -316,7 +316,7 @@ def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction):
 '''
 def create_argparser():
 	parser = argparse.ArgumentParser(prog="reinforcement_grasping", description="Reinforcement learning for robot arm grasping")
-	parser.add_argument("episode", type=int, help="Which episode is this run?")
+	parser.add_argument("run", type=int, help="Which number is this run?")
 	parser.add_argument("--is_testing", action="store_true", default=False, help="True if testing, default is false")
 	parser.add_argument("--force_cpu", action="store_true", default=False, help="True if using CPU, default is false")
 	parser.add_argument("--model", type=str, default="", help="If provided, continue training the model, or using this model for testing, 	default is empty srting")
@@ -329,6 +329,7 @@ def create_argparser():
 	parser.add_argument("--mini_batch_size", type=int, default=5, help="How many transitions should used for learning, default is 4") # K
 	parser.add_argument("--save_every", type=int, default=10, help="Every how many steps should save the model, default is 10")
 	parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for the trainer, default is 1e-4")
+	parser.add_argument("--run_episode", type=int, default=0, help="index for recording bag")
 	return parser
 
 def show_args(args):
@@ -340,11 +341,12 @@ def show_args(args):
 
 def parse_input(args):
 	testing = args.is_testing
-	episode = args.episode
 	use_cpu = args.force_cpu
 	model_str = args.model
 	buffer_str = args.buffer_file
+	run = args.run
 	epsilon = args.epsilon
+	run_episode = args.run_episode
 	port = args.port
 	buffer_size = args.buffer_size
 	learning_freq = args.learning_freq if not testing else 1e-5 # Still using small learning rate to backpropagate when testing
@@ -352,8 +354,8 @@ def parse_input(args):
 	mini_batch_size = args.mini_batch_size
 	save_every = args.save_every
 	learning_rate = args.learning_rate
-	return testing, episode, use_cpu, model_str, buffer_str, epsilon, port, \
-	       buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate
+	return testing, run, use_cpu, model_str, buffer_str, epsilon, port, \
+	       buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode
 	
 
 def standarization(prediction):
@@ -383,9 +385,9 @@ def get_file_path(color_img_path_str):
 	return idx, depth_image_path_str, next_color_image_path_str, next_depth_image_path_str, \
 			primitive_csv, result_csv, target_csv
 			
-def getLoggerPath(testing, root_path, episode):
-	if not testing: logger_dir = "/training/logger_{:03}/".format(episode)
-	else: logger_dir = "/testing/logger_{:03}/".format(episode)
+def getLoggerPath(testing, root_path, run):
+	if not testing: logger_dir = "/training/logger_{:03}/".format(run)
+	else: logger_dir = "/testing/logger_{:03}/".format(run)
 	csv_path         = root_path + logger_dir
 	image_path       = csv_path + "images/"
 	depth_path       = csv_path + "depth_data/"
@@ -502,8 +504,8 @@ def wrap_strings(image_path, depth_path, iteration):
 	return color_name, depth_name, next_color_name, next_depth_name
 
 def shutdown_process(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path, memory, regular=True):
-	saveFiles(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path)
 	memory.save_memory(path)
+	saveFiles(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path)
 	if regular: print "Regular shutdown"
 	else: print "Shutdown since user interrupt"
 	sys.exit(0)
@@ -532,6 +534,15 @@ def save_heatmap_and_mixed(suck_1_prediction, suck_2_prediction, grasp_predictio
 		mixed_imgs.append(mixed)
 		cv2.imwrite(img_name, mixed)
 	return heatmaps, mixed_imgs
+	
+def parse_string(input_str):
+	def _substring(input_str, key, length):
+		pos = input_str.find(key)
+		return input_str[pos+len(key):pos+len(key)+length]
+	episode_str = _substring(input_str, "logger_", 3); episode = int(episode_str)
+	iter_str = _substring(input_str, "color_", 6); iter_ = int(iter_str)
+	print "Sample at episode: {} iteration: {}".format(episode, iter_)
+	return episode, iter_
 	
 # Reward shaping
 def reward_judgement(reward_unit, action_valid, action_success):
