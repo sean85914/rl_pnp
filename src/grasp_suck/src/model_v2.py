@@ -128,7 +128,7 @@ class reinforcement_net(nn.Module):
 				suck_2_color_feat = self.suck_2_color_feat_extractor.features(input_color_data)
 				suck_2_depth_feat = self.suck_2_depth_feat_extractor.features(input_depth_data)
 				suck_2_feat = torch.cat((suck_2_color_feat, suck_2_depth_feat), dim = 1)
-				output_prob.append(self.suck_1_net(suck_2_feat))
+				output_prob.append(self.suck_2_net(suck_2_feat))
 				del suck_2_color_feat, suck_2_depth_feat, suck_2_feat
 				
 			# Rotation
@@ -163,7 +163,7 @@ class reinforcement_net(nn.Module):
 					suck_2_depth_feat.detach()
 				suck_2_feat = torch.cat((suck_2_color_feat, suck_2_depth_feat), dim = 1)
 				self.output_prob = self.suck_2_net(suck_2_feat)
-			else: # "grasp"
+			elif "grasp" in action_str: # "grasp"
 				rotate_idx = specific_rotation
 				theta = np.radians(-90.0+(180.0/self.num_rotations)*rotate_idx)
 				rotate_color, rotate_depth = rotate_heightmap(input_color_data, input_depth_data, theta, self.use_cuda)
