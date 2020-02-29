@@ -2,6 +2,10 @@
   <arg name="port" default="/dev/ttyvacuum"/>
   <include file="$(find arm_operation)/launch/change_tool_service.launch"/>
   <node pkg="arm_operation" type="agent_server_node" name="agent_server_node" output="screen" clear_params="true">
+    <param name="camera_y_lower" value="-0.403"/>
+    <param name="camera_y_lower" value="-0.301"/>
+    <param name="camera_x" value="0.661"/>
+    <param name="camera_z" value="0.5"/>
     <rosparam param="tool_length">[0.15, 0.084, 0.05]</rosparam>
     <rosparam param="service_name">["/change_tool_service/change_tool_service",
                                     "/abb/GetCartesian",
@@ -18,12 +22,12 @@
                                    -0.018849557265639305, 
                                    1.2630947828292847, 
                                    -0.4089306592941284]</rosparam>
-    <rosparam param="middle_joints">[-0.0626573201609, 
-                                      0.121823981817, 
-                                     -0.100705497863, 
-                                     -0.0178023583744, 
-                                      1.55421569926, 
-                                      0.117809724537]</rosparam>
+    <rosparam param="middle_joints">[-0.0652753140395, 
+                                      0.130376095154, 
+                                     -0.166504410678, 
+                                     -0.0, 
+                                      1.60692464268, 
+                                      -0.0652753140395]</rosparam>
     <rosparam param="place_joints">[0.18395769596099854, 
                                     0.14468780159950256, 
                                     0.17662732303142548, 
