@@ -1,5 +1,7 @@
 #include <ros/ros.h>
 #include <tf/tf.h>
+// MSG
+#include <geometry_msgs/Point.h>
 // Server headers
 #include <arm_operation/change_tool.h>
 #include <abb_node/robot_GetCartesian.h>
@@ -56,6 +58,7 @@ class AgentServer{
   ros::ServiceServer go_place_server;
   ros::ServiceServer go_home_fix_orientation_server;
   ros::ServiceServer fast_vibrate_server;
+  ros::ServiceServer light_vibrate_server;
   ros::ServiceServer publish_data_server;
   ros::ServiceServer check_if_collide_server;
   void setupParams(void);
@@ -64,7 +67,9 @@ class AgentServer{
   void _home(void);
   void _home_fix_ori(void);
   void _fast_vibrate(void);
+  void _light_vibrate(void);
   void joint_6_coterminal(abb_node::robot_SetJoints&);
+  double get_final_TCP_height(const int, const double);
   bool homeCB(std_srvs::Empty::Request&,
               std_srvs::Empty::Response&);
   bool placeCB(std_srvs::Empty::Request&,
@@ -73,8 +78,10 @@ class AgentServer{
                  arm_operation::agent_abb_action::Response&);
   bool home_fixCB(std_srvs::Empty::Request&,
                   std_srvs::Empty::Response&);
-  bool vibrateCB(std_srvs::Empty::Request&,
-                 std_srvs::Empty::Response&);
+  bool fast_vibrateCB(std_srvs::Empty::Request&,
+                      std_srvs::Empty::Response&);
+  bool light_vibrateCB(std_srvs::Empty::Request&,
+                       std_srvs::Empty::Response&);
   bool publishCB(arm_operation::publish_info::Request&,
                  arm_operation::publish_info::Response&);
   bool check_if_collision(arm_operation::agent_abb_action::Request&, 
@@ -100,7 +107,8 @@ class AgentServer{
     go_home_server      = pnh_.advertiseService("go_home", &AgentServer::homeCB, this);
     go_place_server     = pnh_.advertiseService("go_place", &AgentServer::placeCB, this);
     go_home_fix_orientation_server = pnh_.advertiseService("go_home_fix_orientation", &AgentServer::home_fixCB, this);
-    fast_vibrate_server = pnh_.advertiseService("fast_vibrate", &AgentServer::vibrateCB, this);
+    fast_vibrate_server = pnh_.advertiseService("fast_vibrate", &AgentServer::fast_vibrateCB, this);
+    light_vibrate_server = pnh_.advertiseService("light_vibrate", &AgentServer::light_vibrateCB, this);
     publish_data_server = pnh_.advertiseService("publish_data", &AgentServer::publishCB, this);
     check_if_collide_server = pnh_.advertiseService("check_if_collide", &AgentServer::check_if_collision, this);
   }
@@ -252,8 +260,8 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   abb_node::robot_SetZone set_zone;
   set_zone.request.mode = 0;
   set_zone_client.call(set_zone);
-  // Go to target, downward 3 cm
-  target_ee_position.z -= 0.23;
+  // Go to target, downward 3 cm (5 cm for gripper)
+  target_ee_position.z -= (req.tool_id==1?0.25:0.23);
   setTargetPose(set_cartesian, target_ee_position, quat);
   set_cartesian_client.call(set_cartesian);
   // Grasp when gripper reach the target
@@ -277,7 +285,8 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
       set_cartesian_client.call(set_cartesian);
     }
   }else{ // Gripper
-    _home_fix_ori();
+    _home();
+    _light_vibrate(); // Vibrate to make object fall if bad grasping 
   }
   // Move slower to prevent droping
   /*abb_node::robot_SetSpeed set_speed;
@@ -291,11 +300,6 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
 }
 
 void AgentServer::_home(void){
-  /*abb_node::robot_SetJoints set_joints;
-  set_joints.request.position.resize(6);
-  set_joints.request.position.assign(home_joints.begin(), home_joints.end());
-  set_joints_client.call(set_joints);
-  set_joints_client.call(set_joints);*/
   abb_node::robot_SetCartesian set_cartesian;
   set_cartesian.request.cartesian.resize(3);
   set_cartesian.request.quaternion.resize(4);
@@ -305,6 +309,19 @@ void AgentServer::_home(void){
   set_cartesian.request.quaternion[2] = -1.0;
   set_cartesian.request.quaternion[3] = 0.0;
   set_cartesian_client.call(set_cartesian);
+  abb_node::robot_GetJoints get_joints;
+  get_joints_client.call(get_joints);
+  if(fabs(get_joints.response.j6)>=2*M_PI){
+    abb_node::robot_SetJoints set_joints;
+    set_joints.request.position.resize(6);
+    set_joints.request.position[0] = get_joints.response.j1;
+    set_joints.request.position[1] = get_joints.response.j2;
+    set_joints.request.position[2] = get_joints.response.j3;
+    set_joints.request.position[3] = get_joints.response.j4;
+    set_joints.request.position[4] = get_joints.response.j5;
+    set_joints.request.position[5] = (get_joints.response.j6>0?get_joints.response.j6-2*M_PI:get_joints.response.j6+2*M_PI);
+    set_joints_client.call(set_joints);
+  }ros::Duration(0.1).sleep();
 }
 
 void AgentServer::_home_fix_ori(void){
@@ -348,6 +365,57 @@ void AgentServer::_fast_vibrate(void){
   set_cartesian_client.call(set_cartesian);
   set_speed.request.tcp = 200.0f;
   set_speed_client.call(set_speed);
+}
+
+void AgentServer::_light_vibrate(void){
+  ros::Duration(0.1).sleep();
+  // Set low speed
+  abb_node::robot_SetSpeed set_speed;
+  set_speed.request.tcp = 25.0f; set_speed.request.ori = 50.0f;
+  set_speed_client.call(set_speed);
+  // Get current cartesian pose
+  abb_node::robot_GetCartesian get_cartesian;
+  get_cartesian_client.call(get_cartesian);
+  abb_node::robot_SetCartesian set_cartesian;
+  set_cartesian.request.cartesian.resize(3); set_cartesian.request.quaternion.resize(4);
+  set_cartesian.request.cartesian[0] = get_cartesian.response.x;
+  set_cartesian.request.cartesian[1] = get_cartesian.response.y;
+  set_cartesian.request.cartesian[2] = get_cartesian.response.z;
+  double small_angle = 5.0/180.0*M_PI;
+  // Rotate X small angle
+  tf::Quaternion current(get_cartesian.response.qx, get_cartesian.response.qy, get_cartesian.response.qz, get_cartesian.response.q0),
+                 rotate, target;
+  rotate.setRPY(small_angle, 0.0, 0.0); target = current*rotate;
+  set_cartesian.request.quaternion[0] = target.getW();
+  set_cartesian.request.quaternion[1] = target.getX();
+  set_cartesian.request.quaternion[2] = target.getY();
+  set_cartesian.request.quaternion[3] = target.getZ();
+  set_cartesian_client.call(set_cartesian); ros::Duration(0.05).sleep();
+  // Rotate back
+  /*rotate.setRPY(-small_angle, 0.0, 0.0); target = current*rotate;
+  set_cartesian.request.quaternion[0] = target.getW();
+  set_cartesian.request.quaternion[1] = target.getX();
+  set_cartesian.request.quaternion[2] = target.getY();
+  set_cartesian.request.quaternion[3] = target.getZ();
+  set_cartesian_client.call(set_cartesian); ros::Duration(0.05).sleep();*/
+  // Recovery to original pose and speed
+  set_cartesian.request.quaternion[0] = get_cartesian.response.q0;
+  set_cartesian.request.quaternion[1] = get_cartesian.response.qx;
+  set_cartesian.request.quaternion[2] = get_cartesian.response.qy;
+  set_cartesian.request.quaternion[3] = get_cartesian.response.qz;
+  set_cartesian_client.call(set_cartesian);
+  set_speed.request.tcp = 200.0f; set_speed.request.ori = 100.0f;
+  set_speed_client.call(set_speed);
+}
+
+double AgentServer::get_final_TCP_height(const int tool_id, const double target_z){
+  double tcp_height;
+  if(tool_id!=1){ // Suction
+    tcp_height = target_z + tool_length[tool_id-1] + tool_head_length - 0.03;
+  }else{
+    tcp_height = target_z + tool_length[tool_id-1] + tool_head_length - 0.05;
+  }
+  return tcp_height;
 }
 
 bool AgentServer::homeCB(std_srvs::Empty::Request  &req,
@@ -410,11 +478,19 @@ bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
   return true;
 }
 
-bool AgentServer::vibrateCB(std_srvs::Empty::Request&,
-                            std_srvs::Empty::Response&){
+bool AgentServer::fast_vibrateCB(std_srvs::Empty::Request&,
+                                 std_srvs::Empty::Response&){
   ros::Time ts = ros::Time::now();
   _fast_vibrate();
   ROS_INFO("Fast vibrate takes %f seconds", (ros::Time::now()-ts).toSec());
+  return true;
+}
+
+bool AgentServer::light_vibrateCB(std_srvs::Empty::Request  &req,
+                                  std_srvs::Empty::Response &res){
+  ros::Time ts = ros::Time::now();
+  _light_vibrate();
+  ROS_INFO("Light vibrate takes %f seconds", (ros::Time::now()-ts).toSec());
   return true;
 }
 
@@ -429,26 +505,42 @@ bool AgentServer::publishCB(arm_operation::publish_info::Request &req,
 bool AgentServer::check_if_collision(arm_operation::agent_abb_action::Request &req, 
                                      arm_operation::agent_abb_action::Response &res)
 {
-  const double gripper_width = 0.11/2;
-  const double radius = 0.08/2;
-  // Only for gripper
-  if(req.tool_id!=1){
-    res.result = "false";
-    return true;
-  }
-  double x_lower, x_upper, y_lower, y_upper;
+  const double gripper_width = 0.115/2;
+  const double gripper_radius = 0.08/2;
+  const double spear_radius = 0.09/2;
+  const double spear_length = 0.19;
+  double final_tcp_height = get_final_TCP_height(req.tool_id, req.position.z);
+  double x_lower, camera_x, camera_y_lower, camera_y_upper, camera_z;
   double theta = M_PI/2-req.angle;
-  bool will_collide;
+  bool will_collide = false;
   nh_.getParam("/combine_pc_node/x_lower", x_lower);
-  x_lower -= 0.04f;
-  // Lower body (parallel-jaw part)
-  bool x_lower_collide = in_range((x_lower-req.position.x+gripper_width*cos(theta))/(2*gripper_width*cos(theta)), 0, 1);
-  if(x_lower_collide) std::cout << "x_lower collide | lower body\n";
-  will_collide = x_lower_collide;
-  // Upper body (circle part)
-  x_lower_collide = (fabs(x_lower-req.position.x)<=radius);
-  if(x_lower_collide) std::cout << "x_lower collide | upper body\n";
-  will_collide = x_lower_collide or will_collide;
+  nh_.getParam("/camera_x", camera_x);
+  nh_.getParam("/camera_y_lower", camera_y_lower);
+  nh_.getParam("/camera_y_upper", camera_y_upper);
+  nh_.getParam("/camera_z", camera_z);
+  x_lower -= 0.04f; // 4 cm to the wall of the tote
+  // Spear
+  if(final_tcp_height-spear_length<camera_z){
+    if(in_range((camera_x-req.position.x)/spear_radius, -1, 1)){  // Valid theta
+      double cos_  = (camera_x-req.position.x)/spear_radius,
+             sin_1 = sqrt(1-cos_*cos_), sin_2 = -sin_1,
+             intersect_1 = req.position.y + spear_radius*sin_1,
+             intersect_2 = req.position.y + spear_radius*sin_2;
+      will_collide = in_range(intersect_1, camera_y_lower, camera_y_upper) or 
+                     in_range(intersect_2, camera_y_lower, camera_y_upper);
+      if(will_collide) std::cout << "Spear collide\n";
+    }
+  }
+  if(req.tool_id==1){
+    // Lower body (parallel-jaw part)
+    bool x_lower_collide = in_range((x_lower-req.position.x+gripper_width*cos(theta))/(2*gripper_width*cos(theta)), 0, 1);
+    if(x_lower_collide) std::cout << "x_lower collide | lower body\n";
+    will_collide = x_lower_collide or will_collide;
+    // Upper body (circle part)
+    x_lower_collide = (fabs(x_lower-req.position.x)<=gripper_radius);
+    if(x_lower_collide) std::cout << "x_lower collide | upper body\n";
+    will_collide = x_lower_collide or will_collide;
+  }
   res.result = (will_collide?"true":"false");
   return true;
 }
