@@ -5,6 +5,7 @@ add_compile_options(-std=c++11)
 
 find_package(catkin REQUIRED COMPONENTS cmake_modules
   roscpp
+  rosbag
   rospy
   roslib
   std_msgs
@@ -25,6 +26,7 @@ add_service_files(
   FILES
   get_pose.srv
   get_result.srv
+  recorder.srv
 )
 
 generate_messages(
@@ -57,3 +59,9 @@ target_link_libraries(robotiq_gripper_control ${catkin_LIBRARIES})
 
 #add_executable(get_reward src/get_reward.cpp)
 #target_link_libraries(get_reward ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_executable(autonomous_recording src/autonomous_recording.cpp)
+target_link_libraries(autonomous_recording ${catkin_LIBRARIES})
+
+add_executable(bag_to_data src/bag_to_data.cpp)
+target_link_libraries(bag_to_data ${catkin_LIBRARIES})
