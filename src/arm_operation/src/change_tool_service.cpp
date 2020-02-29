@@ -286,6 +286,16 @@ class ChangeToolService{
       set_cartesian_srv.request.quaternion[3] = get_cartesian_srv.response.qz;
       setCartesian.call(set_cartesian_srv); ros::Duration(0.25).sleep();
     }
+    getJoints.call(get_joints_srv);
+    if(IRB1660ID_JOINT6_LIMIT/180.0*M_PI-fabs(get_joints_srv.response.j6)<=90.0/180.0*M_PI){
+      set_joints_srv.request.position[0] = get_joints_srv.response.j1;
+      set_joints_srv.request.position[1] = get_joints_srv.response.j2;
+      set_joints_srv.request.position[2] = get_joints_srv.response.j3;
+      set_joints_srv.request.position[3] = get_joints_srv.response.j4;
+      set_joints_srv.request.position[4] = get_joints_srv.response.j5;
+      set_joints_srv.request.position[5] = (get_joints_srv.response.j6>0?get_joints_srv.response.j6-M_PI:get_joints_srv.response.j6+M_PI);
+      setJoints.call(set_joints_srv);
+    }
     set_speed_srv.request.ori = 100.0;
     setSpeed.call(set_speed_srv);
     ROS_INFO("Gripper calibration spend %f seconds", (ros::Time::now()-ts).toSec());
