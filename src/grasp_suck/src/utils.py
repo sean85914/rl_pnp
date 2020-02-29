@@ -244,7 +244,7 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 	if not explore: # Choose max Q
 		print "|Exploit|"
 		primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction)]
-		max_q_index = np.where(primitives_max==np.max(primitives_max))
+		max_q_index = np.where(primitives_max==np.max(primitives_max))[0][0]
 		if max_q_index == 0: # suck_1
 			tmp = np.where(suck_1_prediction == np.max(suck_1_prediction))
 			pixel_index = [0, tmp[1][0], tmp[2][0]]
@@ -253,7 +253,7 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 			pixel_index = [1, tmp[1][0], tmp[2][0]]
 			action_str = "suck_2"
 			action = 1
-		else:
+		elif max_q_index == 2:
 			tmp = np.where(grasp_prediction == np.max(grasp_prediction))
 			pixel_index = [tmp[0][0]+2, tmp[1][0], tmp[2][0]]
 			angle = -90.0+45.0*tmp[0][0]
@@ -286,7 +286,7 @@ def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction):
 	angle = 0
 	pixel_index = [] # rotate_idx, y, x
 	primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction)]
-	max_q_index = np.where(primitives_max==np.max(primitives_max))
+	max_q_index = np.where(primitives_max==np.max(primitives_max))[0][0]
 	if max_q_index == 0: # suck_1
 		tmp = np.where(suck_1_prediction == np.max(suck_1_prediction))
 		pixel_index = [0, tmp[1][0], tmp[2][0]]
@@ -295,7 +295,7 @@ def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction):
 		pixel_index = [1, tmp[1][0], tmp[2][0]]
 		action_str = "suck_2"
 		action = 1
-	else:
+	elif max_q_index == 2: # Grasp
 		tmp = np.where(grasp_prediction == np.max(grasp_prediction))
 		pixel_index = [tmp[0][0]+2, tmp[1][0], tmp[2][0]]
 		angle = -90.0+45.0*tmp[0][0]

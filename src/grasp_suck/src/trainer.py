@@ -41,7 +41,7 @@ class Trainer(object):
 		# Zoom 2 times
 		color_img_2x = ndimage.zoom(color, zoom=[2, 2, 1], order=0)
 		depth_img_2x = ndimage.zoom(depth, zoom=[2, 2],    order=0)
-		 # Add extra padding to handle rotations inside network
+		# Add extra padding to handle rotations inside network
 		diag_length = float(color_img_2x.shape[0])*np.sqrt(2)
 		diag_length = np.ceil(diag_length/32)*32 # Shrink 32 times in network
 		padding_width = int((diag_length - color_img_2x.shape[0])/2)
@@ -150,20 +150,53 @@ class Trainer(object):
 		'''
 		if action_pix_idx[0] == 0: # suck_1
 			prediction = self.forward(color_img, depth_img, action_str="suck_1", is_volatile = False, specific_rotation = -1, network = "behavior", clear_grad = False)
+			if self.use_cuda:
+				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
+									Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(np.array([is_weight])).cuda()
+			else:
+				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float()))* \
+									Variable(torch.from_numpy(label_weight).float(), requires_grad = False)*torch.FloatTensor(np.array([is_weight]))
+			loss = loss.sum()
+			loss.backward()
+			loss_value = loss.cpu().data.numpy()
 		elif action_pix_idx[0] == 1: # suck_2
 			prediction = self.forward(color_img, depth_img, action_str="suck_2", is_volatile = False, specific_rotation = -1, network = "behavior", clear_grad = False)
+			if self.use_cuda:
+				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
+									Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(np.array([is_weight])).cuda()
+			else:
+				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float()))* \
+									Variable(torch.from_numpy(label_weight).float(), requires_grad = False)*torch.FloatTensor(np.array([is_weight]))
+			loss = loss.sum()
+			loss.backward()
+			loss_value = loss.cpu().data.numpy()
 		else: # grasp
 			rotation = action_pix_idx[0]-2
 			prediction = self.forward(color_img, depth_img, action_str="grasp", is_volatile = False, specific_rotation = rotation, network = "behavior", clear_grad = False)
-		if self.use_cuda:
-			loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
-					Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(np.array([is_weight])).cuda()
-		else:
-			loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float()))* \
-					Variable(torch.from_numpy(label_weight).float(), requires_grad = False)*torch.FloatTensor(np.array([is_weight]))
-		loss = loss.sum()
-		loss.backward()
-		loss_value = loss.cpu().data.numpy()
+			if self.use_cuda:
+				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
+									Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(np.array([is_weight])).cuda()
+			else:
+				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float()))* \
+									Variable(torch.from_numpy(label_weight).float(), requires_grad = False)*torch.FloatTensor(np.array([is_weight]))
+			loss = loss.sum()
+			loss.backward()
+			loss_value = loss.cpu().data.numpy()
+			# Grasping is symmetric
+			rotation += 4
+			prediction = self.forward(color_img, depth_img, action_str="grasp", is_volatile = False, specific_rotation = rotation, network = "behavior", clear_grad = False)
+			if self.use_cuda:
+				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
+									Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(np.array([is_weight])).cuda()
+			else:
+				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float()))* \
+									Variable(torch.from_numpy(label_weight).float(), requires_grad = False)*torch.FloatTensor(np.array([is_weight]))
+			loss = loss.sum()
+			loss.backward()
+			loss_value = loss.cpu().data.numpy()
+			
+			loss_value = loss_value/2
+		
 		print "Training loss: %f" % loss_value
 		self.optimizer.step()
 		return loss_value
