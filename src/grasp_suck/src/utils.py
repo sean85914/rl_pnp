@@ -245,6 +245,7 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 	if not explore: # Choose max Q
 		out_str += "|Exploit| "
 		primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction)]
+		print primitives_max
 		max_q_index = np.where(primitives_max==np.max(primitives_max))[0][0]
 		if max_q_index == 0: # suck_1
 			tmp = np.where(suck_1_prediction == np.max(suck_1_prediction))
@@ -338,7 +339,8 @@ def create_argparser():
 	parser.add_argument("--updating_freq", type=int, default=40, help="Frequency for updating target network, default is 40") # C
 	parser.add_argument("--mini_batch_size", type=int, default=5, help="How many transitions should used for learning, default is 4") # K
 	parser.add_argument("--save_every", type=int, default=10, help="Every how many steps should save the model, default is 10")
-	parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for the trainer, default is 1e-4")
+	parser.add_argument("--learning_rate", type=float, default=5e-4, help="Learning rate for the trainer, default is 5e-4")
+	parser.add_argument("--densenet_lr", type=float, default=1e-4, help="Learning rate for the densenet block, default is 1e-4")
 	parser.add_argument("--run_episode", type=int, default=0, help="index for recording bag")
 	return parser
 
@@ -364,8 +366,9 @@ def parse_input(args):
 	mini_batch_size = args.mini_batch_size
 	save_every = args.save_every
 	learning_rate = args.learning_rate
+	densenet_lr = args.densenet_lr
 	return testing, run, use_cpu, model_str, buffer_str, epsilon, port, \
-	       buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode
+	       buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr
 	
 
 def standarization(prediction):

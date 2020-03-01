@@ -3,7 +3,7 @@ import utils
 parser = utils.create_argparser()
 args = parser.parse_args()
 utils.show_args(args)
-testing, run, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode = utils.parse_input(args)
+testing, run, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr = utils.parse_input(args)
 
 import os
 import sys
@@ -43,7 +43,7 @@ if model_str == "" and testing: # TEST SHOULD PROVIDE MODEL
 if buffer_str != "": memory.load_memory(buffer_str)
 
 # trainer
-trainer = Trainer(reward, discount_factor, use_cpu, learning_rate)
+trainer = Trainer(reward, discount_factor, use_cpu, learning_rate, densenet_lr)
 
 # Load model if provided
 if model_str != "":
@@ -248,7 +248,7 @@ try:
 				memory.add(transition)
 				iteration += 1; t += 1
 				# TRAIN
-				if memory.length >= mini_batch_size:
+				if memory.length % mini_batch_size == 0:
 					learned_times += 1
 					back_ts = time.time(); arduino.write("b 1000")
 					mini_batch, idxs, is_weight = memory.sample(mini_batch_size)

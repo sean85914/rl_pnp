@@ -11,7 +11,7 @@ from model_v2 import reinforcement_net
 from scipy import ndimage
 
 class Trainer(object):
-	def __init__(self, reward, discount_factor, force_cpu, learning_rate = 1e-4):
+	def __init__(self, reward, discount_factor, force_cpu, learning_rate = 5e-4, densenet_lr = 1e-4):
 		if torch.cuda.is_available() and not force_cpu:
 			print "CUDA detected, use GPU"
 			self.use_cuda = True
@@ -36,7 +36,17 @@ class Trainer(object):
 		self.behavior_net.train()
 		self.target_net.train()
 		# Initialize optimizer
-		self.optimizer = torch.optim.SGD(self.behavior_net.parameters(), lr = learning_rate, momentum = 0.9, weight_decay = 2e-5)
+		#self.optimizer = torch.optim.SGD(self.behavior_net.parameters(), lr = learning_rate, momentum = 0.9, weight_decay = 2e-5)
+		self.optimizer = torch.optim.SGD([{'params': self.behavior_net.suck_1_net.parameters(), 'lr': learning_rate},
+		                                  {'params': self.behavior_net.suck_2_net.parameters(), 'lr': learning_rate},
+		                                  {'params': self.behavior_net.grasp_net.parameters(), 'lr': learning_rate},
+		                                  {'params': self.behavior_net.suck_1_color_feat_extractor.parameters(), 'lr': densenet_lr},
+		                                  {'params': self.behavior_net.suck_1_depth_feat_extractor.parameters(), 'lr': densenet_lr}, 
+		                                  {'params': self.behavior_net.suck_2_color_feat_extractor.parameters(), 'lr': densenet_lr}, 
+		                                  {'params': self.behavior_net.suck_2_depth_feat_extractor.parameters(), 'lr': densenet_lr}, 
+		                                  {'params': self.behavior_net.grasp_color_feat_extractor.parameters(), 'lr': densenet_lr}, 
+		                                  {'params': self.behavior_net.grasp_depth_feat_extractor.parameters(), 'lr': densenet_lr},
+		                                  ], lr = learning_rate, momentum = 0.9, weight_decay = 2e-5)
 	def preprocessing(self, color, depth):
 		# Zoom 2 times
 		color_img_2x = ndimage.zoom(color, zoom=[2, 2, 1], order=0)
