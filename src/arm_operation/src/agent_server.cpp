@@ -32,6 +32,21 @@ void setTargetPose(abb_node::robot_SetCartesian& srv, geometry_msgs::Point posit
   srv.request.quaternion[3] = quat.getZ(); // q3, a.k.a qz
 }
 
+void printQuat(const tf::Quaternion quat){
+  std::cout << quat.getX() << " "
+            << quat.getY() << " "
+            << quat.getZ() << " "
+            << quat.getW() << "\n";
+}
+
+void printMat(const tf::Matrix3x3 mat){
+  for(int i=0; i<3; ++i){
+    std::cout << mat.getColumn(i).getX() << " "
+              << mat.getColumn(i).getY() << " "
+              << mat.getColumn(i).getZ() << "\n";
+  } std::cout << "\n";
+}
+
 class AgentServer{
  private:
   int curr_tool_id; // ID of current tool, from parameter server
@@ -242,7 +257,23 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
          qz = get_cartesian.response.qz,
          qw = get_cartesian.response.q0;
   tf::Quaternion quat(qx, qy, qz, qw), // Current orientation
+                 quat_perpendicular, // Tune to make Z axis perpendicular to the tote
                  quat_compensate;
+  std::cout << "Original quat: "; printQuat(quat);
+  tf::Matrix3x3 current_mat(quat), tuned_1, tuned_2;
+    tf::Vector3 current_z = current_mat.getColumn(2), ideal_z(0, 0, -1), cross = current_z.cross(ideal_z);
+    //if(std::fabs(current_z.getZ())<=1){
+      double theta = acos(-current_z.getZ()), theta_ = theta+M_PI/2;
+      tf::Quaternion quat_1 = quat*tf::Quaternion(cross, theta), 
+                     quat_2 = quat*tf::Quaternion(cross, theta_);
+      tf::Matrix3x3 mat_1(quat), mat_2(quat_2);
+      if(!std::isnan(quat_1.getX())){
+        if(mat_1.getColumn(2).getZ()<mat_2.getColumn(2).getZ())
+          quat = quat_1;
+        else quat = quat_2;
+        std::cout << "Quat set to: "; printQuat(quat);
+    }else
+      ROS_WARN("Meet nan");
   quat_compensate.setRPY(0.0, 0.0, req.angle);
   quat *= quat_compensate;
   geometry_msgs::Point target_ee_position(req.position);
@@ -325,6 +356,7 @@ void AgentServer::_home(void){
 }
 
 void AgentServer::_home_fix_ori(void){
+  ros::Duration(0.1).sleep();
   // Get current cartesian pose
   abb_node::robot_GetCartesian get_cartesian;
   get_cartesian_client.call(get_cartesian);
