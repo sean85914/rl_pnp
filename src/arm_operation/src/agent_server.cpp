@@ -260,20 +260,18 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
                  quat_perpendicular, // Tune to make Z axis perpendicular to the tote
                  quat_compensate;
   std::cout << "Original quat: "; printQuat(quat);
-  tf::Matrix3x3 current_mat(quat), tuned_1, tuned_2;
-    tf::Vector3 current_z = current_mat.getColumn(2), ideal_z(0, 0, -1), cross = current_z.cross(ideal_z);
-    //if(std::fabs(current_z.getZ())<=1){
-      double theta = acos(-current_z.getZ()), theta_ = theta+M_PI/2;
-      tf::Quaternion quat_1 = quat*tf::Quaternion(cross, theta), 
-                     quat_2 = quat*tf::Quaternion(cross, theta_);
-      tf::Matrix3x3 mat_1(quat), mat_2(quat_2);
-      if(!std::isnan(quat_1.getX())){
-        if(mat_1.getColumn(2).getZ()<mat_2.getColumn(2).getZ())
-          quat = quat_1;
-        else quat = quat_2;
-        std::cout << "Quat set to: "; printQuat(quat);
-    }else
-      ROS_WARN("Meet nan");
+  tf::Matrix3x3 mat(quat);
+  double a_31 = mat.getRow(2).getX(),
+         a_32 = mat.getRow(2).getY(),
+         a_33 = mat.getRow(2).getZ();
+  double roll  = atan2(a_32, -a_33);
+  if(fabs(roll)>=M_PI/2)
+    roll += (roll>=0?-M_PI:M_PI);
+  double pitch = atan2(a_31, -a_32*sin(roll)+a_33*cos(roll));
+  if(fabs(pitch)>=M_PI/2)
+    pitch += (pitch>=0?-M_PI:M_PI);
+  quat_perpendicular.setRPY(roll, pitch, 0);
+  quat *= quat_perpendicular; std::cout << "Quat compensate to: "; printQuat(quat);
   quat_compensate.setRPY(0.0, 0.0, req.angle);
   quat *= quat_compensate;
   geometry_msgs::Point target_ee_position(req.position);
