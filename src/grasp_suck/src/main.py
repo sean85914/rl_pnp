@@ -32,6 +32,7 @@ from grasp_suck.srv import recorder, recorderRequest, recorderResponse
 reward = 5.0
 discount_factor = 0.5
 iteration = 0
+learned_times = 0
 memory = Memory(buffer_size)
 arduino = serial.Serial(port, 115200)
 
@@ -136,6 +137,7 @@ program_time = 0.0
 # Initialize
 go_home()
 vacuum_pump_control(SetBoolRequest(False))
+valid_input = None
 
 try:
 	while True:
@@ -144,13 +146,14 @@ try:
 			return_list.append(return_); 
 			episode_list.append(t)
 			stop_record_client()
-			run_episode+=1
+			if valid_input: run_episode+=1 
 		program_time += time.time()-program_ts
 		cmd = raw_input("\033[1;34m[%f] Reset environment, if ready, press 's' to start. 'e' to exit: \033[0m" %(program_time))
 		program_ts = time.time()
 		if cmd == 'E' or cmd == 'e':
 			utils.shutdown_process(program_time, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, True)
 		elif cmd == 'S' or cmd == 's':
+			valid_input = True
 			t = 0; return_ = 0.0; is_empty = False
 			record_bag_client(recorderRequest(run_episode))
 			while is_empty is not True:
@@ -244,9 +247,12 @@ try:
 				transition = Transition(color_name, depth_name, pixel_index, current_reward, next_color_name, next_depth_name, is_empty)
 				memory.add(transition)
 				iteration += 1; t += 1
-				if iteration % learning_freq == 0: # Training stage, update parameters
+				# TRAIN
+				if memory.length >= mini_batch_size:
+					learned_times += 1
 					back_ts = time.time(); arduino.write("b 1000")
 					mini_batch, idxs, is_weight = memory.sample(mini_batch_size)
+					old_q = []
 					for i in range(mini_batch_size):
 						episode_, iter_ = utils.parse_string(mini_batch[i].color);
 						color = cv2.imread(mini_batch[i].color)
@@ -254,8 +260,10 @@ try:
 						pixel_index = mini_batch[i].pixel_idx
 						next_color = cv2.imread(mini_batch[i].next_color)
 						next_depth = np.loadtxt(mini_batch[i].next_depth)
+						action_str, rotate_idx = utils.get_action_info(pixel_index)
+						old_q.append(trainer.forward(color, depth, action_str, False, rotate_idx, clear_grad=True)[0, pixel_index[1], pixel_index[2]])
 						td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
-						loss_ = trainer.backprop(color, depth, pixel_index, td_target, is_weight[i])
+						loss_ = trainer.backprop(color, depth, pixel_index, td_target, is_weight[i], i==0, i==mini_batch_size-1)
 						loss_list.append(loss_)
 					# After parameter updated, update prioirites tree
 					for i in range(mini_batch_size):
@@ -267,15 +275,18 @@ try:
 						td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
 						action_str, rotate_idx = utils.get_action_info(pixel_index)
 						old_value = trainer.forward(color, depth, action_str, False, rotate_idx, clear_grad=True)[0, pixel_index[1], pixel_index[2]]
-						memory.update(idxs[i], (td_target-old_value)**2)
+						print "New Q value: {:03f} -> {:03f}".format(old_q[i], old_value)
+						memory.update(idxs[i], td_target-old_value)
 					back_t = time.time()-back_ts
 					arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/mini_batch_size)
-				if iteration % updating_freq == 0:
+				if learned_times % updating_freq == 0 and learned_times != 0:
 					print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
 					trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
-				if iteration % save_every == 0 and not testing:
+				if learned_times % save_every == 0 and learned_times != 0:
 					model_name = model_path + "{}_{}.pth".format(run, iteration)
 					torch.save(trainer.behavior_net.state_dict(), model_name)
 					print "[%f] Model: %s saved" %(program_time+time.time()-program_ts, model_name)
+		else:
+			valid_input = False
 except KeyboardInterrupt:
 	utils.shutdown_process(program_time, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, False)

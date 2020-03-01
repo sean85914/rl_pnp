@@ -47,7 +47,7 @@ class Memory:
 		
 	def update(self, idx, error):
 		p = self._get_priority(error)
-		print "Data index {} priority set from {} to {}".format(self.tree.write, self.tree.tree[idx], p)
+		print "Data index {} priority set from {} to {}".format(idx - self.tree.capacity + 1, self.tree.tree[idx], p)
 		self.tree.update(idx, p)
 		
 	def save_memory(self, root_path):
@@ -59,3 +59,7 @@ class Memory:
 		with open(file_path, 'rb') as file:
 			self.tree = pickle.load(file)
 			print "Loaded {} data".format(self.tree.length)
+	
+	@property
+	def length(self):
+		return self.tree.n_entries

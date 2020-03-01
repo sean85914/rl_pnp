@@ -241,18 +241,21 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 	angle = 0
 	action_str = "suck_1"
 	pixel_index = [] # primitive index, y, x
+	out_str = ""
 	if not explore: # Choose max Q
-		print "|Exploit|"
+		out_str += "|Exploit| "
 		primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction)]
 		max_q_index = np.where(primitives_max==np.max(primitives_max))[0][0]
 		if max_q_index == 0: # suck_1
 			tmp = np.where(suck_1_prediction == np.max(suck_1_prediction))
 			pixel_index = [0, tmp[1][0], tmp[2][0]]
+			out_str += "Select suck_1 at ({}, {}) with Q value {:.3f}\n".format(pixel_index[1], pixel_index[2], suck_1_prediction[0, pixel_index[1], pixel_index[2]])
 		elif max_q_index == 1: # suck_2
 			tmp = np.where(suck_2_prediction == np.max(suck_2_prediction))
 			pixel_index = [1, tmp[1][0], tmp[2][0]]
 			action_str = "suck_2"
 			action = 1
+			out_str += "Select suck_2 at ({}, {}) with Q value {:.3f}\n".format(pixel_index[1], pixel_index[2], suck_2_prediction[0, pixel_index[1], pixel_index[2]])
 		elif max_q_index == 2:
 			tmp = np.where(grasp_prediction == np.max(grasp_prediction))
 			pixel_index = [tmp[0][0]+2, tmp[1][0], tmp[2][0]]
@@ -260,23 +263,30 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 			action_str = "grasp " + str(int(angle))
 			angle = np.radians(angle)
 			action = tmp[0][0]+2
+			out_str += "Select grasp with angle {} at ({}, {}) with Q value {:.3f}\n".format(angle, pixel_index[1], pixel_index[2], grasp_prediction[action-2, pixel_index[1], pixel_index[2]])
 	else: # Random 
-		print "|Explore|"
+		out_str += "|Explore| "
 		mask = generate_mask(depth)
 		mask_name = loggerPath + "diff_{:06}.jpg".format(iteration)
 		cv2.imwrite(mask_name, mask)
 		idx = np.random.choice(np.arange(resolution*resolution), p=get_prob(mask))
+		x = int(idx/resolution); y = int(idx%resolution)
 		primitive = np.random.choice(np.arange(3), p=[0.4, 0.4, 0.2]) # suck_1: suck_2: grasp = 2:2:1
+		if primitive == 0:
+			out_str += "Select suck_1 at ({}, {}) with Q value {:.3f}\n".format(x, y, suck_1_prediction[0, x, y])
 		if primitive == 1:
 			action = 1
 			action_str = "suck_2"
+			out_str += "Select suck_2 at ({}, {}) with Q value {:.3f}\n".format(x, y, suck_2_prediction[0, x, y])
 		if primitive == 2:
 			rotate_idx = np.random.choice(np.arange(4)) # grasp_-90, grasp_-45, grasp_0, grasp_45
 			angle = -90.0+45.0*rotate_idx
 			primitive += rotate_idx
 			action = primitive
 			action_str = "grasp " + str(int(angle))
-		pixel_index = [primitive, int(idx/resolution), int(idx%resolution)]
+			out_str += "Select grasp with angle {} at ({}, {}) with Q value {:.3f}\n".format(angle, x, y, grasp_prediction[rotate_idx, x, y])
+		pixel_index = [primitive, x, y]
+	print out_str
 	return explore, action, action_str, pixel_index, angle
 
 # Choose action using greedy policy

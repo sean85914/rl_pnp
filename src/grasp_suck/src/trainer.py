@@ -132,13 +132,14 @@ class Trainer(object):
 		del next_prediction
 		return td_target
 	# Do backwardpropagation
-	def backprop(self, color_img, depth_img, action_pix_idx, label_value, is_weight):
+	def backprop(self, color_img, depth_img, action_pix_idx, label_value, is_weight, first = False, update=False):
 		label = np.zeros((1, 320, 320))
 		label[0, action_pix_idx[1], action_pix_idx[2]] = label_value
 		label_weight = np.zeros((1, 320, 320))
 		label_weight[0, action_pix_idx[1], action_pix_idx[2]] = 1
-		self.optimizer.zero_grad()
+		if first: self.optimizer.zero_grad()
 		loss_value = 0.0
+		out_str = "({}, {}, {})| TD Target: {:.3f}\t".format(action_pix_idx[0], action_pix_idx[1], action_pix_idx[2], label_value)
 		# Forward pass to save gradient
 		'''
 			0 -> suck_1
@@ -150,6 +151,7 @@ class Trainer(object):
 		'''
 		if action_pix_idx[0] == 0: # suck_1
 			prediction = self.forward(color_img, depth_img, action_str="suck_1", is_volatile = False, specific_rotation = -1, network = "behavior", clear_grad = False)
+			out_str += "Q value: {:.3f}\t".format(prediction[0, action_pix_idx[1], action_pix_idx[2]])
 			if self.use_cuda:
 				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
 									Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(np.array([is_weight])).cuda()
@@ -161,6 +163,7 @@ class Trainer(object):
 			loss_value = loss.cpu().data.numpy()
 		elif action_pix_idx[0] == 1: # suck_2
 			prediction = self.forward(color_img, depth_img, action_str="suck_2", is_volatile = False, specific_rotation = -1, network = "behavior", clear_grad = False)
+			out_str += "Q value: {:.3f}\t".format(prediction[0, action_pix_idx[1], action_pix_idx[2]])
 			if self.use_cuda:
 				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
 									Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(np.array([is_weight])).cuda()
@@ -173,6 +176,7 @@ class Trainer(object):
 		else: # grasp
 			rotation = action_pix_idx[0]-2
 			prediction = self.forward(color_img, depth_img, action_str="grasp", is_volatile = False, specific_rotation = rotation, network = "behavior", clear_grad = False)
+			out_str += "Q value: {:.3f}\t".format(prediction[0, action_pix_idx[1], action_pix_idx[2]])
 			if self.use_cuda:
 				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
 									Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(np.array([is_weight])).cuda()
@@ -185,6 +189,7 @@ class Trainer(object):
 			# Grasping is symmetric
 			rotation += 4
 			prediction = self.forward(color_img, depth_img, action_str="grasp", is_volatile = False, specific_rotation = rotation, network = "behavior", clear_grad = False)
+			out_str += "Q value (symmetric): {:.3f}\t".format(prediction[0, action_pix_idx[1], action_pix_idx[2]])
 			if self.use_cuda:
 				loss = self.criterion(self.behavior_net.output_prob.view(1, 320, 320), Variable(torch.from_numpy(label).float().cuda()))* \
 									Variable(torch.from_numpy(label_weight).float().cuda(), requires_grad = False)*torch.FloatTensor(np.array([is_weight])).cuda()
@@ -193,10 +198,11 @@ class Trainer(object):
 									Variable(torch.from_numpy(label_weight).float(), requires_grad = False)*torch.FloatTensor(np.array([is_weight]))
 			loss = loss.sum()
 			loss.backward()
-			loss_value = loss.cpu().data.numpy()
+			loss_value += loss.cpu().data.numpy()
 			
 			loss_value = loss_value/2
 		
-		print "Training loss: %f" % loss_value
-		self.optimizer.step()
+		out_str += "Training loss: {}".format(loss_value)
+		print out_str
+		if update: self.optimizer.step()
 		return loss_value
