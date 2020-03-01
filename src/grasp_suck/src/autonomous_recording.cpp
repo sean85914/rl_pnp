@@ -109,9 +109,7 @@ void Recording::check_record_CB(const ros::TimerEvent &event){
   check_record_timer.stop();
   rosbag::RecorderOptions opts;
   opts.prefix = path_to_desired + "rl_e_" + std::to_string(run_episode);
-  opts.append_date = true;
-  opts.compression =  rosbag::compression::BZ2;
-  opts.buffer_size = 1048576*1024; // Prevent dropping oldest queue
+  opts.append_date = false; 
   for(auto sub_topic: topics_to_record)
     opts.topics.push_back(sub_topic);
   rosbag::Recorder recorder(opts);
