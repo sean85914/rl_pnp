@@ -202,13 +202,23 @@ class ChangeToolService{
     set_cartesian_srv.request.quaternion.resize(4);
     // Save current cartesian position
     getCartesian.call(get_cartesian_srv);
-    double original_x = get_cartesian_srv.response.x,
+    /*double original_x = get_cartesian_srv.response.x,
            original_y = get_cartesian_srv.response.y,
            original_z = get_cartesian_srv.response.z;
     ROS_INFO("Save position: [%f, %f, %f]", original_x, original_y, original_z);
-    set_cartesian_srv.request.cartesian[0] = original_x;
-    set_cartesian_srv.request.cartesian[1] = original_y;
-    set_cartesian_srv.request.cartesian[2] = original_z - 80.0;
+    */
+    // Get home position
+    std::vector<double> home_pos;
+    nh_.getParam("/agent_server_node/home_xyz", home_pos);
+    if(home_pos.size()==3){
+      set_cartesian_srv.request.cartesian[0] = home_pos[0];
+      set_cartesian_srv.request.cartesian[1] = home_pos[1];
+      set_cartesian_srv.request.cartesian[2] = home_pos[2] - 80.0;
+    }else{
+      ROS_WARN("Can't get parameters, exit..."); 
+      ros::shutdown();
+      exit(EXIT_FAILURE);
+    }
     set_cartesian_srv.request.quaternion[0] = get_cartesian_srv.response.q0;
     set_cartesian_srv.request.quaternion[1] = get_cartesian_srv.response.qx;
     set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
@@ -219,7 +229,10 @@ class ChangeToolService{
     set_speed_srv.request.tcp = 200.0;
     set_speed_srv.request.ori = 400.0;
     setSpeed.call(set_speed_srv);
-    int direction = -1; // -1: CCW; 1: CW
+    getJoints.call(get_joints_srv);
+    double dis_to_upper = IRB1660ID_JOINT6_LIMIT/180.0*M_PI-get_joints_srv.response.j6,
+           dis_to_lower = IRB1660ID_JOINT6_LIMIT/180.0*M_PI+get_joints_srv.response.j6;
+    int direction = (dis_to_upper<=dis_to_lower?-1:1); // -1: CW; 1: CCW
     const double rotating_unit_angle = 30.0;
     while(ros::ok()){
       // Check if detected
@@ -277,9 +290,9 @@ class ChangeToolService{
     }
     if(go_back){
       getCartesian.call(get_cartesian_srv);
-      set_cartesian_srv.request.cartesian[0] = original_x;
-      set_cartesian_srv.request.cartesian[1] = original_y;
-      set_cartesian_srv.request.cartesian[2] = original_z;
+      set_cartesian_srv.request.cartesian[0] = home_pos[0];
+      set_cartesian_srv.request.cartesian[1] = home_pos[1];
+      set_cartesian_srv.request.cartesian[2] = home_pos[2];
       set_cartesian_srv.request.quaternion[0] = get_cartesian_srv.response.q0;
       set_cartesian_srv.request.quaternion[1] = get_cartesian_srv.response.qx;
       set_cartesian_srv.request.quaternion[2] = get_cartesian_srv.response.qy;
