@@ -188,7 +188,7 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
   seg.setOptimizeCoefficients(true);
   seg.setModelType(pcl::SACMODEL_PLANE);
   seg.setMethodType(pcl::SAC_RANSAC);
-  seg.setDistanceThreshold(0.005f);
+  seg.setDistanceThreshold(0.004f);
   pcl::PointCloud<pcl::PointXYZRGB> pc;
   pcl::fromROSMsg(req.input_pc, pc);
   seg.setInputCloud(pc.makeShared());
