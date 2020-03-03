@@ -2,6 +2,7 @@
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
 #include <std_srvs/Empty.h>
+#include <std_srvs/SetBool.h>
 #include <abb_node/robot_SetJoints.h>
 #include <abb_node/robot_SetCartesian.h>
 #include <abb_node/robot_GetJoints.h>
@@ -181,17 +182,20 @@ class ChangeToolService{
     nh_.setParam("/curr_tool_id", req.togo);
     return true;
   }
-  bool calibrate_gripper_cb(std_srvs::Empty::Request  &req,
-                            std_srvs::Empty::Response &res)
+  bool calibrate_gripper_cb(std_srvs::SetBool::Request  &req,
+                            std_srvs::SetBool::Response &res)
   {
     int curr_tool_id = -1;
     nh_.getParam("/curr_tool_id", curr_tool_id);
     if(curr_tool_id==1){ // Only do if current tool is parallel-jaw gripper
-      calibrate_gripper(false);
+      res.success = calibrate_gripper(false);
+      if(res.success==true){
+        res.message = "successful";
+      }else res.message = "fail to find apriltag";
     }
     return true;
   }
-  void calibrate_gripper(bool go_back){
+  bool calibrate_gripper(bool go_back){
     ros::Time ts = ros::Time::now();
     abb_node::robot_GetJoints get_joints_srv;
     abb_node::robot_SetJoints set_joints_srv;
@@ -232,17 +236,25 @@ class ChangeToolService{
     getJoints.call(get_joints_srv);
     double dis_to_upper = IRB1660ID_JOINT6_LIMIT/180.0*M_PI-get_joints_srv.response.j6,
            dis_to_lower = IRB1660ID_JOINT6_LIMIT/180.0*M_PI+get_joints_srv.response.j6;
+    // Rotate CCW if near LOWER BOUND and vice versa
     int direction = (dis_to_upper<=dis_to_lower?-1:1); // -1: CW; 1: CCW
     const double rotating_unit_angle = 30.0;
-    while(ros::ok()){
+    bool calibrated = false;
+    ros::Time calibration_ts = ros::Time::now();
+    while(ros::ok() and (ros::Time::now()-calibration_ts).toSec()<=60.0){
       // Check if detected
       ros::Time ts = ros::Time::now();
       apriltags_ros::AprilTagDetectionArrayConstPtr detections;
-      while((ros::Time::now()-ts).toSec()<=1.5){
+      while((ros::Time::now()-ts).toSec()<=1.0){
         detections = ros::topic::waitForMessage<apriltags_ros::AprilTagDetectionArray>("/tag_detections", ros::Duration(1.0));
-        if(detections->detections.size()!=0) break;
+        if(detections->detections.size()!=0){
+          calibrated = true; break;
+        }
       }
-      if(detections->detections.size()!=0) break;
+      if(detections->detections.size()!=0){
+        calibrated = true;
+        break; // FIXME Is this block needed?
+      }
       // Get current joints and put it into buffer
       getJoints.call(get_joints_srv);
       ROS_INFO("Rotating joint 6 %s30 degree...", (direction==1?"+":"-"));
@@ -259,6 +271,10 @@ class ChangeToolService{
       }else
         setJoints.call(set_joints_srv); ros::Duration(0.3).sleep();
     }// End while
+    if(calibrated == false){
+      ROS_WARN("Can't find apriltag after one minute, abort request!");
+      return calibrated;
+    }
     tf::StampedTransform stf;
     try{
       listener.waitForTransform("base_link", "gripper", ros::Time(0), ros::Duration(1.0f));
@@ -312,6 +328,7 @@ class ChangeToolService{
     set_speed_srv.request.ori = 100.0;
     setSpeed.call(set_speed_srv);
     ROS_INFO("Gripper calibration spend %f seconds", (ros::Time::now()-ts).toSec());
+    return calibrated;
   }
   void joint_6_coterminal(abb_node::robot_SetJoints &joint_req){
     abb_node::robot_GetJoints get_joints;
