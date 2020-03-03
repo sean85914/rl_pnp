@@ -63,7 +63,7 @@ if model_str == "":
 vacuum_pump_control      = rospy.ServiceProxy("/vacuum_pump_control_node/vacuum_control", SetBool)
 check_suck_success       = rospy.ServiceProxy("/vacuum_pump_control_node/check_suck_success", SetBool)
 agent_take_action_client = rospy.ServiceProxy("/agent_server_node/agent_take_action", agent_abb_action)
-calibrate_gripper_client = rospy.ServiceProxy("/change_tool_service/calibrate_gripper", Empty)
+calibrate_gripper_client = rospy.ServiceProxy("/change_tool_service/calibrate_gripper", SetBool)
 get_pc_client            = rospy.ServiceProxy("/combine_pc_node/get_pc", get_pc)
 empty_checker            = rospy.ServiceProxy("/combine_pc_node/empty_state", pc_is_empty)
 check_grasp_success      = rospy.ServiceProxy("/combine_pc_node/grasp_state", check_grasp_success)
@@ -125,12 +125,16 @@ def _check_if_empty(pc):
 	return empty_checker(empty_checker_req).is_empty.data
 def _check_grasp_success():
 	go_home(); rospy.sleep(0.5)
-	calibrate_gripper_client()
+	calibrate_req = SetBoolRequest()
+	calibrate_res = calibrate_gripper_client(calibrate_req)
+	if not calibrate_res.success: return calibrate_res.success
 	check_grasp_success_request = check_grasp_successRequest()
 	# Get temporary pc and save file
 	_ = _get_pc(iteration, False, True)
 	check_grasp_success_request.pcd_str = check_grasp_path + "{:06}.pcd".format(iteration)
 	return check_grasp_success(check_grasp_success_request).is_success
+
+cv2.namedWindow("prediction")
 
 program_ts = time.time()
 program_time = 0.0
@@ -152,6 +156,11 @@ try:
 		program_ts = time.time()
 		if cmd == 'E' or cmd == 'e':
 			utils.shutdown_process(program_time, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, True)
+			cv2.destroyWindow("prediction")
+		elif cmd == 'v':
+			trainer.set_verbose(True); print "Save depth tensor for debugging"
+		elif cmd == 'd':
+			trainer.set_verbose(False); print "Disable saving depth tensor"
 		elif cmd == 'S' or cmd == 's':
 			valid_input = True
 			t = 0; return_ = 0.0; is_empty = False
@@ -279,13 +288,20 @@ try:
 						memory.update(idxs[i], td_target-old_value)
 					back_t = time.time()-back_ts
 					arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/mini_batch_size)
-				if learned_times % updating_freq == 0 and learned_times != 0:
+					if learned_times % updating_freq == 0:
+						print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
+						trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
+					if learned_times % save_every == 0:
+						model_name = model_path + "{}_{}.pth".format(run, iteration)
+						torch.save(trainer.behavior_net.state_dict(), model_name)
+						print "[%f] Model: %s saved" %(program_time+time.time()-program_ts, model_name)
+				'''if learned_times % updating_freq == 0 and learned_times != 0 and memory.length % mini_batch_size == 0:
 					print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
 					trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
-				if learned_times % save_every == 0 and learned_times != 0:
+				if learned_times % save_every == 0 and learned_times != 0 and memory.length % mini_batch_size == 0:
 					model_name = model_path + "{}_{}.pth".format(run, iteration)
 					torch.save(trainer.behavior_net.state_dict(), model_name)
-					print "[%f] Model: %s saved" %(program_time+time.time()-program_ts, model_name)
+					print "[%f] Model: %s saved" %(program_time+time.time()-program_ts, model_name)'''
 		else:
 			valid_input = False
 except KeyboardInterrupt:
