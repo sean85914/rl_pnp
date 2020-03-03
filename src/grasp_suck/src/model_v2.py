@@ -16,8 +16,8 @@ def tensor_to_PIL(tensor):
 
 def rotate_heightmap(color_tensor, depth_tensor, theta, use_cuda):
 	# theta in radian
-	affine_mat_before = np.asarray([[ np.cos(theta), -np.sin(theta), 0],
-	                                [ np.sin(theta),  np.cos(theta), 0]])
+	affine_mat_before = np.asarray([[ np.cos(-theta), -np.sin(-theta), 0],
+	                                [ np.sin(-theta),  np.cos(-theta), 0]])
 	affine_mat_before.shape = (2, 3, 1)
 	affine_mat_before = torch.from_numpy(affine_mat_before).permute(2, 0, 1).float()
 	with torch.no_grad():
@@ -29,7 +29,6 @@ def rotate_heightmap(color_tensor, depth_tensor, theta, use_cuda):
 			flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False), color_tensor.size())
 			rotate_color_tensor = F.grid_sample(Variable(color_tensor), flow_grid_before, mode='nearest')
 			rotate_depth_tensor = F.grid_sample(Variable(depth_tensor), flow_grid_before, mode='nearest')
-			
 	return rotate_color_tensor, rotate_depth_tensor
 	
 def rotate_featuremap(feature_tensor, theta, use_cuda):
