@@ -9,9 +9,17 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from model_v2 import reinforcement_net
 from scipy import ndimage
+from PIL import Image
+from torchvision import transforms
+
+def tensor_to_PIL(tensor):
+	image = tensor.cpu().clone()
+	image = image.squeeze(0)
+	image = transforms.ToPILImage()(image)
+	return image
 
 class Trainer(object):
-	def __init__(self, reward, discount_factor, force_cpu, learning_rate = 5e-4, densenet_lr = 1e-4):
+	def __init__(self, reward, discount_factor, force_cpu, learning_rate = 5e-4, densenet_lr = 1e-4, verbose = None):
 		if torch.cuda.is_available() and not force_cpu:
 			print "CUDA detected, use GPU"
 			self.use_cuda = True
@@ -24,6 +32,7 @@ class Trainer(object):
 		self.behavior_net = reinforcement_net(self.use_cuda)
 		self.target_net   = reinforcement_net(self.use_cuda)
 		self.target_net.load_state_dict(self.behavior_net.state_dict())
+		self.verbose = verbose
 		# Huber Loss
 		self.criterion = nn.SmoothL1Loss(reduce = False)
 		if self.use_cuda:
@@ -47,6 +56,8 @@ class Trainer(object):
 		                                  {'params': self.behavior_net.grasp_color_feat_extractor.parameters(), 'lr': densenet_lr}, 
 		                                  {'params': self.behavior_net.grasp_depth_feat_extractor.parameters(), 'lr': densenet_lr},
 		                                  ], lr = learning_rate, momentum = 0.9, weight_decay = 2e-5)
+	def set_verbose(self, verbose):
+		self.verbose = verbose
 	def preprocessing(self, color, depth):
 		# Zoom 2 times
 		color_img_2x = ndimage.zoom(color, zoom=[2, 2, 1], order=0)
@@ -71,10 +82,11 @@ class Trainer(object):
 		for c in range(3):
 			input_color_img[:, :, c] = (input_color_img[:, :, c] - image_mean[c]) / image_std[c]
 		# Normalize depth image
-		depth_mean = 0.07
-		depth_std  = 0.0005
+		depth_mean = 0.06
+		#depth_std  = 0.0005 # Terrible value...
+		depth_std = 0.03
 		tmp = depth_img_2x.astype(float)
-		tmp = (tmp-depth_mean)/depth_std
+		tmp = (tmp-depth_std)/depth_std
 		# Duplicate channel to DDD
 		tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
 		input_depth_img = np.concatenate((tmp, tmp, tmp), axis = 2)
@@ -84,6 +96,8 @@ class Trainer(object):
 		input_depth_img.shape = (input_depth_img.shape[0], input_depth_img.shape[1], input_depth_img.shape[2], 1)
 		input_color_data = torch.from_numpy(input_color_img.astype(np.float32)).permute(3, 2, 0, 1)
 		input_depth_data = torch.from_numpy(input_depth_img.astype(np.float32)).permute(3, 2, 0, 1)
+		if self.verbose:
+			tensor_to_PIL(input_depth_data).save("depth_tensor.jpg")
 		return input_color_data, input_depth_data, padding_width
 	# Forward pass through image, get Q value
 	def forward(self, color_img, depth_img, action_str = None, is_volatile = False, specific_rotation=-1, network = "behavior", clear_grad = False):
