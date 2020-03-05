@@ -11,6 +11,7 @@
 #include <rosbag/view.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/CompressedImage.h>
 // CV
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
@@ -45,7 +46,7 @@ void write_video(std::vector<data_pair> &data_vec){
 int main(int argc, char** argv)
 {
   // Parse input argument
-  bool has_data = false;
+  bool has_data = false, is_compressed;
   std::string topic_name="";
   if(argc<3){
     std::cout << "\033[1;31mInsufficient input arguments\n\
@@ -87,28 +88,45 @@ Usage: ./bag_to_video bag_name output_video_name [speed]\n\033[0m";
   // Start reading
   auto s_ts = std::chrono::high_resolution_clock::now();
   foreach(const rosbag::MessageInstance m, view){
-    if(m.getDataType()=="sensor_msgs/Image"){
-      sensor_msgs::Image::ConstPtr img_ptr = m.instantiate<sensor_msgs::Image>();
-      try{
-        cv_bridge_ptr = cv_bridge::toCvCopy(img_ptr);
-      } catch(cv_bridge::Exception& e){
-        std::cout << "\033[1;33mcv_bridge exception: " << e.what() << "\033[0m\n";
-        exit(EXIT_FAILURE);
+    if(m.getDataType()=="sensor_msgs/Image" or \
+       m.getDataType()=="sensor_msgs/CompressedImage"){
+      if(m.getDataType()=="sensor_msgs/Image"){
+        is_compressed = false;
+        sensor_msgs::Image::ConstPtr img_ptr = m.instantiate<sensor_msgs::Image>();
+        try{
+          cv_bridge_ptr = cv_bridge::toCvCopy(img_ptr);
+        } catch(cv_bridge::Exception& e){
+          std::cout << "\033[1;33mcv_bridge exception: " << e.what() << "\033[0m\n";
+          exit(EXIT_FAILURE);
+        }
+      } else{
+       is_compressed = true;
+       sensor_msgs::CompressedImage::ConstPtr img_ptr = m.instantiate<sensor_msgs::CompressedImage>();
+        try{
+          cv_bridge_ptr = cv_bridge::toCvCopy(img_ptr);
+        } catch(cv_bridge::Exception& e){
+          std::cout << "\033[1;33mcv_bridge exception: " << e.what() << "\033[0m\n";
+          exit(EXIT_FAILURE);
+        }
       }
       // Make sure is color image topic
-      if(cv_bridge_ptr->encoding=="rgb8" and not has_data){ // ROS uses RGB
-        has_data = true;
-        topic_name = m.getTopic();
+      if((!is_compressed and cv_bridge_ptr->encoding=="rgb8") or \
+          (is_compressed and cv_bridge_ptr->encoding=="bgr8") and \
+          !has_data){
+        has_data = true; topic_name = m.getTopic();
       }
       // Make sure is the same topic
       if(m.getTopic()!=topic_name) continue;
       double read_ratio = ((m.getTime() - view.getBeginTime()).toSec())/bag_duration;
-      width = img_ptr->width;
-      height = img_ptr->height;
-      cv::Mat rgb_img;
-      cv::cvtColor(cv_bridge_ptr->image, rgb_img, CV_BGR2RGB);
+      width = cv_bridge_ptr->image.cols;
+      height = cv_bridge_ptr->image.rows;
+      cv::Mat img;
+      if(is_compressed) img = cv_bridge_ptr->image; // Don't have to convert, VideoWriter expected BGR image as input
+      else{
+        cv::cvtColor(cv_bridge_ptr->image, img, CV_RGB2BGR);
+      }
       printf("\r[%05.1f%%]", read_ratio*100);
-      data_pair pair = std::make_pair(rgb_img, m.getTime());
+      data_pair pair = std::make_pair(img, m.getTime());
       data_vec.push_back(pair);
     }
   }
