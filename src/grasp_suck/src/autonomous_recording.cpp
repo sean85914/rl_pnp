@@ -44,6 +44,12 @@ class Recording{
     {
     topics_to_record.push_back("/record/color/image_raw");
     topics_to_record.push_back("/agent_server_node/execution_info");
+    bool compressed;
+    if(!pnh_.getParam("compressed", compressed)) compressed = false;
+    if(compressed){
+      ROS_WARN("Record compressed image for saving hard disk space");
+      topics_to_record[0]+="/compressed";
+    }
     start_recording_service = pnh_.advertiseService("start_recording", &Recording::start_recording_CB, this);
     stop_recording_service  = pnh_.advertiseService("stop_recording", &Recording::stop_recording_CB, this);
     check_record_timer = pnh_.createTimer(ros::Duration(0.1), &Recording::check_record_CB, this);

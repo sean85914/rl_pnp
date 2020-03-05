@@ -1,3 +1,5 @@
 <launch>
-  <node pkg="grasp_suck" type="autonomous_recording" name="autonomous_recording_node" respawn="true" output="screen" cwd="node"/>
+  <node pkg="grasp_suck" type="autonomous_recording" name="autonomous_recording_node" respawn="true" output="screen" cwd="node">
+    <param name="compressed" value="true"/>
+  </node>
 </launch>
