@@ -3,6 +3,7 @@
   <node pkg="rviz" name="rviz" type="rviz" args="-d $(find visualization)/config/grasp_suck_system.rviz" if="$(arg rviz)"/>
   <node pkg="visualization" type="viz_marker.py" name="viz_marker_node" output="screen"/>
   <node pkg="visualization" type="viz_boundary.py" name="viz_boundary"/>
+  <node pkg="visualization" type="show_lines.py" name="show_lines"/>
   <node pkg="image_view" type="image_view" name="image_view">
     <remap from="image" to="/camera1/color/image_raw"/>
     <param name="autosize" value="true"/>
