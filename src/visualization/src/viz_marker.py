@@ -18,7 +18,7 @@ def service_cb(req):
 	marker.pose.position = req.point
 	marker.pose.orientation.w = 1.0
 	marker.scale.x = marker.scale.y = marker.scale.z = 0.02
-	text_marker.pose.position.y = 0.4
+	text_marker.pose.position.y = -0.9; text_marker.pose.position.x =0.9
 	text_marker.scale.z = 0.06
 	if req.primitive==0: # suck 1
 		marker.color.b = marker.color.a = 1.0 # blue
@@ -31,9 +31,9 @@ def service_cb(req):
 		text_marker.text = "suck_1"
 	elif req.primitive == 1 and req.valid: # suck 2
 		text_marker.text = "suck_2"
-	elif req.primitive == 2 and req.valid: # GRASP
+	elif req.primitive >= 2 and req.valid: # GRASP
 		angle = round(req.angle * 180 / pi)
-		text_marker.text = "grasp, " + str(angle)
+		text_marker.text = "grasp," + str(int(angle))
 	elif not req.valid: # INVALID
 		text_marker.text = "invalid target"
 	pub_marker.publish(marker)
