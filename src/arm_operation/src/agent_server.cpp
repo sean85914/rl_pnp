@@ -274,7 +274,7 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   quat *= quat_perpendicular; std::cout << "Quat compensate to: "; printQuat(quat);
   quat_compensate.setRPY(0.0, 0.0, req.angle);
   quat *= quat_compensate;
-  geometry_msgs::Point target_ee_position(req.position);
+  geometry_msgs::Point target_ee_position(req.position); 
   target_ee_position.z += (tool_length[req.tool_id-1] + tool_head_length + 0.2);
   // Go to first waypoint, 20 cm above target position
   abb_node::robot_SetCartesian set_cartesian;
@@ -289,10 +289,21 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   abb_node::robot_SetZone set_zone;
   set_zone.request.mode = 0;
   set_zone_client.call(set_zone);
+  // If using suction 2, slow down
+  abb_node::robot_SetSpeed set_speed;
+  if(req.tool_id==2){
+    set_speed.request.tcp = 100.0f;
+    set_speed.request.ori = 100.0f;
+    set_speed_client.call(set_speed);
+  }
   // Go to target, downward 3 cm (5 cm for gripper)
   target_ee_position.z -= (req.tool_id==1?0.25:0.23);
   setTargetPose(set_cartesian, target_ee_position, quat);
   set_cartesian_client.call(set_cartesian);
+  if(req.tool_id==2){
+    set_speed.request.tcp = 200.0f;
+    set_speed_client.call(set_speed);
+  }
   // Grasp when gripper reach the target
   if(req.tool_id==1) vacuum_control_client.call(bool_data);
   ros::Duration(0.5).sleep();
@@ -314,7 +325,7 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
       set_cartesian_client.call(set_cartesian);
     }
   }else{ // Gripper
-    _home();
+    _home(); ros::Duration(0.1).sleep();
     _light_vibrate(); // Vibrate to make object fall if bad grasping 
   }
   // Move slower to prevent droping
@@ -398,7 +409,7 @@ void AgentServer::_fast_vibrate(void){
 }
 
 void AgentServer::_light_vibrate(void){
-  ros::Duration(0.1).sleep();
+  ros::Duration(0.05).sleep();
   // Set low speed
   abb_node::robot_SetSpeed set_speed;
   set_speed.request.tcp = 25.0f; set_speed.request.ori = 50.0f;
@@ -411,7 +422,7 @@ void AgentServer::_light_vibrate(void){
   set_cartesian.request.cartesian[0] = get_cartesian.response.x;
   set_cartesian.request.cartesian[1] = get_cartesian.response.y;
   set_cartesian.request.cartesian[2] = get_cartesian.response.z;
-  double small_angle = 5.0/180.0*M_PI;
+  double small_angle = 3.0/180.0*M_PI;
   // Rotate X small angle
   tf::Quaternion current(get_cartesian.response.qx, get_cartesian.response.qy, get_cartesian.response.qz, get_cartesian.response.q0),
                  rotate, target;
