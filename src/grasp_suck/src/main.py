@@ -1,9 +1,10 @@
 import utils
+from utils import Transition
 
 parser = utils.create_argparser()
 args = parser.parse_args()
 utils.show_args(args)
-testing, run, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr = utils.parse_input(args)
+testing, run, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr, specific_tool = utils.parse_input(args)
 
 import os
 import sys
@@ -16,7 +17,7 @@ import rospkg
 import serial
 from trainer import Trainer
 from prioritized_memory import Memory
-from utils import Transition
+
 # srv
 from std_srvs.srv import SetBool, SetBoolRequest, SetBoolResponse, \
                          Empty, EmptyRequest, EmptyResponse
@@ -33,16 +34,29 @@ reward = 5.0
 discount_factor = 0.5
 iteration = 0
 learned_times = 0
-memory = Memory(buffer_size)
+sufficient_exp = 0
+
+gripper_memory_buffer   = Memory(buffer_size)
+suction_1_memory_buffer = Memory(buffer_size)
+suction_2_memory_buffer = Memory(buffer_size)
 arduino = serial.Serial(port, 115200)
 
 if model_str == "" and testing: # TEST SHOULD PROVIDE MODEL
 	print "\033[0;31mNo model provided, exit!\033[0m"
 	os._exit(0)
-	
-if buffer_str != "": memory.load_memory(buffer_str)
+
+# Get logger path
+r = rospkg.RosPack()
+package_path = r.get_path("grasp_suck")
+csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path, check_grasp_path = utils.getLoggerPath(testing, package_path, run)
+
+if run!=0:
+	gripper_memory_buffer.load_memory(csv_path.replace("logger_{:03}".format(run), "logger_{:03}".format(run-1))+"gripper_memory.pkl")
+	suction_1_memory_buffer.load_memory(csv_path.replace("logger_{:03}".format(run), "logger_{:03}".format(run-1))+"suction_1_memory.pkl")
+	suction_2_memory_buffer.load_memory(csv_path.replace("logger_{:03}".format(run), "logger_{:03}".format(run-1))+"suction_2_memory.pkl")
 
 # trainer
+if testing: learning_rate = 5e-5; densenet_lr = 1e-5
 trainer = Trainer(reward, discount_factor, use_cpu, learning_rate, densenet_lr)
 
 # Load model if provided
@@ -51,10 +65,6 @@ if model_str != "":
 	trainer.behavior_net.load_state_dict(torch.load(model_str))
 	trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
 	
-# Get logger path
-r = rospkg.RosPack()
-package_path = r.get_path("grasp_suck")
-csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path, check_grasp_path = utils.getLoggerPath(testing, package_path, run)
 
 if model_str == "":
 	torch.save(trainer.behavior_net.state_dict(), model_path+"initial.pth")
@@ -135,18 +145,21 @@ def _check_grasp_success():
 	return check_grasp_success(check_grasp_success_request).is_success
 
 cv2.namedWindow("prediction")
-
 program_ts = time.time()
 program_time = 0.0
+
 # Initialize
 go_home()
 vacuum_pump_control(SetBoolRequest(False))
 valid_input = None
+loss_t = 0
 
 try:
 	while True:
 		if iteration is not 0: 
 			arduino.write("gb 1000") # Green + buzzer for alarming resetting
+			print "Return: {} | Mean Training Loss: {}".format(return_, np.mean(loss_list[loss_t:len(loss_list)])) # For recording data
+			loss_t = len(loss_list)
 			return_list.append(return_); 
 			episode_list.append(t)
 			stop_record_client()
@@ -154,17 +167,19 @@ try:
 		program_time += time.time()-program_ts
 		cmd = raw_input("\033[1;34m[%f] Reset environment, if ready, press 's' to start. 'e' to exit: \033[0m" %(program_time))
 		program_ts = time.time()
-		if cmd == 'E' or cmd == 'e':
-			utils.shutdown_process(program_time, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, True)
+		if cmd == 'E' or cmd == 'e': # End
+			utils.shutdown_process(program_time, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, suction_1_memory_buffer, suction_2_memory_buffer, gripper_memory_buffer, True)
 			cv2.destroyWindow("prediction")
-		elif cmd == 'v':
+		elif cmd == 'V' or cmd == 'v' : # Verbose
+			valid_input = False
 			trainer.set_verbose(True); print "Save depth tensor for debugging"
-		elif cmd == 'd':
+		elif cmd == 'D' or cmd == 'd': # Disable
+			valid_input = False
 			trainer.set_verbose(False); print "Disable saving depth tensor"
-		elif cmd == 'S' or cmd == 's':
+		elif cmd == 'S' or cmd == 's': # Start
 			valid_input = True
 			t = 0; return_ = 0.0; is_empty = False
-			record_bag_client(recorderRequest(run_episode))
+			record_bag_client(recorderRequest(run_episode)) # Start recording
 			while is_empty is not True:
 				print "\033[0;32m[%f] Iteration: %d\033[0m" %(program_time+time.time()-program_ts, iteration)
 				if not testing: epsilon_ = max(epsilon * np.power(0.998, t), 0.1) # half after 350 steps
@@ -175,23 +190,21 @@ try:
 				print "Forward past: {} seconds".format(time.time()-ts)
 				heatmaps, mixed_imgs = utils.save_heatmap_and_mixed(suck_1_prediction, suck_2_prediction, grasp_prediction, feat_paths, mixed_paths, color, iteration)
 				# Standarize predictions to avoid bias between them
-				suck_1_prediction = utils.standarization(suck_1_prediction)
-				suck_2_prediction = utils.standarization(suck_2_prediction)
-				grasp_prediction = utils.standarization(grasp_prediction)
+				#suck_1_prediction = utils.standarization(suck_1_prediction);suck_2_prediction = utils.standarization(suck_2_prediction)
+				#grasp_prediction = utils.standarization(grasp_prediction)
+				# SELECT ACTION
 				if not testing: # Train
-					explore, action, action_str, pixel_index, angle = utils.epsilon_greedy_policy(epsilon_, suck_1_prediction, suck_2_prediction, grasp_prediction, depth, diff_path, iteration)
+					explore, action, action_str, pixel_index, angle = utils.epsilon_greedy_policy(epsilon_, suck_1_prediction, suck_2_prediction, grasp_prediction, depth, diff_path, iteration, specific_tool)
 				else: # Testing
-					action, action_str, pixel_index, angle = utils.greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction); explore = False
+					action, action_str, pixel_index, angle = utils.greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction, specific_tool); explore = False
 				explore_list.append(explore)
 				target_list.append(pixel_index)
 				position_list.append(points[pixel_index[1], pixel_index[2]])
 				del suck_1_prediction, suck_2_prediction, grasp_prediction
 				utils.print_action(action_str, pixel_index, points[pixel_index[1], pixel_index[2]])
 				# Save (color heightmap + prediction heatmap + motion primitive and corresponding position), then show it
-				visual_img = utils.draw_image(mixed_imgs[pixel_index[0]], explore, pixel_index)
-				img_name = vis_path + "vis_{:06}.jpg".format(iteration)
-				cv2.imwrite(img_name, visual_img)
-				cv2.imshow("prediction", visual_img);cv2.waitKey(33)
+				visual_img = utils.draw_image(mixed_imgs[pixel_index[0]], explore, pixel_index, vis_path + "vis_{:06}.jpg".format(iteration))
+				cv2.imshow("prediction", cv2.resize(visual_img, None, fx=2, fy=2)); cv2.waitKey(33)
 				# Check if action valid (is NAN?)
 				is_valid = utils.check_if_valid(points[pixel_index[1], pixel_index[2]])
 				# Visualize in RViz
@@ -219,32 +232,14 @@ try:
 						else:
 							action_success = False
 				result_list.append(action_success)
-				if action_success: go_place(); fixed_home(); arduino.write("g 1000") # Green
+				if action_success: arduino.write("g 1000"); go_place(); fixed_home(); # Green
 				else: 
-					fixed_home()
-					vacuum_pump_control(SetBoolRequest(False))
 					if is_valid: arduino.write("o 1000") # Orange
-				info = publish_infoRequest()
-				info.execution.iteration = iteration
-				if not is_valid:
-					info.execution.primitive = "invalid"
-				else:
-					if pixel_index[0]==0:
-						info.execution.primitive = "suck_1"
-					elif pixel_index[0]==1:
-						info.execution.primitive = "suck_2"
-					elif pixel_index[0]==2:
-						info.execution.primitive = "grasp_neg_90"
-					elif pixel_index[0]==2:
-						info.execution.primitive = "grasp_neg_45"
-					elif pixel_index[0]==2:
-						info.execution.primitive = "grasp_0"
-					else:
-						info.execution.primitive = "grasp_45"
-				info.execution.is_success = action_success
+					fixed_home(); vacuum_pump_control(SetBoolRequest(False))
+				info = publish_infoRequest(); info.execution = utils.wrap_execution_info(iteration, is_valid, pixel_index[0], action_success)
 				publish_data_client(info)
-				time.sleep(0.5)
-				# Get next images, and check if bin is empty
+				time.sleep(1.0); arduino.write("go 1000") # Remind takeing input
+				# Get next images, and check if workspace is empty
 				next_pc = _get_pc(iteration, False)
 				next_color, next_depth, next_points = utils.get_heightmap(next_pc.pc, image_path + "next_", depth_path + "next_", iteration)
 				is_empty = _check_if_empty(next_pc.pc)
@@ -254,55 +249,75 @@ try:
 				# Store transition to experience buffer
 				color_name, depth_name, next_color_name, next_depth_name = utils.wrap_strings(image_path, depth_path, iteration)
 				transition = Transition(color_name, depth_name, pixel_index, current_reward, next_color_name, next_depth_name, is_empty)
-				memory.add(transition)
+				if pixel_index[0] == 0:
+					suction_1_memory_buffer.add(transition)
+				elif pixel_index[0] == 1:
+					suction_2_memory_buffer.add(transition)
+				else:
+					gripper_memory_buffer.add(transition)
+				print "Suction_1_Buffer: {} | Suction_2_Buffer: {} | Gripper_Buffer: {}".format(suction_1_memory_buffer.length, suction_2_memory_buffer.length, gripper_memory_buffer.length)
 				iteration += 1; t += 1
-				# TRAIN
-				if memory.length % mini_batch_size == 0:
-					learned_times += 1
-					back_ts = time.time(); arduino.write("b 1000")
-					mini_batch, idxs, is_weight = memory.sample(mini_batch_size)
-					old_q = []
-					for i in range(mini_batch_size):
-						episode_, iter_ = utils.parse_string(mini_batch[i].color);
-						color = cv2.imread(mini_batch[i].color)
-						depth = np.loadtxt(mini_batch[i].depth)
-						pixel_index = mini_batch[i].pixel_idx
-						next_color = cv2.imread(mini_batch[i].next_color)
-						next_depth = np.loadtxt(mini_batch[i].next_depth)
-						action_str, rotate_idx = utils.get_action_info(pixel_index)
-						old_q.append(trainer.forward(color, depth, action_str, False, rotate_idx, clear_grad=True)[0, pixel_index[1], pixel_index[2]])
-						td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
-						loss_ = trainer.backprop(color, depth, pixel_index, td_target, is_weight[i], i==0, i==mini_batch_size-1)
-						loss_list.append(loss_)
-					# After parameter updated, update prioirites tree
-					for i in range(mini_batch_size):
-						color = cv2.imread(mini_batch[i].color)
-						depth = np.loadtxt(mini_batch[i].depth)
-						pixel_index = mini_batch[i].pixel_idx
-						next_color = cv2.imread(mini_batch[i].next_color)
-						next_depth = np.loadtxt(mini_batch[i].next_depth)
-						td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
-						action_str, rotate_idx = utils.get_action_info(pixel_index)
-						old_value = trainer.forward(color, depth, action_str, False, rotate_idx, clear_grad=True)[0, pixel_index[1], pixel_index[2]]
-						print "New Q value: {:03f} -> {:03f}".format(old_q[i], old_value)
-						memory.update(idxs[i], td_target-old_value)
-					back_t = time.time()-back_ts
-					arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/mini_batch_size)
-					if learned_times % updating_freq == 0:
-						print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
-						trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
-					if learned_times % save_every == 0:
-						model_name = model_path + "{}_{}.pth".format(run, iteration)
-						torch.save(trainer.behavior_net.state_dict(), model_name)
-						print "[%f] Model: %s saved" %(program_time+time.time()-program_ts, model_name)
-				'''if learned_times % updating_freq == 0 and learned_times != 0 and memory.length % mini_batch_size == 0:
-					print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
-					trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
-				if learned_times % save_every == 0 and learned_times != 0 and memory.length % mini_batch_size == 0:
-					model_name = model_path + "{}_{}.pth".format(run, iteration)
-					torch.save(trainer.behavior_net.state_dict(), model_name)
-					print "[%f] Model: %s saved" %(program_time+time.time()-program_ts, model_name)'''
+				################################TRAIN################################
+				# Start training after buffer has sufficient experiences
+				if suction_1_memory_buffer.length > mini_batch_size and \
+				   suction_2_memory_buffer.length > mini_batch_size and \
+				   gripper_memory_buffer.length   > mini_batch_size:
+					sufficient_exp+=1
+					if (sufficient_exp-1)%learning_freq==0:
+						back_ts = time.time(); arduino.write("b 1000"); learned_times += 1
+						mini_batch = []; idxs = []; is_weight = []; old_q = []; td_target_list = [];
+						if specific_tool is not None:
+							if specific_tool == 0:
+								mini_batch, idxs, is_weight = utils.sample_data(suction_1_memory_buffer, mini_batch_size)
+							elif specific_tool == 1:
+								mini_batch, idxs, is_weight = utils.sample_data(suction_2_memory_buffer, mini_batch_size)
+							elif specific_tool == 2:
+								mini_batch, idxs, is_weight = utils.sample_data(gripper_memory_buffer, mini_batch_size)
+						else:
+							_mini_batch, _idxs, _is_weight = utils.sample_data(suction_1_memory_buffer, mini_batch_size); mini_batch += _mini_batch; idxs += _idxs; is_weight += list(_is_weight)
+							_mini_batch, _idxs, _is_weight = utils.sample_data(suction_2_memory_buffer, mini_batch_size); mini_batch += _mini_batch; idxs += _idxs; is_weight += list(_is_weight)
+							_mini_batch, _idxs, _is_weight = utils.sample_data(gripper_memory_buffer, mini_batch_size);  mini_batch += _mini_batch; idxs += _idxs; is_weight += list(_is_weight)
+						for i in range(len(mini_batch)):
+							color = cv2.imread(mini_batch[i].color)
+							depth = np.load(mini_batch[i].depth)
+							pixel_index = mini_batch[i].pixel_idx
+							next_color = cv2.imread(mini_batch[i].next_color)
+							next_depth = np.load(mini_batch[i].next_depth)
+							action_str, rotate_idx = utils.get_action_info(pixel_index)
+							old_q.append(trainer.forward(color, depth, action_str, False, rotate_idx, clear_grad=True)[0, pixel_index[1], pixel_index[2]])
+							td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty); td_target_list.append(td_target)
+							loss_ = trainer.backprop(color, depth, pixel_index, td_target, is_weight[i], mini_batch_size, i==0, i==len(mini_batch)-1)
+							loss_list.append(loss_)
+						# After parameter updated, update prioirites tree
+						for i in range(len(mini_batch)):
+							episode_, iter_ = utils.parse_string(mini_batch[i].color);
+							color = cv2.imread(mini_batch[i].color)
+							depth = np.load(mini_batch[i].depth)
+							pixel_index = mini_batch[i].pixel_idx
+							next_color = cv2.imread(mini_batch[i].next_color)
+							next_depth = np.load(mini_batch[i].next_depth)
+							td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
+							action_str, rotate_idx = utils.get_action_info(pixel_index)
+							old_value = trainer.forward(color, depth, action_str, False, rotate_idx, clear_grad=True)[0, pixel_index[1], pixel_index[2]]
+							print "New Q value: {:03f} -> {:03f} | TD Target: {:03f}".format(old_q[i], old_value, td_target_list[i])
+							print "========================================================================================"
+							#update_tree[i/5].update(idxs[i], td_target-old_value)
+							if i/mini_batch_size==0 or specific_tool == 0: suction_1_memory_buffer.update(idxs[i], td_target-old_value)
+							elif i/mini_batch_size==1 or specific_tool == 1: suction_2_memory_buffer.update(idxs[i], td_target-old_value)
+							else: gripper_memory_buffer.update(idxs[i], td_target-old_value)
+						back_t = time.time()-back_ts
+						arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/(3*mini_batch_size))
+						if learned_times % updating_freq == 0:
+							print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
+							trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
+						if learned_times % save_every == 0:
+							model_name = model_path + "{}_{}.pth".format(run, iteration)
+							torch.save(trainer.behavior_net.state_dict(), model_name)
+							print "[%f] Model: %s saved" %(program_time+time.time()-program_ts, model_name)
 		else:
 			valid_input = False
+			print "\033[1;33mInvalid input\033[0m"
 except KeyboardInterrupt:
-	utils.shutdown_process(program_time, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, memory, False)
+	stop_record_client()
+	result_list.append(0)
+	utils.shutdown_process(program_time, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, csv_path, suction_1_memory_buffer, suction_2_memory_buffer, gripper_memory_buffer, False)

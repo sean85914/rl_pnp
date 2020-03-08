@@ -68,35 +68,41 @@ class reinforcement_net(nn.Module):
 		
 		# Suck 1, corresponding to tool ID 3
 		self.suck_1_net = nn.Sequential(OrderedDict([
-		  ('suck1-conv0', nn.Conv2d(2048, 64, kernel_size = 1, stride = 1, bias = True)),
+		  ('suck1-norm0', nn.BatchNorm2d(2048)),
 		  ('suck1-relu0', nn.ReLU(inplace = True)),
-		  ('suck1-norm0', nn.BatchNorm2d(64)),
+		  ('suck1-conv0', nn.Conv2d(2048, 64, kernel_size = 1, stride = 1, bias = False)),
+		  ('suck1-norm1', nn.BatchNorm2d(64)),
+		  ('suck1-relu1', nn.ReLU(inplace = True)),
 		  ('suck1-upsample0', nn.Upsample(scale_factor = 4, mode = "bilinear")),
-		  ("suck1-conv1", nn.Conv2d(64, 1, kernel_size = 1, stride = 1, bias = True)),
-		  ("suck1-relu1", nn.ReLU(inplace = True)),
-		  ('suck1-norm1', nn.BatchNorm2d(1)),
+		  ("suck1-conv1", nn.Conv2d(64, 1, kernel_size = 1, stride = 1, bias = False)),
+		  ('suck1-norm2', nn.BatchNorm2d(1)),
+		  ("suck1-relu2", nn.ReLU(inplace = True)),
 		  ("suck1-upsample1", nn.Upsample(scale_factor = 4, mode="bilinear"))
 		]))
 		# Suck 2, corresponding to tool ID 2
 		self.suck_2_net = nn.Sequential(OrderedDict([
-		  ('suck2-conv0', nn.Conv2d(2048, 64, kernel_size = 1, stride = 1, bias = True)),
+		  ('suck2-norm0', nn.BatchNorm2d(2048)),
 		  ('suck2-relu0', nn.ReLU(inplace = True)),
-		  ('suck2-norm0', nn.BatchNorm2d(64)),
+		  ('suck2-conv0', nn.Conv2d(2048, 64, kernel_size = 1, stride = 1, bias = False)),
+		  ('suck2-norm1', nn.BatchNorm2d(64)),
+		  ('suck2-relu1', nn.ReLU(inplace = True)),
 		  ('suck2-upsample0', nn.Upsample(scale_factor = 4, mode = "bilinear")),
-		  ("suck2-conv1", nn.Conv2d(64, 1, kernel_size = 1, stride = 1, bias = True)),
-		  ("suck2-relu1", nn.ReLU(inplace = True)),
-		  ('suck2-norm1', nn.BatchNorm2d(1)),
+		  ("suck2-conv1", nn.Conv2d(64, 1, kernel_size = 1, stride = 1, bias = False)),
+		  ('suck2-norm2', nn.BatchNorm2d(1)),
+		  ("suck2-relu2", nn.ReLU(inplace = True)),
 		  ("suck2-upsample1", nn.Upsample(scale_factor = 4, mode="bilinear"))
 		]))
 		# Gripper, corresponding to tool ID 1
 		self.grasp_net = nn.Sequential(OrderedDict([
-		  ('grasp-conv0', nn.Conv2d(2048, 64, kernel_size = 1, stride = 1, bias = True)),
+		  ('grasp-norm0', nn.BatchNorm2d(2048)),
 		  ('grasp-relu0', nn.ReLU(inplace = True)),
-		  ('grasp-norm0', nn.BatchNorm2d(64)),
+		  ('grasp-conv0', nn.Conv2d(2048, 64, kernel_size = 1, stride = 1, bias = False)),
+		  ('grasp-norm1', nn.BatchNorm2d(64)),
+		  ('grasp-relu1', nn.ReLU(inplace = True)),
 		  ('grasp-upsample0', nn.Upsample(scale_factor = 4, mode = "bilinear")),
-		  ("grasp-conv1", nn.Conv2d(64, 1, kernel_size = 1, stride = 1, bias = True)),
-		  ("grasp-relu1", nn.ReLU(inplace = True)),
-		  ('grasp-norm1', nn.BatchNorm2d(1)),
+		  ("grasp-conv1", nn.Conv2d(64, 1, kernel_size = 1, stride = 1, bias = False)),
+		  ('grasp-norm2', nn.BatchNorm2d(1)),
+		  ("grasp-relu2", nn.ReLU(inplace = True)),
 		  ("grasp-upsample1", nn.Upsample(scale_factor = 4, mode="bilinear"))
 		]))
 		
@@ -105,7 +111,7 @@ class reinforcement_net(nn.Module):
 			if 'suck1-' in m[0] or 'suck2-' in m[0] or 'grasp-' in m[0]:
 				if isinstance(m[1], nn.Conv2d):
 					nn.init.kaiming_normal_(m[1].weight.data)
-					m[1].bias.data.zero_()
+					#m[1].bias.data.zero_()
 				elif isinstance(m[1], nn.BatchNorm2d):
 					m[1].weight.data.fill_(1)
 					m[1].bias.data.zero_()
@@ -149,7 +155,7 @@ class reinforcement_net(nn.Module):
 			if "suck_1" in action_str:
 				suck_1_color_feat = self.suck_1_color_feat_extractor.features(input_color_data)
 				suck_1_depth_feat = self.suck_1_depth_feat_extractor.features(input_depth_data)
-				if clear_grad:
+				if clear_grad: # Target doesn't need gradient
 					suck_1_color_feat.detach()
 					suck_1_depth_feat.detach()
 				suck_1_feat = torch.cat((suck_1_color_feat, suck_1_depth_feat), dim = 1)

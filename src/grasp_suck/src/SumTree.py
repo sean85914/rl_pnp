@@ -51,7 +51,7 @@ class SumTree:
 	def add(self, p, data):
 		idx = self.write + self.capacity - 1
 		self.data[self.write] = data
-		print "[Memory] Index {} with priority {} add to tree".format(idx, p)
+		print("[Memory] Index {} with priority {} add to tree".format(idx, p))
 		self.update(idx, p)
 		self.write += 1
 		if self.write >= self.capacity:

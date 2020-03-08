@@ -13,6 +13,10 @@ import matplotlib.pyplot as plt
 import sensor_msgs.point_cloud2 as pc2
 from geometry_msgs.msg import Point
 from visual_system.srv import get_pc, get_pcRequest, get_pcResponse
+from arm_operation.msg import execution
+import torch
+from torchvision import transforms
+from prioritized_memory import Memory
 
 # Define transition tuple
 Transition = namedtuple('Transition', ['color', 'depth', 'pixel_idx', 'reward', 'next_color', 'next_depth', 'is_empty'])
@@ -102,7 +106,7 @@ def get_heightmap(pc, img_path, depth_path, iteration):
 	#depth_heightmap[depth_heightmap == -z_bot] = np.nan
 	color_name = img_path + "color_{:06}.jpg".format(iteration)
 	cv2.imwrite(color_name, color_heightmap)
-	np.savetxt(depth_path+"depth_data_{:06}.txt".format(iteration), depth_heightmap)
+	np.save(depth_path+"depth_data_{:06}.npy".format(iteration), depth_heightmap) # for saving space of hard disk
 	return color_heightmap, depth_heightmap, points
 
 def _depth_to_heatmap(depth):
@@ -111,43 +115,59 @@ def _depth_to_heatmap(depth):
 	depth_hm = cv2.applyColorMap(depth_hm, cv2.COLORMAP_JET)
 	return depth_hm
 	
-def preprocessing(color, depth):
-	# Zoom 2X
-	color_2x = ndimage.zoom(color, zoom=[2, 2, 1], order=0)
-	depth_2x = ndimage.zoom(depth, zoom=[2, 2],    order=0)
-	cv2.imwrite("color_2x.jpg", color_2x)
-	cv2.imwrite("depth_2x.jpg", _depth_to_heatmap(depth_2x))
-	# Zero padding
-	diag_length = float(color_2x.shape[0])*np.sqrt(2)
-	diag_length = np.ceil(diag_length/32)*32
-	padding_width = int((diag_length-color_2x.shape[0])/2)
-	color_padded = cv2.copyMakeBorder(color_2x, padding_width, padding_width, padding_width, padding_width, cv2.BORDER_CONSTANT, 0)
-	depth_padded = cv2.copyMakeBorder(depth_2x, padding_width, padding_width, padding_width, padding_width, cv2.BORDER_CONSTANT, 0)
-	cv2.imwrite("color_padded.jpg", color_padded)
-	cv2.imwrite("depth_padded.jpg", _depth_to_heatmap(depth_padded))
-	# Normalization
-	image_mean = [0.406, 0.456, 0.485] # BGR
-	image_std  = [0.225, 0.224, 0.229]
-	color_float = color_padded.astype(float)/255
-	color_norm = np.zeros_like(color_padded, dtype=float)
-	# Change to RGB
-	for i in range(3):
-		color_norm[:, :, i] = (color_float[:, :, i] - image_mean[i]) / image_std[i]
-	color_norm_ = (color_norm*255).astype(np.uint8)
-	depth_mean = 0.07
-	depth_std  = 0.0005
-	depth_norm = (depth_padded - depth_mean) / depth_std
-	fig = plt.figure(figsize=(640./100, 640./100), frameon=False)
-	ax = plt.Axes(fig, [0., 0., 1., 1.])
-	ax.set_axis_off()
-	fig.add_axes(ax)
-	ax.imshow(color_norm_)
-	plt.savefig('color_normalized.jpg', aspect="normal")
-	ax.imshow(depth_norm)
-	plt.savefig('depth_normalized.jpg', aspect="normal")
+def preprocessing(name, dir_, color=None, depth=None):
+	has_color = None; has_depth = None
+	try:
+		shape = color.shape
+		has_color = True
+	except AttributeError:
+		has_color = False
+	try:
+		shape = depth.shape
+		has_depth = True
+	except AttributeError:
+		has_depth = False
+	if has_color==False and has_depth==False:
+		return
+	def _tensor_to_PIL(tensor):
+		image = tensor.cpu().clone()
+		image = image.squeeze(0)
+		image = transforms.ToPILImage()(image)
+		return image
+	if has_color:
+		color_2x = ndimage.zoom(color, zoom=[2, 2, 1], order=0)
+		diag_length = float(color_2x.shape[0])*np.sqrt(2)
+		diag_length = np.ceil(diag_length/32)*32
+		padding_width = int((diag_length-color_2x.shape[0])/2)
+		color_padded = cv2.copyMakeBorder(color_2x, padding_width, padding_width, padding_width, padding_width, cv2.BORDER_CONSTANT, 0)
+		image_mean = [0.406, 0.456, 0.485] # BGR
+		image_std  = [0.225, 0.224, 0.229]
+		color_float = color_padded.astype(float)/255
+		color_norm = np.zeros_like(color_padded, dtype=float)
+		# Change to RGB
+		for i in range(3):
+			color_norm[:, :, i] = (color_float[:, :, i] - image_mean[i]) / image_std[i]
+		color_norm_ = (color_norm*255).astype(np.uint8)
+		color_norm_.shape = (color_norm_.shape[0], color_norm_.shape[1], color_norm_.shape[2], 1)
+		color_tensor = torch.from_numpy(color_norm_.astype(np.float32)).permute(3, 2, 0, 1)
+		_tensor_to_PIL(color_tensor).save(dir_+"color_processed_"+name+".jpg")
+	if has_depth:
+		depth_2x = ndimage.zoom(depth, zoom=[2, 2],    order=0)
+		diag_length = float(depth_2x.shape[0])*np.sqrt(2)
+		diag_length = np.ceil(diag_length/32)*32
+		padding_width = int((diag_length-depth_2x.shape[0])/2)
+		depth_padded = cv2.copyMakeBorder(depth_2x, padding_width, padding_width, padding_width, padding_width, cv2.BORDER_CONSTANT, 0)
+		depth_mean = 0.0909769548291
+		depth_std  = 0.0397293901695
+		depth_norm = (depth_padded - depth_mean) / depth_std
+		depth_norm.shape  = (depth_norm.shape[0], depth_norm.shape[1], 1)
+		depth_3c = np.concatenate((depth_norm, depth_norm, depth_norm), axis = 2)
+		depth_3c.shape = (depth_3c.shape[0], depth_3c.shape[1], depth_3c.shape[2], 1)
+		depth_tensor = torch.from_numpy(depth_3c.astype(np.float32)).permute(3, 2, 0, 1)
+		_tensor_to_PIL(depth_tensor).save(dir_+"depth_processed_"+name+".jpg")
 	
 # Draw symbols in the color image with different primitive
-def draw_image(image, explore, pixel_index):
+def draw_image(image, explore, pixel_index, image_name):
 	'''
 		pixel_index[0] == 0: suck_1
 		pixel_index[0] == 1: suck_2
@@ -183,12 +203,14 @@ def draw_image(image, explore, pixel_index):
 		result = cv2.circle(image, center, 3, color, 2)
 		result = cv2.line(result, p11, p12, color, 2)
 		result = cv2.line(result, p21, p22, color, 2)
+	cv2.imwrite(image_name, result)
 	return result
 
 def vis_affordance(predictions):
 	tmp = np.copy(predictions)
 	# View the value as probability
 	tmp[tmp<0] = 0
+	tmp /= 5
 	tmp[tmp>1] = 1
 	tmp = (tmp*255).astype(np.uint8)
 	tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
@@ -261,7 +283,7 @@ def standarization(prediction):
 	return prediction
 
 # Choose action using epsilon-greedy policy
-def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_prediction, depth, loggerPath, iteration):
+def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_prediction, depth, loggerPath, iteration, specific_tool=None):
 	explore = np.random.uniform() < epsilon # explore with probability epsilon
 	action = 0
 	angle = 0
@@ -271,8 +293,12 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 	print np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction[0]), np.max(grasp_prediction[1]), np.max(grasp_prediction[2]), np.max(grasp_prediction[3])
 	if not explore: # Choose max Q
 		out_str += "|Exploit| "
-		primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction)]
-		max_q_index = np.where(primitives_max==np.max(primitives_max))[0][0]
+		if specific_tool is not None:
+			max_q_index = specific_tool
+			out_str += "(Specific: {}) ".format(specific_tool)
+		else:
+			primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction)]
+			max_q_index = np.where(primitives_max==np.max(primitives_max))[0][0]
 		if max_q_index == 0: # suck_1
 			tmp = np.where(suck_1_prediction == np.max(suck_1_prediction))
 			pixel_index = [0, tmp[1][0], tmp[2][0]]
@@ -298,7 +324,11 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 		cv2.imwrite(mask_name, mask)
 		idx = np.random.choice(np.arange(resolution*resolution), p=get_prob(mask))
 		x = int(idx/resolution); y = int(idx%resolution)
-		primitive = np.random.choice(np.arange(3), p=[0.4, 0.4, 0.2]) # suck_1: suck_2: grasp = 2:2:1
+		if specific_tool is not None:
+			primitive = specific_tool
+			out_str += "(Specific: {}) ".format(specific_tool)
+		else:
+			primitive = np.random.choice(np.arange(3), p=[0.4, 0.4, 0.2]) # suck_1: suck_2: grasp = 2:2:1
 		if primitive == 0:
 			out_str += "Select suck_1 at ({}, {}) with Q value {:.3f}\n".format(x, y, suck_1_prediction[0, x, y])
 		if primitive == 1:
@@ -307,23 +337,26 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 			out_str += "Select suck_2 at ({}, {}) with Q value {:.3f}\n".format(x, y, suck_2_prediction[0, x, y])
 		if primitive == 2:
 			rotate_idx = np.random.choice(np.arange(4)) # grasp_-90, grasp_-45, grasp_0, grasp_45
-			angle = -90.0+45.0*rotate_idx
+			angle = np.radians(-90.0+45.0*rotate_idx); angle_deg = -90.0+45.0*rotate_idx
 			primitive += rotate_idx
 			action = primitive
-			action_str = "grasp " + str(int(angle))
+			action_str = "grasp " + str(int(angle_deg))
 			out_str += "Select grasp with angle {} at ({}, {}) with Q value {:.3f}\n".format(angle, x, y, grasp_prediction[rotate_idx, x, y])
 		pixel_index = [primitive, x, y]
 	print out_str
 	return explore, action, action_str, pixel_index, angle
 
 # Choose action using greedy policy
-def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction):
+def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction, specific_tool=None):
 	action = 0
 	action_str = 'suck_1'
 	angle = 0
 	pixel_index = [] # rotate_idx, y, x
-	primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction)]
-	max_q_index = np.where(primitives_max==np.max(primitives_max))[0][0]
+	if specific_tool is not None:
+		max_q_index = specific_tool
+	else:
+		primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction)]
+		max_q_index = np.where(primitives_max==np.max(primitives_max))[0][0]
 	if max_q_index == 0: # suck_1
 		tmp = np.where(suck_1_prediction == np.max(suck_1_prediction))
 		pixel_index = [0, tmp[1][0], tmp[2][0]]
@@ -360,14 +393,15 @@ def create_argparser():
 	parser.add_argument("--buffer_file", type=str, default="", help="If provided, will read the given file to construct the experience buffer, default is empty string")
 	parser.add_argument("--epsilon", type=float, default=0.5, help="Probability to choose random action, default is 0.5")
 	parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alram lamp, default is /dev/ttylight")
-	parser.add_argument("--buffer_size", type=int, default=1000, help="Experience buffer size, default is 1000") # N
-	parser.add_argument("--learning_freq", type=int, default=10, help="Frequency for updating behavior network, default is 10") # M, deprecated
-	parser.add_argument("--updating_freq", type=int, default=20, help="Frequency for updating target network, default is 20") # C
-	parser.add_argument("--mini_batch_size", type=int, default=5, help="How many transitions should used for learning, default is 5") # K
-	parser.add_argument("--save_every", type=int, default=5, help="Every how many steps should save the model, default is 5")
+	parser.add_argument("--buffer_size", type=int, default=500, help="Experience buffer size, default is 500") # N
+	parser.add_argument("--learning_freq", type=int, default=5, help="Frequency for updating behavior network, default is 5") # M
+	parser.add_argument("--updating_freq", type=int, default=10, help="Frequency for updating target network, default is 10") # C
+	parser.add_argument("--mini_batch_size", type=int, default=3, help="How many transitions should used for learning, default is 3") # K
+	parser.add_argument("--save_every", type=int, default=5, help="Every how many update should save the model, default is 5")
 	parser.add_argument("--learning_rate", type=float, default=5e-4, help="Learning rate for the trainer, default is 5e-4")
 	parser.add_argument("--densenet_lr", type=float, default=1e-4, help="Learning rate for the densenet block, default is 1e-4")
 	parser.add_argument("--run_episode", type=int, default=0, help="index for recording bag")
+	parser.add_argument("--specific_tool", type=int, default=None, help="If use specific tool only?")
 	return parser
 
 def show_args(args):
@@ -393,8 +427,9 @@ def parse_input(args):
 	save_every = args.save_every
 	learning_rate = args.learning_rate
 	densenet_lr = args.densenet_lr
+	specific_tool = args.specific_tool
 	return testing, run, use_cpu, model_str, buffer_str, epsilon, port, \
-	       buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr
+	       buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr, specific_tool
 
 def get_file_path(color_img_path_str):
 	idx = color_img_path_str[-16:]; idx = idx.replace("color_", ""); idx = idx.replace(".jpg", "")
@@ -444,6 +479,18 @@ def getLoggerPath(testing, root_path, run):
 	return csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path, check_grasp_path
 
 def saveFiles(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path):
+	def _count_success(usage_iter, result_list):
+		num = 0
+		for idx in usage_iter:
+			if result_list[idx]==1:
+				num+=1
+		return num
+	def _get_rate(num, den):
+		try:
+			rate = float(num)/den
+		except ZeroDivisionError:
+			rate = float('nan')
+		return rate
 	action_list = np.array(action_list)
 	result_list = np.array(result_list)
 	np.savetxt(path+"action_primitive.csv", action_list, delimiter=",")
@@ -487,20 +534,6 @@ def saveFiles(runtime, action_list, target_list, result_list, loss_list, explore
 	f.write("suction II usage rate: {}\n".format(suction_2_usage_rate))
 	f.close()
 
-def _count_success(usage_iter, result_list):
-	num = 0
-	for idx in usage_iter:
-		if result_list[idx]==1:
-			num+=1
-	return num
-	
-def _get_rate(num, den):
-	try:
-		rate = float(num)/den
-	except ZeroDivisionError:
-		rate = float('nan')
-	return rate
-
 def check_if_valid(position):
 	if (position[0] > x_lower and position[0] < x_upper) and \
 	   (position[1] > y_lower and position[1] < y_upper) and \
@@ -514,17 +547,40 @@ def getModelCapacity(model):
 def wrap_strings(image_path, depth_path, iteration):
 	color_name = image_path + "color_{:06}.jpg".format(iteration)
 	next_color_name = image_path + "next_color_{:06}.jpg".format(iteration)
-	depth_name = depth_path + "depth_data_{:06}.txt".format(iteration)
-	next_depth_name = depth_path + "next_depth_data_{:06}.txt".format(iteration)
+	depth_name = depth_path + "depth_data_{:06}.npy".format(iteration)
+	next_depth_name = depth_path + "next_depth_data_{:06}.npy".format(iteration) # for saving space of hard disk
 	return color_name, depth_name, next_color_name, next_depth_name
 
-def shutdown_process(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path, memory, regular=True):
-	memory.save_memory(path)
+def shutdown_process(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path, s_1_mem, s_2_mem, gri_mem, regular=True):
+	s_1_mem.save_memory(path, "suction_1_memory.pkl")
+	s_2_mem.save_memory(path, "suction_2_memory.pkl")
+	gri_mem.save_memory(path, "gripper_memory.pkl")
 	saveFiles(runtime, action_list, target_list, result_list, loss_list, explore_list, return_list, episode_list, position_list, path)
 	if regular: print "Regular shutdown"
 	else: print "Shutdown since user interrupt"
 	sys.exit(0)
 	
+def wrap_execution_info(iteration, is_valid, primitive, is_success):
+	res = execution()
+	res.iteration = iteration
+	if not is_valid:
+		res.primitive = "invalid"
+	else:
+		if primitive == 0:
+			res.primitive = "suck_1"
+		elif primitive == 1:
+			res.primitive = "suck_2"
+		elif primitive == 2:
+			res.primitive = "grasp_neg_90"
+		elif primitive == 3:
+			res.primitive = "grasp_neg_45"
+		elif primitive == 4:
+			res.primitive = "grasp_0"
+		else:
+			res.primitive = "grasp_45"
+	res.is_success = is_success
+	return res
+
 def get_action_info(pixel_index):
 	if pixel_index[0] == 0:
 		action_str = "suck_1"; rotate_idx = -1
@@ -534,15 +590,17 @@ def get_action_info(pixel_index):
 		action_str = "grasp"; rotate_idx = pixel_index[0]-2
 	return action_str, rotate_idx
 
-def parse_string(input_str):
-	def _substring(input_str, key, length):
-		pos = input_str.find(key)
-		return input_str[pos+len(key):pos+len(key)+length]
-	episode_str = _substring(input_str, "logger_", 3); episode = int(episode_str)
-	iter_str = _substring(input_str, "color_", 6); iter_ = int(iter_str)
-	print "Sample at episode: {} iteration: {}".format(episode, iter_)
-	return episode, iter_
-	
+def sample_data(memory, batch_size):
+	done = False
+	mini_batch = []; idxs = []; is_weight = []
+	while not done:
+		success = True
+		mini_batch, idxs, is_weight = memory.sample(batch_size)
+		for transition in mini_batch:
+			success = success and isinstance(transition, Transition)
+		if success: done = True
+	return mini_batch, idxs, is_weight
+
 '''
   ____                                         _ 
  |  _ \    ___  __      __   __ _   _ __    __| |
@@ -596,3 +654,12 @@ def print_action(action_str, pixel_index, point):
 	print "Take action [\033[1;31m%s\033[0m] at (%d, %d) -> (%f, %f, %f)" %(action_str, \
 	                                                                        pixel_index[1], pixel_index[2], \
 	                                                                        point[0], point[1], point[2])
+
+def parse_string(input_str):
+	def _substring(input_str, key, length):
+		pos = input_str.find(key)
+		return input_str[pos+len(key):pos+len(key)+length]
+	episode_str = _substring(input_str, "logger_", 3); episode = int(episode_str)
+	iter_str = _substring(input_str, "color_", 6); iter_ = int(iter_str)
+	print "Sample at episode: {} iteration: {}".format(episode, iter_)
+	return episode, iter_
