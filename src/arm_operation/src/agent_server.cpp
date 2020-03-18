@@ -481,8 +481,8 @@ bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
   ros::Time ts = ros::Time::now();
   abb_node::robot_SetZone set_zone;
   abb_node::robot_SetSpeed set_speed;
-  // Set zone to z_10, speed to (300, 100)
-  set_speed.request.tcp = 300.0f;
+  // Set zone to z_10, speed to (150, 100) (slow then fast)
+  set_speed.request.tcp = 150.0f;
   set_speed.request.ori = 100.0f;
   set_zone.request.mode = 4; // z_10
   set_zone_client.call(set_zone);
@@ -492,6 +492,8 @@ bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
   // First, go to middle joints
   set_joints.request.position.assign(middle_joints.begin(), middle_joints.end());
   set_joints_client.call(set_joints);
+  set_speed.request.tcp = 300.0f;
+  set_speed_client.call(set_speed);
   set_joints.request.position.assign(place_joints.begin(), place_joints.end());
   set_joints_client.call(set_joints);
   ros::Duration(0.5).sleep();
