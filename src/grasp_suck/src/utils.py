@@ -136,10 +136,12 @@ def preprocessing(name, dir_, color=None, depth=None):
 		return image
 	if has_color:
 		color_2x = ndimage.zoom(color, zoom=[2, 2, 1], order=0)
+		cv2.imwrite("color_2x.jpg", color_2x)
 		diag_length = float(color_2x.shape[0])*np.sqrt(2)
 		diag_length = np.ceil(diag_length/32)*32
 		padding_width = int((diag_length-color_2x.shape[0])/2)
 		color_padded = cv2.copyMakeBorder(color_2x, padding_width, padding_width, padding_width, padding_width, cv2.BORDER_CONSTANT, 0)
+		cv2.imwrite("color_2x_padded.jpg", color_padded)
 		image_mean = [0.406, 0.456, 0.485] # BGR
 		image_std  = [0.225, 0.224, 0.229]
 		color_float = color_padded.astype(float)/255
@@ -152,11 +154,14 @@ def preprocessing(name, dir_, color=None, depth=None):
 		color_tensor = torch.from_numpy(color_norm_.astype(np.float32)).permute(3, 2, 0, 1)
 		_tensor_to_PIL(color_tensor).save(dir_+"color_processed_"+name+".jpg")
 	if has_depth:
+		cv2.imwrite("depth.jpg", viz_depth_heightmap(depth))
 		depth_2x = ndimage.zoom(depth, zoom=[2, 2],    order=0)
+		cv2.imwrite("depth_2x.jpg", viz_depth_heightmap(depth_2x))
 		diag_length = float(depth_2x.shape[0])*np.sqrt(2)
 		diag_length = np.ceil(diag_length/32)*32
 		padding_width = int((diag_length-depth_2x.shape[0])/2)
 		depth_padded = cv2.copyMakeBorder(depth_2x, padding_width, padding_width, padding_width, padding_width, cv2.BORDER_CONSTANT, 0)
+		cv2.imwrite("depth_2x_padded.jpg", viz_depth_heightmap(depth_padded))
 		depth_mean = 0.0909769548291
 		depth_std  = 0.0397293901695
 		depth_norm = (depth_padded - depth_mean) / depth_std
@@ -165,6 +170,11 @@ def preprocessing(name, dir_, color=None, depth=None):
 		depth_3c.shape = (depth_3c.shape[0], depth_3c.shape[1], depth_3c.shape[2], 1)
 		depth_tensor = torch.from_numpy(depth_3c.astype(np.float32)).permute(3, 2, 0, 1)
 		_tensor_to_PIL(depth_tensor).save(dir_+"depth_processed_"+name+".jpg")
+	
+def viz_depth_heightmap(depth):
+	norm = (depth/np.max(depth)*255).astype(np.uint8)
+	#norm_color = cv2.applyColorMap(norm, cv2.COLORMAP_JET)
+	return norm
 	
 # Draw symbols in the color image with different primitive
 def draw_image(image, explore, pixel_index, image_name):
@@ -348,6 +358,7 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 
 # Choose action using greedy policy
 def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction, specific_tool=None):
+	print np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction[0]), np.max(grasp_prediction[1]), np.max(grasp_prediction[2]), np.max(grasp_prediction[3])
 	action = 0
 	action_str = 'suck_1'
 	angle = 0

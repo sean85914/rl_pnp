@@ -70,3 +70,8 @@ class SumTree:
 		idx = self._retrieve(0, target)
 		dataIdx = idx - self.capacity + 1
 		return idx, self.tree[idx], self.data[dataIdx]
+		
+	def reset_priority(self):
+		for i in range(self.write):
+			idx = i + self.capacity - 1
+			self.update(idx, 1.0)

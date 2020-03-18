@@ -20,32 +20,28 @@ def rotate_heightmap(color_tensor, depth_tensor, theta, use_cuda):
 	                                [ np.sin(-theta),  np.cos(-theta), 0]])
 	affine_mat_before.shape = (2, 3, 1)
 	affine_mat_before = torch.from_numpy(affine_mat_before).permute(2, 0, 1).float()
-	with torch.no_grad():
-		if use_cuda:
-			flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False).cuda(), color_tensor.size())
-			rotate_color_tensor = F.grid_sample(Variable(color_tensor).cuda(), flow_grid_before, mode='nearest')
-			rotate_depth_tensor = F.grid_sample(Variable(depth_tensor).cuda(), flow_grid_before, mode='nearest')
-		else:
-			flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False), color_tensor.size())
-			rotate_color_tensor = F.grid_sample(Variable(color_tensor), flow_grid_before, mode='nearest')
-			rotate_depth_tensor = F.grid_sample(Variable(depth_tensor), flow_grid_before, mode='nearest')
+	if use_cuda:
+		flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False).cuda(), color_tensor.size())
+		rotate_color_tensor = F.grid_sample(Variable(color_tensor, volatile=True).cuda(), flow_grid_before, mode="nearest")
+		rotate_depth_tensor = F.grid_sample(Variable(depth_tensor, volatile=True).cuda(), flow_grid_before, mode="nearest")
+	else:
+		flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False), color_tensor.size())
+		rotate_color_tensor = F.grid_sample(Variable(color_tensor, volatile=True), flow_grid_before, mode="nearest")
+		rotate_depth_tensor = F.grid_sample(Variable(depth_tensor, volatile=True), flow_grid_before, mode="nearest")
 	return rotate_color_tensor, rotate_depth_tensor
 	
 def rotate_featuremap(feature_tensor, theta, use_cuda):
 	# theta in radian
-	affine_mat_after = np.asarray([[ np.cos(theta), -np.sin(theta), 0],
-	                               [ np.sin(theta),  np.cos(theta), 0]])
+	affine_mat_after = np.asarray([[ np.cos(-theta), -np.sin(-theta), 0],
+	                               [ np.sin(-theta),  np.cos(-theta), 0]])
 	affine_mat_after.shape = (2, 3, 1)
 	affine_mat_after = torch.from_numpy(affine_mat_after).permute(2, 0, 1).float()
 	if use_cuda:
 		flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), feature_tensor.size())
+		rotate_feature = F.grid_sample(feature_tensor, flow_grid_after, mode="nearest")
 	else:
 		flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), feature_tensor.size())
-	with torch.no_grad():
-		if use_cuda:
-			rotate_feature = F.grid_sample(Variable(feature_tensor).cuda(), flow_grid_after, mode='nearest')
-		else:
-			rotate_feature = F.grid_sample(Variable(feature_tensor), flow_grid_after, mode='nearest')
+		rotate_feature = F.grid_sample(feature_tensor, flow_grid_after, mode="nearest")
 	return rotate_feature
 	
 class reinforcement_net(nn.Module):
@@ -73,10 +69,9 @@ class reinforcement_net(nn.Module):
 		  ('suck1-conv0', nn.Conv2d(2048, 64, kernel_size = 1, stride = 1, bias = False)),
 		  ('suck1-norm1', nn.BatchNorm2d(64)),
 		  ('suck1-relu1', nn.ReLU(inplace = True)),
-		  ('suck1-upsample0', nn.Upsample(scale_factor = 4, mode = "bilinear")),
+		  ('suck1-upsample0', nn.Upsample(scale_factor = 4, mode="bilinear")),
 		  ("suck1-conv1", nn.Conv2d(64, 1, kernel_size = 1, stride = 1, bias = False)),
 		  ('suck1-norm2', nn.BatchNorm2d(1)),
-		  ("suck1-relu2", nn.ReLU(inplace = True)),
 		  ("suck1-upsample1", nn.Upsample(scale_factor = 4, mode="bilinear"))
 		]))
 		# Suck 2, corresponding to tool ID 2
@@ -86,10 +81,9 @@ class reinforcement_net(nn.Module):
 		  ('suck2-conv0', nn.Conv2d(2048, 64, kernel_size = 1, stride = 1, bias = False)),
 		  ('suck2-norm1', nn.BatchNorm2d(64)),
 		  ('suck2-relu1', nn.ReLU(inplace = True)),
-		  ('suck2-upsample0', nn.Upsample(scale_factor = 4, mode = "bilinear")),
+		  ('suck2-upsample0', nn.Upsample(scale_factor = 4, mode="bilinear")),
 		  ("suck2-conv1", nn.Conv2d(64, 1, kernel_size = 1, stride = 1, bias = False)),
 		  ('suck2-norm2', nn.BatchNorm2d(1)),
-		  ("suck2-relu2", nn.ReLU(inplace = True)),
 		  ("suck2-upsample1", nn.Upsample(scale_factor = 4, mode="bilinear"))
 		]))
 		# Gripper, corresponding to tool ID 1
@@ -99,10 +93,9 @@ class reinforcement_net(nn.Module):
 		  ('grasp-conv0', nn.Conv2d(2048, 64, kernel_size = 1, stride = 1, bias = False)),
 		  ('grasp-norm1', nn.BatchNorm2d(64)),
 		  ('grasp-relu1', nn.ReLU(inplace = True)),
-		  ('grasp-upsample0', nn.Upsample(scale_factor = 4, mode = "bilinear")),
+		  ('grasp-upsample0', nn.Upsample(scale_factor = 4, mode="bilinear")),
 		  ("grasp-conv1", nn.Conv2d(64, 1, kernel_size = 1, stride = 1, bias = False)),
 		  ('grasp-norm2', nn.BatchNorm2d(1)),
-		  ("grasp-relu2", nn.ReLU(inplace = True)),
 		  ("grasp-upsample1", nn.Upsample(scale_factor = 4, mode="bilinear"))
 		]))
 		
@@ -144,10 +137,10 @@ class reinforcement_net(nn.Module):
 					interm_color_feat_rotated = self.grasp_color_feat_extractor.features(rotate_color)
 					interm_depth_feat_rotated = self.grasp_depth_feat_extractor.features(rotate_depth)
 					interm_feat_rotated = torch.cat((interm_color_feat_rotated, interm_depth_feat_rotated), dim=1)
-					interm_feat = rotate_featuremap(interm_feat_rotated, -theta, self.use_cuda)
-					output_prob.append(self.grasp_net(interm_feat))
+					#interm_feat = rotate_featuremap(interm_feat_rotated, -theta, self.use_cuda)
+					output_prob.append(rotate_featuremap(self.grasp_net(interm_feat_rotated), -theta, self.use_cuda))
 			return output_prob
-		else: # For backpropagation
+		else: # For backpropagation, or computing TD target
 			self.output_prob = None
 			if self.use_cuda:
 				input_color_data = input_color_data.cuda()
@@ -178,6 +171,6 @@ class reinforcement_net(nn.Module):
 					interm_color_feat_rotated.detach()
 					interm_depth_feat_rotated.detach()
 				interm_feat_rotated = torch.cat((interm_color_feat_rotated, interm_depth_feat_rotated), dim=1)
-				interm_feat = rotate_featuremap(interm_feat_rotated, -theta, self.use_cuda)
-				self.output_prob = self.grasp_net(interm_feat)
+				#interm_feat = rotate_featuremap(interm_feat_rotated, -theta, self.use_cuda)
+				self.output_prob = rotate_featuremap(self.grasp_net(interm_feat_rotated), -theta, self.use_cuda)
 			return self.output_prob
