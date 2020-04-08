@@ -97,14 +97,15 @@ Usage: ./bag_to_video bag_name output_video_name [speed]\n\033[0m";
   }
   file << "========================================================================\n"
        << "Run time: \t" << bag_duration << "\n"
-       << "Invalid action rate: \t" << float(invalid_iter)/total_iter << "\n"
-       << "Success rate: \t" << float(total_success)/total_iter << "\n"
-       << "Gripper success rate: \t" << float(gripper_success)/gripper_usage << "\n"
-       << "Suction 1 success rate: \t" << float(suction_1_success)/suction_1_usage << "\n"
-       << "Suction 2 success rate: \t" << float(suction_2_success)/suction_2_usage << "\n"
-       << "Gripper usage rate: \t" << float(gripper_usage)/total_iter << "\n"
-       << "Suction 1 usage rate: \t" << float(suction_1_usage)/total_iter << "\n"
-       << "Suction 2 usage rate: \t" << float(suction_2_usage)/total_iter << "\n";
+       << "Run iteration: \t" << total_iter << "\n"
+       << "Invalid action rate: \t" << float(invalid_iter)/total_iter << "\t" << invalid_iter << "\n"
+       << "Success rate: \t" << float(total_success)/total_iter << "\t" << total_success << "\n"
+       << "Gripper success rate: \t" << float(gripper_success)/gripper_usage << "\t" << gripper_success << "\n"
+       << "Suction 2 success rate: \t" << float(suction_2_success)/suction_2_usage << "\t" << suction_2_success << "\n"
+       << "Suction 1 success rate: \t" << float(suction_1_success)/suction_1_usage << "\t" << suction_1_success << "\n"
+       << "Gripper usage rate: \t" << float(gripper_usage)/total_iter << "\t" << gripper_usage << "\n"
+       << "Suction 2 usage rate: \t" << float(suction_2_usage)/total_iter << "\t" << suction_2_usage << "\n"
+       << "Suction 1 usage rate: \t" << float(suction_1_usage)/total_iter << "\t" << suction_1_usage << "\n";
   auto e_ts = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(e_ts-s_ts).count();
   file.close();

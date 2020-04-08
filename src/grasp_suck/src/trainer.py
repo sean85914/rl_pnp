@@ -124,7 +124,8 @@ class Trainer(object):
 				grasp_prediction = np.concatenate((grasp_prediction, output_prob[2+rotate_idx].cpu().detach().numpy()[:, 0, lower:upper, lower:upper]))
 		return suck_1_prediction, suck_2_prediction, grasp_prediction
 	# Get TD target given reward and next state
-	def get_label_value(self, reward, next_color, next_depth, is_empty):
+	# Added parameter `primitive_idx` in 3/19: should choose next best action according to what have been done in last iteration
+	def get_label_value(self, reward, next_color, next_depth, is_empty, primitive_idx):
 		current_reward = reward
 		# Compute TD target
 		''' 
@@ -133,7 +134,23 @@ class Trainer(object):
 		'''
 		# Use behavior net to find best action in next state
 		next_suck_1_prediction, next_suck_2_prediction, next_grasp_prediction = self.forward(next_color, next_depth, is_volatile = True)
-		primitives_max_q = [np.max(next_suck_1_prediction), np.max(next_suck_2_prediction), np.max(next_grasp_prediction)]
+		# New block added in 3/19
+		if primitive_idx == 0:
+			action_str = "suck_1"
+			tmp = np.where(next_suck_1_prediction==np.max(next_suck_1_prediction))
+			next_best_pixel = [tmp[0][0], tmp[1][0], tmp[2][0]]
+			rotation = -1
+		elif primitive_idx == 1:
+			action_str = "suck_2"
+			tmp = np.where(next_suck_2_prediction==np.max(next_suck_2_prediction))
+			next_best_pixel = [tmp[0][0], tmp[1][0], tmp[2][0]]
+			rotation = -1
+		else:
+			action_str = "grasp"
+			tmp = np.where(next_grasp_prediction==np.max(next_grasp_prediction))
+			next_best_pixel = [tmp[0][0], tmp[1][0], tmp[2][0]]
+			rotation = next_best_pixel[0]
+		'''primitives_max_q = [np.max(next_suck_1_prediction), np.max(next_suck_2_prediction), np.max(next_grasp_prediction)]
 		max_q_index = np.where(primitives_max_q==np.max(primitives_max_q))[0][0]
 		if max_q_index == 0:
 			action_str = "suck_1"
@@ -149,13 +166,13 @@ class Trainer(object):
 			action_str = "grasp"
 			tmp = np.where(next_grasp_prediction==np.max(next_grasp_prediction))
 			next_best_pixel = [tmp[0][0], tmp[1][0], tmp[2][0]]
-			rotation = next_best_pixel[0]
+			rotation = next_best_pixel[0]'''
 		next_prediction = self.forward(next_color, next_depth, action_str = action_str, is_volatile = False, specific_rotation = rotation, network = "target")
 		future_reward = 0.0
 		if not is_empty:
 			future_reward = next_prediction[0, next_best_pixel[1], next_best_pixel[2]]
 		td_target = current_reward + self.discount_factor * future_reward
-		print "Next best action: {} @({}, {}) Current reward: {}. future reward: {}".format(action_str, next_best_pixel[1], next_best_pixel[2], current_reward, future_reward)
+		#print "Next best action: {} @({}, {}) Current reward: {}. future reward: {}".format(action_str, next_best_pixel[1], next_best_pixel[2], current_reward, future_reward)
 		del next_prediction
 		return td_target
 	# Do backwardpropagation
@@ -246,6 +263,6 @@ class Trainer(object):
 			loss_value = loss_value/2
 		
 		out_str += "Training loss: {}".format(loss_value)
-		print(out_str)
+		#print(out_str)
 		if update: self.optimizer.step()
 		return loss_value

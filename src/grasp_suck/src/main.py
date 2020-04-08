@@ -4,7 +4,7 @@ from utils import Transition
 parser = utils.create_argparser()
 args = parser.parse_args()
 utils.show_args(args)
-testing, run, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr, specific_tool = utils.parse_input(args)
+testing, run, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr, specific_tool, suction_1_memory, suction_2_memory, gripper_memory = utils.parse_input(args)
 
 import os
 import sys
@@ -50,10 +50,17 @@ r = rospkg.RosPack()
 package_path = r.get_path("grasp_suck")
 csv_path, image_path, depth_path, mixed_paths, feat_paths, pc_path, model_path, vis_path, diff_path, check_grasp_path = utils.getLoggerPath(testing, package_path, run)
 
-if run!=0:
+'''if run!=0:
 	gripper_memory_buffer.load_memory(csv_path.replace("logger_{:03}".format(run), "logger_{:03}".format(run-1))+"gripper_memory.pkl")
 	suction_1_memory_buffer.load_memory(csv_path.replace("logger_{:03}".format(run), "logger_{:03}".format(run-1))+"suction_1_memory.pkl")
 	suction_2_memory_buffer.load_memory(csv_path.replace("logger_{:03}".format(run), "logger_{:03}".format(run-1))+"suction_2_memory.pkl")
+'''
+if suction_1_memory!="":
+	suction_1_memory_buffer.load_memory(suction_1_memory)
+if suction_2_memory!="":
+	suction_2_memory_buffer.load_memory(suction_2_memory)
+if gripper_memory!="":
+	gripper_memory_buffer.load_memory(gripper_memory)
 
 # trainer
 if testing: learning_rate = 5e-5; densenet_lr = 1e-5
@@ -285,18 +292,18 @@ try:
 							next_depth = np.load(mini_batch[i].next_depth)
 							action_str, rotate_idx = utils.get_action_info(pixel_index)
 							old_q.append(trainer.forward(color, depth, action_str, False, rotate_idx, clear_grad=True)[0, pixel_index[1], pixel_index[2]])
-							td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty); td_target_list.append(td_target)
+							td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty, pixel_index[0]); td_target_list.append(td_target)
 							loss_ = trainer.backprop(color, depth, pixel_index, td_target, is_weight[i], mini_batch_size, i==0, i==len(mini_batch)-1)
 							loss_list.append(loss_)
 						# After parameter updated, update prioirites tree
 						for i in range(len(mini_batch)):
-							episode_, iter_ = utils.parse_string(mini_batch[i].color);
+							#episode_, iter_ = utils.parse_string(mini_batch[i].color);
 							color = cv2.imread(mini_batch[i].color)
 							depth = np.load(mini_batch[i].depth)
 							pixel_index = mini_batch[i].pixel_idx
 							next_color = cv2.imread(mini_batch[i].next_color)
 							next_depth = np.load(mini_batch[i].next_depth)
-							td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty)
+							td_target = trainer.get_label_value(mini_batch[i].reward, next_color, next_depth, mini_batch[i].is_empty, pixel_index[0])
 							action_str, rotate_idx = utils.get_action_info(pixel_index)
 							old_value = trainer.forward(color, depth, action_str, False, rotate_idx, clear_grad=True)[0, pixel_index[1], pixel_index[2]]
 							print "New Q value: {:03f} -> {:03f} | TD Target: {:03f}".format(old_q[i], old_value, td_target_list[i])

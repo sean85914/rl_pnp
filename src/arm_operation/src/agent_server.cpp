@@ -50,6 +50,10 @@ void printMat(const tf::Matrix3x3 mat){
 class AgentServer{
  private:
   int curr_tool_id; // ID of current tool, from parameter server
+  int count[2] = {0}; // Execution counter, home and place
+  int action_count[3] = {0};  // Gripper, bagcup suction, small suction
+  double mean_time[2] = {0.0}; // Execution mean time, indice as above
+  double action_time[3] = {0.0}; 
   const double tool_head_length = 0.555f; // Length of spear tool head, roughly measured
   std::vector<double> tool_length; // Length of three tool, from parameter server
   std::vector<double> home_joints; // Joints for home pose
@@ -227,7 +231,7 @@ void AgentServer::joint_6_coterminal(abb_node::robot_SetJoints &joint_req){
 
 bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req, 
                             arm_operation::agent_abb_action::Response& res){
-  ros::Time ts = ros::Time::now();
+  //ros::Time ts = ros::Time::now(); Change to count after tool changed
   if(req.tool_id!=1 and req.tool_id!=2 and req.tool_id!=3){
     ROS_WARN("Invalid tool ID given, abort...");
     res.result = "Invalid ID given";
@@ -248,6 +252,7 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
     curr_tool_id = req.tool_id;
     nh_.setParam("curr_tool_id", curr_tool_id);
   }
+  ros::Time ts = ros::Time::now();
   ros::Duration(0.5).sleep();
   // Get current pose and store it into buffer
   abb_node::robot_GetCartesian get_cartesian;
@@ -259,7 +264,7 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   tf::Quaternion quat(qx, qy, qz, qw), // Current orientation
                  quat_perpendicular, // Tune to make Z axis perpendicular to the tote
                  quat_compensate;
-  std::cout << "Original quat: "; printQuat(quat);
+  //std::cout << "Original quat: "; printQuat(quat);
   tf::Matrix3x3 mat(quat);
   double a_31 = mat.getRow(2).getX(),
          a_32 = mat.getRow(2).getY(),
@@ -271,7 +276,7 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   if(fabs(pitch)>=M_PI/2)
     pitch += (pitch>=0?-M_PI:M_PI);
   quat_perpendicular.setRPY(roll, pitch, 0);
-  quat *= quat_perpendicular; std::cout << "Quat compensate to: "; printQuat(quat);
+  quat *= quat_perpendicular; //std::cout << "Quat compensate to: "; printQuat(quat);
   quat_compensate.setRPY(0.0, 0.0, req.angle);
   quat *= quat_compensate;
   geometry_msgs::Point target_ee_position(req.position); 
@@ -326,7 +331,10 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
     }
   }else{ // Gripper
     _home(); ros::Duration(0.1).sleep();
-    _light_vibrate(); // Vibrate to make object fall if bad grasping 
+    bool need_vibrate = true;
+    nh_.getParam("is_train", need_vibrate);
+    if(need_vibrate)
+      _light_vibrate(); // Vibrate to make object fall if bad grasping 
   }
   // Move slower to prevent droping
   /*abb_node::robot_SetSpeed set_speed;
@@ -335,6 +343,15 @@ bool AgentServer::serviceCB(arm_operation::agent_abb_action::Request&  req,
   set_speed_client.call(set_speed);*/
   ros::Duration(0.5).sleep();
   double time = (ros::Time::now()-ts).toSec();
+  if(action_count[req.tool_id-1]==0)
+    action_time[req.tool_id-1] = time;
+  else{
+    action_time[req.tool_id-1] = (action_count[req.tool_id-1]*action_time[req.tool_id-1]+time)/(action_count[req.tool_id-1]+1);
+  }
+  action_count[req.tool_id-1] += 1;
+  ROS_INFO("Gripper \t Mean: %f \t Count: %d", action_time[0], action_count[0]);
+  ROS_INFO("Bagcup Suction \t Mean: %f \t Count: %d", action_time[1], action_count[1]);
+  ROS_INFO("Small Suction \t Mean: %f \t Count: %d", action_time[2], action_count[2]);
   res.result = "success, action takes " + std::to_string(time) + " seconds"; 
   return true;
 }
@@ -463,7 +480,14 @@ bool AgentServer::homeCB(std_srvs::Empty::Request  &req,
                          std_srvs::Empty::Response &res){
   ros::Time ts = ros::Time::now();
   _home();
-  ROS_INFO("Go home takes %f seconds", (ros::Time::now()-ts).toSec());
+  if(count[0]==0)
+    mean_time[0] = (ros::Time::now()-ts).toSec();
+  else{
+    mean_time[0] = (count[0]*mean_time[0]+(ros::Time::now()-ts).toSec())/(count[0]+1);
+  }
+  count[0] += 1;
+  ROS_INFO("Go home takes %f seconds | Mean %f | Count %d", (ros::Time::now()-ts).toSec(), mean_time[0], count[0]);
+  
   return true;
 }
 
@@ -502,22 +526,30 @@ bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
   bool_data.request.data = false;
   vacuum_control_client.call(bool_data);
   int curr_tool_id; nh_.getParam("curr_tool_id", curr_tool_id);
-  if(curr_tool_id==1){
+  /*if(curr_tool_id==1){
     _fast_vibrate();
-  }
+  }*/
   // Set zone to z_0
   set_zone.request.mode = 1;
   set_zone_client.call(set_zone);
   // And then middle joints and go home
-  set_joints.request.position.assign(middle_joints.begin(), middle_joints.end());
-  joint_6_coterminal(set_joints);
-  set_joints_client.call(set_joints);
+  if(curr_tool_id==1){
+    set_joints.request.position.assign(middle_joints.begin(), middle_joints.end());
+    joint_6_coterminal(set_joints);
+    set_joints_client.call(set_joints);
+  }
   _home();
   // Speed to original one
   set_speed.request.tcp = 200.0f;
   set_speed.request.ori = 100.0f;
   set_speed_client.call(set_speed);
-  ROS_INFO("Go place takes %f seconds", (ros::Time::now()-ts).toSec());
+  if(count[1]==0)
+    mean_time[1] = (ros::Time::now()-ts).toSec();
+  else{
+    mean_time[1] = (count[1]*mean_time[1]+(ros::Time::now()-ts).toSec())/(count[1]+1);
+  }
+  count[1] += 1;
+  ROS_INFO("Go place takes %f seconds | Mean %f | Count %d", (ros::Time::now()-ts).toSec(), mean_time[1], count[1]);
   return true;
 }
 

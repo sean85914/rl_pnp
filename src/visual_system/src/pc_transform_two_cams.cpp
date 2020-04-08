@@ -41,7 +41,9 @@ bool use_two_cam; // If enable camera2
 bool down_sample; // If downsampling
 int resolution; // Heightmap resolution
 int thres_point; // Threshold points number for determining if grasp success
+int count = 0; // Counter for `get_pointcloud`
 const int thread_num = 16; // Number of threads
+double mean_time = 0.0; // Average time cost for `get_pointcloud`
 double factor; // Voxel grid factor
 double empty_thres; // Threshold rate for determining if the bin is empty
 double x_lower; // X lower bound, in hand coord.
@@ -182,6 +184,7 @@ void callback(const sensor_msgs::PointCloud2::ConstPtr msg){
 
 bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::pc_is_empty::Response &res)
 {
+  
   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients ());
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices ());
   pcl::SACSegmentation<pcl::PointXYZRGB> seg;
@@ -190,7 +193,15 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
   seg.setMethodType(pcl::SAC_RANSAC);
   seg.setDistanceThreshold(0.004f);
   pcl::PointCloud<pcl::PointXYZRGB> pc;
-  pcl::fromROSMsg(req.input_pc, pc);
+  if(req.pcd_file.empty()){
+    pcl::fromROSMsg(req.input_pc, pc);
+  }else{
+    if(pcl::io::loadPCDFile<pcl::PointXYZRGB>(req.pcd_file, pc)==-1){
+      ROS_ERROR("Can't read given PCD file string, abort request");
+      res.is_empty.data = false;
+      return false;
+    }
+  }
   seg.setInputCloud(pc.makeShared());
   seg.segment(*inliers, *coefficients);
   double ratio = double(inliers->indices.size())/pc.points.size();
@@ -262,6 +273,13 @@ bool callback_get_pc(visual_system::get_pc::Request  &req,
       create_directories(p);
     pcl::io::savePCDFileBinary(pc_name, pc_in_range);
   }
+  if(count==0)
+    mean_time = (ros::Time::now()-ts).toSec();
+  else{
+    mean_time = (count*mean_time+(ros::Time::now()-ts).toSec())/(count+1);
+  }
+  count += 1;
+  ROS_INFO("Get Pointcloud Average Time Cost: %f | Count %d | %d Points", mean_time, count, (int)pc_in_range.points.size());
   return true;
 }
 

@@ -101,9 +101,16 @@ class reinforcement_net(nn.Module):
 		
 		# Initialize network weights
 		for m in self.named_modules():
-			if 'suck1-' in m[0] or 'suck2-' in m[0] or 'grasp-' in m[0]:
+			#if 'suck1-' in m[0] or 'suck2-' in m[0] or 'grasp-' in m[0]:
+			if 'suck1-' in m[0]:
 				if isinstance(m[1], nn.Conv2d):
 					nn.init.kaiming_normal_(m[1].weight.data)
+					if 'conv0' in m[0]:
+						self.suck_2_net[2].load_state_dict(self.suck_1_net[2].state_dict())
+						self.grasp_net[2].load_state_dict(self.suck_1_net[2].state_dict())
+					elif 'conv1' in m[0]:
+						self.suck_2_net[6].load_state_dict(self.suck_1_net[6].state_dict())
+						self.grasp_net[6].load_state_dict(self.suck_1_net[6].state_dict())
 					#m[1].bias.data.zero_()
 				elif isinstance(m[1], nn.BatchNorm2d):
 					m[1].weight.data.fill_(1)

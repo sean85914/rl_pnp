@@ -28,9 +28,26 @@ inline bool in_range(double data, double upper, double lower){
   else return true;
 }
 
+inline tf::Quaternion mean_quat(const std::vector<tf::Quaternion> vec){
+  double qx = 0.0, qy = 0.0, qz = 0.0, qw = 0.0;
+  for(int i=0; i<vec.size(); ++i){
+    qx += vec[i].getX()/double(vec.size());
+    qy += vec[i].getY()/double(vec.size());
+    qz += vec[i].getZ()/double(vec.size());
+    qw += vec[i].getW()/double(vec.size());
+  } 
+  tf::Quaternion mean(qx, qy, qz, qw);
+  return mean.normalized();
+}
+
 class ChangeToolService{
  private:
-  apriltags_ros::AprilTagDetectionArray detections;
+  //int count[3] = {0};
+  //double mean_time[3] = {0.0};
+  int calibrate_count;
+  double calibrate_mean;
+  std::vector<std::vector<int>> count; // Tool change counter
+  std::vector<std::vector<double>> mean_time; // Tool change mean time
   std::vector<std::vector<double>> joints_vector;
   ros::NodeHandle nh_, pnh_;
   tf::TransformListener listener;
@@ -175,6 +192,37 @@ class ChangeToolService{
     setZone.call(set_zone_srv);
     double time_response = (ros::Time::now()-ts).toSec();
     ROS_INFO("Service response complete, takes %f seconds", time_response);
+    // For calculate poster index
+    /*  Now Togo Poster Index
+          1    2       0
+          1    3       1
+          2    1       0
+          2    3       1
+          3    1       0
+          3    2       1
+     */
+    int idx;
+    if(req.now==1) idx = req.togo-2;
+    else if(req.now==2) idx = (req.togo-1)/2;
+    else idx = req.togo-1;
+    if(count[req.now-1][idx]==0)
+      mean_time[req.now-1][idx] = time_response;
+    else
+      mean_time[req.now-1][idx] = (count[req.now-1][idx]*mean_time[req.now-1][idx]+time_response)/(count[req.now-1][idx]+1);
+    count[req.now-1][idx]+=1;
+    ROS_INFO("Tool changing time average: \n%f (%d)\t%f (%d)\n%f (%d)\t%f (%d)\n%f (%d)\t%f (%d)", 
+      mean_time[0][0], count[0][0], 
+      mean_time[0][1], count[0][1], 
+      mean_time[1][0], count[1][0],
+      mean_time[1][1], count[1][1],
+      mean_time[2][0], count[2][0],
+      mean_time[2][1], count[2][1]);
+    /*if(count[req.togo-1]==0)
+      mean_time[req.togo-1] = time_response;
+    else{
+      mean_time[req.togo-1] = (count[req.togo-1]*mean_time[req.togo-1]+time_response)/(count[req.togo-1]+1);
+    } count[req.togo-1]+=1;
+    ROS_INFO("Average Time: [%f, %f, %f] | Change Count: [%d, %d, %d]", mean_time[0], mean_time[1], mean_time[2], count[0], count[1], count[2]);*/
     // Make gripper in zero degree
     if(req.togo==1){
       calibrate_gripper(true);
@@ -257,7 +305,7 @@ class ChangeToolService{
       }
       // Get current joints and put it into buffer
       getJoints.call(get_joints_srv);
-      ROS_INFO("Rotating joint 6 %s30 degree...", (direction==1?"+":"-"));
+      //ROS_INFO("Rotating joint 6 %s30 degree...", (direction==1?"+":"-"));
       set_joints_srv.request.position[0] = get_joints_srv.response.j1;
       set_joints_srv.request.position[1] = get_joints_srv.response.j2;
       set_joints_srv.request.position[2] = get_joints_srv.response.j3;
@@ -275,12 +323,18 @@ class ChangeToolService{
       ROS_WARN("Can't find apriltag after one minute, abort request!");
       return calibrated;
     }
-    tf::StampedTransform stf;
     try{
-      listener.waitForTransform("base_link", "gripper", ros::Time(0), ros::Duration(1.0f));
-      listener.lookupTransform("base_link", "gripper", ros::Time(0), stf);
-      tf::Quaternion desired_quat(-0.5f, 0.5f, 0.5f, -0.5f);
-      double theta = 2*desired_quat.angle(stf.getRotation());
+      int tag_count = 0, wait_message = 5;
+      std::vector<tf::Quaternion> quat_vec; quat_vec.resize(wait_message);
+      while(tag_count<wait_message){
+        tf::StampedTransform stf;
+        listener.waitForTransform("base_link", "gripper", ros::Time(0), ros::Duration(1.0f));
+        listener.lookupTransform("base_link", "gripper", ros::Time(0), stf);
+        quat_vec[tag_count] = stf.getRotation();
+        ++tag_count; usleep(1000);
+      }
+      tf::Quaternion desired_quat(-0.5f, 0.5f, 0.5f, -0.5f); // [0, 0, -1; -1, 0, 0; 0, 1, 0]
+      double theta = 2*desired_quat.angle(mean_quat(quat_vec));
       if(theta>=M_PI) theta -= 2*M_PI;
       else if(theta<=-M_PI) theta += 2*M_PI;
       getJoints.call(get_joints_srv);
@@ -328,6 +382,18 @@ class ChangeToolService{
     set_speed_srv.request.ori = 100.0;
     setSpeed.call(set_speed_srv);
     ROS_INFO("Gripper calibration spend %f seconds", (ros::Time::now()-ts).toSec());
+    /*if(count[0]==0)
+      calibrate_mean = (ros::Time::now()-ts).toSec();
+    else{
+      calibrate_mean = (count[0]*calibrate_mean+(ros::Time::now()-ts).toSec())/(count[0]+1);
+    }
+    ROS_INFO("Calibrattion Average Time: %f", calibrate_mean);*/
+    if(calibrate_count==0)
+      calibrate_mean = (ros::Time::now()-ts).toSec();
+    else
+      calibrate_mean = (calibrate_count*calibrate_mean+(ros::Time::now()-ts).toSec())/(calibrate_count+1);
+    calibrate_count+=1;
+    ROS_INFO("Calibrattion Average Time: %f (%d)", calibrate_mean, calibrate_count);
     return calibrated;
   }
   void joint_6_coterminal(abb_node::robot_SetJoints &joint_req){
@@ -341,7 +407,7 @@ class ChangeToolService{
     }
 }
  public:
-  ChangeToolService(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh){
+  ChangeToolService(ros::NodeHandle nh, ros::NodeHandle pnh): calibrate_count(0), calibrate_mean(0.0), nh_(nh), pnh_(pnh){
     setupParameters();
     change_tool_service = pnh_.advertiseService("change_tool_service", &ChangeToolService::service_cb, this);
     calibrate_gripper_service = pnh_.advertiseService("calibrate_gripper", &ChangeToolService::calibrate_gripper_cb, this);
@@ -355,6 +421,11 @@ class ChangeToolService{
       while(!ros::service::waitForService(name, ros::Duration(3.0)) and ros::ok()){
         ROS_WARN("Waiting for service: %s", name.c_str());
       }
+    }
+    count.resize(3); mean_time.resize(3);
+    for(int i=0; i<3; ++i){
+      count[i].resize(2);
+      mean_time[i].resize(2);
     }
     getCartesian = nh_.serviceClient<abb_node::robot_GetCartesian>(service_name[0]);
     getJoints = nh_.serviceClient<abb_node::robot_GetJoints>(service_name[1]);
