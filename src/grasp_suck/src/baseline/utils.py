@@ -35,15 +35,9 @@ def preprocessing(colorImg, depthImg): # Expected color in BGR order
 def background_subtraction(color, depth, background_color, background_depth):
 	color_bg = cv2.imread(background_color)
 	depth_bg = cv2.imread(background_depth, -1)
-	if color_bg.shape[0] != 480:
-		color_bg = cv2.resize(color_bg, (640, 480))
-		depth_bg = cv2.resize(depth_bg, (640, 480))
 	color_bg = (color_bg/255.).astype(np.float32)
 	depth_bg = (depth_bg/1000.).astype(np.float32)
 	depth_bg = np.clip(depth_bg, 0.0, 10.0)
-	if color.shape[0] != 480:
-		color = cv2.resize(color, (640, 480))
-		depth = cv2.resize(depth, (640, 480))
 	color = (color/255.).astype(np.float32)
 	depth = (depth/1000.).astype(np.float32)
 	depth = np.clip(depth, 0.0, 10.0)
@@ -58,10 +52,9 @@ def background_subtraction(color, depth, background_color, background_depth):
 	fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel)
 	return fg_mask
 
-def generate_heightmap(color, depth, camera_info, background_color, background_depth):
+def generate_heightmap(color, depth, camera_info, background_color, background_depth, voxel_size):
 	# The following coordinate has been rotated by [[0, -1, 0], [-1, 0, 0], [0, 0, -1]]
-	binMiddleBottom = [0.383878856897, -0.884349167347, 0.02]
-	voxel_size = 0.002 # 2 mm
+	binMiddleBottom = np.loadtxt(os.path.dirname(os.path.abspath(__file__))+"/bin_pose.txt")
 	grid_origin = [binMiddleBottom[0]-0.3, binMiddleBottom[1]-0.2, binMiddleBottom[2]]
 	# Background subtraction
 	color_bg = cv2.imread(background_color)
@@ -189,6 +182,14 @@ def rotate_heightmap(color_heightmap, depth_heightmap, angle):
 	rotated_depth_heightmap = cv2.warpAffine(depth_heightmap, M, (w, h))
 	return rotated_color_heightmap, rotated_depth_heightmap
 
+def rotate_img(img, angle):
+	(h, w) = img.shape[:2]
+	center = (w/2, h/2)
+	M = cv2.getRotationMatrix2D(center, angle, 1.0)
+	rotate_img = cv2.warpAffine(img, M, (w, h))
+	return rotate_img
+
+# For computing connected components label
 class Graph:
 	def __init__(self):
 		self.connect = []
@@ -269,13 +270,21 @@ def bwareaopen(mask, P):
 			res[np.where(label==val)] = 0 # Change from 255 to 0
 	return res
 
-def draw_action(color, prediction, primitive="suck"):
+def draw_action(color_hm, pixel, primitive="suck"):
+	res = copy.deepcopy(color_hm)
 	if primitive=="suck":
-		color_draw = copy.deepcopy(color)
-		best = np.where(prediction==np.max(prediction))
-		best_pixel = (best[1], best[0])
-		cv2.circle(color_draw, best_pixel, 7, (0, 0, 0), 3)
-		return color_draw
+		cv2.circle(res, tuple(pixel), 7, (0, 0, 0), 2)
+	elif primitive=="grasp":
+		x = 20
+		y = 10
+		line_1_upper = (pixel[0]-x, pixel[1]-y)
+		line_1_lower = (pixel[0]-x, pixel[1]+y)
+		line_2_upper = (pixel[0]+x, pixel[1]-y)
+		line_2_lower = (pixel[0]+x, pixel[1]+y)
+		cv2.circle(res, tuple(pixel), 7, (0, 0, 0), 2)
+		cv2.line(res, line_1_upper, line_1_lower, (0, 0, 0), 3)
+		cv2.line(res, line_2_upper, line_2_lower, (0, 0, 0), 3)
+	return res
 		
 def draw_affordance(prediction):
 	# @prediciton: background area set to 0
