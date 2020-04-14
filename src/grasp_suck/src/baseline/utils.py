@@ -55,7 +55,7 @@ def background_subtraction(color, depth, background_color, background_depth):
 def generate_heightmap(color, depth, camera_info, background_color, background_depth, voxel_size):
 	# The following coordinate has been rotated by [[0, -1, 0], [-1, 0, 0], [0, 0, -1]]
 	binMiddleBottom = np.loadtxt(os.path.dirname(os.path.abspath(__file__))+"/bin_pose.txt")
-	grid_origin = [binMiddleBottom[0]-0.3, binMiddleBottom[1]-0.2, binMiddleBottom[2]]
+	grid_origin = [binMiddleBottom[0]-voxel_size*150, binMiddleBottom[1]-voxel_size*100, binMiddleBottom[2]]
 	# Background subtraction
 	color_bg = cv2.imread(background_color)
 	depth_bg = cv2.imread(background_depth, -1)
@@ -105,6 +105,7 @@ def generate_heightmap(color, depth, camera_info, background_color, background_d
 	validDepth = np.ravel_multi_index(np.where(validDepth==1), depth.shape)
 	valid = np.intersect1d(validDepth, validPix)
 	gridMapping_depth = gridMapping[:, valid]
+	gridMapping_depth[gridMapping_depth<0.0] = 0.0
 	ind_depth = np.array([gridMapping_depth[1, :].astype(int), gridMapping_depth[0, :].astype(int)])
 	heightMap[np.ravel_multi_index(ind_depth, (200, 300))] = gridMapping_depth[2, :]
 	# Find missing depth and project background depth into camera space
