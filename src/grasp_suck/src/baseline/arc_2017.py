@@ -35,11 +35,15 @@ class Process(object):
 		self.depth_topic = args.depth_topic
 		self.episode = args.episode
 		self.run = args.run
+		self.num_objs = args.num_objs
 		self.save_root = self.file_path + "/exp_2/ep{}_run{}".format(self.episode, self.run)
 		self._create_directories()
 		self.suck_weight = 1.0
 		self.grasp_weight = 0.25
 		self.count = 0
+		self.last_iter_fail = None
+		self.last_fail_primitive = None
+		self.gripper_angle_list = [0, -45, -90, 45] # 0 1 2 3
 		self.bridge = CvBridge()
 		self.background_color = self.file_path + "/" + args.color_bg
 		self.background_depth = self.file_path + "/" + args.depth_bg
@@ -123,7 +127,8 @@ class Process(object):
 			predict = self.grasp_net.forward(color_tensor, depth_tensor)
 			grasp = predict.detach().cpu().numpy()[0, 1]
 			affordance = cv2.resize(grasp, dsize=(grasp.shape[1]*self.scale, grasp.shape[0]*self.scale))
-			affordance[depth_heightmap==0] = 0.0 # Background
+			affordance[rotated_depth_heightmap==0] = 0.0 # Background
+			# affordance[depth_heightmap==0] = 0.0 # Background
 			graspable[i, :, :] = affordance
 		return color_heightmap, depth_heightmap, graspable
 	# Start process, until workspace is empty
@@ -132,9 +137,11 @@ class Process(object):
 		self.action_wrapper.reset()
 		empty = False
 		iter_count = 0
+		valid_count = 0
+		grasped_count = 0
 		# Start recording
 		self.record_bag_client(recorderRequest(self.encode_index(self.episode, self.run)))
-		while empty is not True:
+		while empty is not True and iter_count<2*self.num_objs:
 			rospy.loginfo("Baseline method, iter: {}".format(iter_count))
 			# Get color and depth images
 			color_topic = rospy.wait_for_message(self.color_topic, Image)
@@ -148,6 +155,19 @@ class Process(object):
 			cv2.imwrite(self.save_paths[1]+"{:06}.png".format(iter_count), depth_img) # depth
 			cv2.imwrite(self.save_paths[2]+"{:06}.png".format(iter_count), color_heightmap) # color heightmap
 			cv2.imwrite(self.save_paths[3]+"{:06}.png".format(iter_count), depth_heightmap) # depth heightmap
+			# Last-fail punishment
+			if self.last_iter_fail:
+				if self.last_fail_primitive[0] == 0: # suction
+					y = self.last_fail_primitive[1]
+					x = self.last_fail_primitive[2]
+					z_cam = self.last_fail_primitive[3]
+					punish_mask = utils.create_mask(suckable.shape, y, x, 0.02, img_type="image", camera_info=self.camera_info, z=z_cam)
+					suckable = np.multiply(suckable, punish_mask)
+				else: # gripper
+					y = self.last_fail_primitive[1]
+					x = self.last_fail_primitive[2]
+					punish_mask = utils.create_mask(graspable[0].shape, y, x, 0.02, img_type="heightmap", voxel_size=self.voxel_size)
+					graspable[self.last_fail_primitive[0]-1] *= np.multiply(graspable[self.last_fail_primitive[0]-1], punish_mask)
 			suck_hm = utils.viz_affordance(suckable)
 			suck_combined = cv2.addWeighted(color_img, 0.8, suck_hm, 0.8, 0)
 			# Multiply by primitive weight
@@ -161,11 +181,18 @@ class Process(object):
 				grasp_hm = utils.viz_affordance(graspable[i])
 				grasp_combined = cv2.addWeighted(rotated_color_heightmap, 0.8, grasp_hm, 0.8, 0)
 				cv2.imwrite(self.save_paths[4]+"/grasp_{:06}_{}.png".format(iter_count, i), grasp_combined) # mixed
-				grasps_combined.append(grasp_combined)
+				grasps_combined.append(grasp_combined) # Stored rotated combined image
+				'''angle = np.degrees(np.pi/self.grasp_angle*i)
+				rotate_predict = utils.rotate_img(graspable[i], angle)
+				grasp_hm = utils.viz_affordance(rotate_predict)
+				grasp_combined = cv2.addWeighted(color_heightmap, 0.8, grasp_hm, 0.8, 0)
+				cv2.imwrite(self.save_paths[4]+"/grasp_{:06}_{}.png".format(iter_count, i), grasp_combined) # mixed
+				grasp_combined = utils.rotate_img(grasp_combined, -angle)
+				grasps_combined.append(grasp_combined)'''
 			# Get position
 			best_action = [np.max(suckable), np.max(graspable[0]), np.max(graspable[1]), np.max(graspable[2]), np.max(graspable[3])]
 			print "Action value: ", best_action
-			best_action_idx = np.where(best_action==np.max(best_action))[0]
+			best_action_idx = np.where(best_action==np.max(best_action))[0][0]
 			gripper_angle = 0
 			targetPt = np.zeros((3, 1))
 			static = np.array([[0.0, -1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, -1.0]])
@@ -188,48 +215,80 @@ class Process(object):
 				tool_id = 1
 				best_angle_idx = best_action_idx-1
 				angle = np.degrees(np.pi/self.grasp_angle*best_angle_idx)
-				gripper_angle = -angle
+				gripper_angle = self.gripper_angle_list[best_angle_idx]
 				rospy.loginfo("Use \033[1;31mparallel-jaw gripper with angle: {}\033[0m".format(gripper_angle))
 				binMiddleBottom = np.loadtxt(self.file_path+"/bin_pose.txt")
-				grasp_pixel = np.where(graspable[best_angle_idx]==np.max(graspable[best_angle_idx]))
+				rotate_predict = utils.rotate_img(graspable[best_angle_idx], angle)
+				grasp_pixel = np.where(rotate_predict==np.max(rotate_predict))
 				grasp_pixel = [grasp_pixel[1][0], grasp_pixel[0][0]] # x, y
 				u = grasp_pixel[0] - graspable[best_angle_idx].shape[0]/2
-				v = grasp_pixel[1] - graspable[best_angle_idx].shape[1]/2 
+				v = grasp_pixel[1] - graspable[best_angle_idx].shape[1]/2
+				print "u: {}, v: {}".format(u, v)
 				tempPt = np.zeros((3, 1))
 				# Position in fake link
 				tempPt[0] = binMiddleBottom[0] + u * self.voxel_size # X
 				tempPt[1] = binMiddleBottom[1] + v * self.voxel_size # Y
 				tempPt[2] = depth_heightmap[grasp_pixel[1], grasp_pixel[0]].astype(np.float32)/1000 # Z
 				targetPt = np.matmul(static, tempPt).reshape(3)
-				targetPt[2] = -targetPt[2] - binMiddleBottom[2]
-				action = utils.draw_action(grasps_combined[best_angle_idx], grasp_pixel, "grasp")
-				if angle!=0:
+				targetPt[2] = -targetPt[2] - binMiddleBottom[2] # Have no idea
+				gripper_center = np.where(graspable[best_angle_idx]==np.max(graspable[best_angle_idx]))
+				gripper_center = [gripper_center[1][0], gripper_center[0][0]]
+				action = utils.draw_action(grasps_combined[best_angle_idx], gripper_center, "grasp")
+				if angle!=0: # Then rotate back
 					action_rotate = utils.rotate_img(action, angle)
 				else: action_rotate = action
+				action_rotate[np.where(color_heightmap==np.array([0, 0, 0]))] = 0
 				cv2.imwrite(self.save_paths[6]+"action_{:06}.png".format(iter_count), action_rotate)
-				self.action_wrapper.get_pc(self.grasp_paths[5]+"{:06}_before.png".format(iter_count))
-				will_collide = self.action_wrapper.check_if_empty(self.grasp_paths[5]+"{:06}_before.pcd".format(iter_count))
+				self.action_wrapper.get_pc(self.save_paths[5]+"{:06}_before.png".format(iter_count))
+				will_collide = self.action_wrapper.check_if_collide(targetPt, np.radians(gripper_angle))
 			print "Target position: [{}, {}, {}]".format(targetPt[0], targetPt[1], targetPt[2])
-			if will_collide:
-				# TODO: add memory
-				rospy.logwarn("Will collide, abort action")
+			# Check if out of range
+			in_range = False
+			bin_range = np.loadtxt(self.file_path+"/bin_range.txt") # Range in `base_link` frame
+			if bin_range[0][0] < targetPt[0] < bin_range[0][1] and \
+			   bin_range[1][0] < targetPt[1] < bin_range[1][1] and \
+			   bin_range[2][0] < targetPt[2] < bin_range[2][1]:
+				in_range = True
+			if will_collide or not in_range:
+				self.last_iter_fail = True
+				if best_action_idx==0: self.last_fail_primitive = [best_action_idx, suck_pixel[1], suck_pixel[0], camPt[2]]
+				else: self.last_fail_primitive = [best_action_idx, grasp_pixel[1], grasp_pixel[0]]
+				if will_collide: rospy.logwarn("Will collide, abort action") 
+				if not in_range: rospy.logwarn("Out of range, abort action") 
+				iter_count += 1
 				continue
-			self.action_wrapper.take_action(tool_id, targetPt, np.radians(gripper_angle))
+			self.action_wrapper.take_action(tool_id, targetPt, np.radians(gripper_angle)) # execute action
+			valid_count += 1
 			action_success = self.action_wrapper.check_if_success(tool_id, self.save_paths[5]+"{:06}_check.pcd".format(iter_count))
 			self.action_wrapper.publish_data(iter_count, best_action_idx, action_success)
-			if not action_success:
-				pass
-				# TODO: add memory, reset
+			if not action_success: # fail
+				self.last_iter_fail = True
+				if best_action_idx==0: # suction fail
+					self.last_fail_primitive = [best_action_idx, suck_pixel[1], suck_pixel[0], camPt[2]] # suction, y, x (pixel), z (meter in camera coordinate)
+				else: # gripper fail
+					self.last_fail_primitive = [best_action_idx, grasp_pixel[1], grasp_pixel[0]] # gripper, y, x (pixel)
 				rospy.loginfo("Action fail")
 				self.action_wrapper.reset()
-			else:
+			else: # success
+				grasped_count += 1
+				self.last_iter_fail = False
+				self.last_fail_primitive = []
 				rospy.loginfo("Action success")
 				self.action_wrapper.place()
 			self.action_wrapper.get_pc(self.save_paths[5]+"{:06}_after.pcd".format(iter_count))
 			empty = self.action_wrapper.check_if_empty(self.save_paths[5]+"{:06}_after.pcd".format(iter_count))
 			iter_count += 1
+			rospy.sleep(1.0)
 		self.stop_record_client()
+		self.last_iter_fail = None
+		self.last_fail_primitive = []
 		rospy.loginfo("Complete")
+		print("================================================")
+		print("Number of iterations: {}".format(iter_count))
+		print("Valid iterations: {}".format(valid_count))
+		print("Grasped objects: {}".format(grasped_count))
+		print("Pass test: {}".format(empty))
+		print("================================================")
 		
 		return EmptyResponse()
 	# Reset `self.episode`, `self.run` and create new save root
@@ -238,15 +297,14 @@ class Process(object):
 		rospy.loginfo("current run: \t{}".format(self.run))
 		new_episode = int(raw_input("Input new episode: "))
 		new_run = int(raw_input("Input new run: "))
-		if new_episode == self.episode and new_run == self.run:
-			rospy.loginfo("same value, abort request")
-			return EmptyResponse()
 		rospy.loginfo("episode set from {} to {}".format(self.episode, new_episode))
 		rospy.loginfo("run set from {} to {}".format(self.run, new_run))
 		self.episode = new_episode
 		self.run = new_run
 		self.save_root = self.file_path + "/exp_2/ep{}_run{}".format(self.episode, self.run)
 		self._create_directories()
+		self.last_iter_fail = None
+		self.last_fail_primitive = []
 		
 		return EmptyResponse()
 
@@ -255,6 +313,7 @@ def main():
 	parser.add_argument("episode", type=int, help="Which placing method is this test")
 	parser.add_argument("run", type=int, help="Which run is this test")
 	parser.add_argument("--n_classes", type=int, default=3, help="number of class for classification")
+	parser.add_argument("--num_objs", type=int, default=8, help="number of objects in the bin when start")
 	parser.add_argument("--scale", type=int, default=8, help="scale after prediction")
 	parser.add_argument("--grasp_angle", type=int, default=4, help="how many grasping angle needed")
 	parser.add_argument("--voxel_size", type=float, default=0.002, help="voxel size in meter for height map")

@@ -272,6 +272,7 @@ def bwareaopen(mask, P):
 	return res
 
 def draw_action(color_hm, pixel, primitive="suck"):
+	# @param pixel: in x, y order
 	res = copy.deepcopy(color_hm)
 	if primitive=="suck":
 		cv2.circle(res, tuple(pixel), 7, (0, 0, 0), 2)
@@ -296,7 +297,37 @@ def draw_affordance(prediction):
 	hm = cv2.applyColorMap(hm, cv2.COLORMAP_JET)
 	hm = cv2.GaussianBlur(hm, (29, 29), 7)
 	return hm
-		
+
+def create_mask(img_shape, y, x, radius, **kargs):
+	res = np.ones(img_shape, dtype=np.uint8)
+	if kargs['img_type'] == "heightmap":
+		voxel_size = kargs['voxel_size']
+		R = int(radius/voxel_size)
+		for i in range(-R, R+1):
+			for j in range(-R, R+1):
+				if y+i>=0 and y+i<img_shape[0] and \
+				   x+j>=0 and x+j<img_shape[1] and \
+				   (i*voxel_size)**2+(j*voxel_size)**2<=radius**2:
+					res[y+i, x+j] = 0
+	if kargs['img_type'] == "image":
+		ros_camera_info = kargs['camera_info']
+		z = kargs['z']
+		if z==0:
+			lx = ly = 10
+			dx = dy = 0.002
+		else:
+			dx = z/ros_camera_info.K[0]
+			dy = z/ros_camera_info.K[4]
+			lx = int(radius/dx)
+			ly = int(radius/dy)
+		for i in range(-ly, ly+1):
+			for j in range(-lx, lx+1):
+				if y+i>=0 and y+i<img_shape[0] and \
+				   x+j>=0 and x+j<img_shape[1] and \
+				   (i*dy)**2+(j*dx)**2<=radius**2:
+					res[y+i, x+j] = 0
+	return res
+ 
 class Net(nn.Module):
 	def __init__(self, n_classes):
 		super(Net, self).__init__()
