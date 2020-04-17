@@ -22,13 +22,12 @@ import utils
 from utils import Net
 from actionWrapper import ActionWrapper
 
-# TODO: add memory for action
-
 class Process(object):
 	def __init__(self, args):
 		self.file_path = os.path.dirname(os.path.abspath(__file__)) # current file path
 		self.use_cuda = args.use_cuda
 		self.scale = args.scale
+		self.dir = args.dir
 		self.grasp_angle = args.grasp_angle
 		self.voxel_size = args.voxel_size
 		self.color_topic = args.color_topic
@@ -36,7 +35,7 @@ class Process(object):
 		self.episode = args.episode
 		self.run = args.run
 		self.num_objs = args.num_objs
-		self.save_root = self.file_path + "/exp_2/ep{}_run{}".format(self.episode, self.run)
+		self.save_root = self.file_path + "/exp_2/{}/ep{}_run{}".format(self.dir, self.episode, self.run)
 		self._create_directories()
 		self.suck_weight = 1.0
 		self.grasp_weight = 0.25
@@ -139,6 +138,12 @@ class Process(object):
 		iter_count = 0
 		valid_count = 0
 		grasped_count = 0
+		primitive = [] # `best_action_idx` `pixel y` `pixel x`
+		position = [] # execution position in `base_link` frame
+		suck_fail = 0
+		grasp_fail = 0
+		suck_weight = self.suck_weight
+		grasp_weight = self.grasp_weight
 		# Start recording
 		self.record_bag_client(recorderRequest(self.encode_index(self.episode, self.run)))
 		while empty is not True and iter_count<2*self.num_objs:
@@ -155,7 +160,7 @@ class Process(object):
 			cv2.imwrite(self.save_paths[1]+"{:06}.png".format(iter_count), depth_img) # depth
 			cv2.imwrite(self.save_paths[2]+"{:06}.png".format(iter_count), color_heightmap) # color heightmap
 			cv2.imwrite(self.save_paths[3]+"{:06}.png".format(iter_count), depth_heightmap) # depth heightmap
-			# Last-fail punishment
+			# Last-fail punishment (From Appendix A. `Avoid repeating unsuccessful attempts`)
 			if self.last_iter_fail:
 				if self.last_fail_primitive[0] == 0: # suction
 					y = self.last_fail_primitive[1]
@@ -167,12 +172,18 @@ class Process(object):
 					y = self.last_fail_primitive[1]
 					x = self.last_fail_primitive[2]
 					punish_mask = utils.create_mask(graspable[0].shape, y, x, 0.02, img_type="heightmap", voxel_size=self.voxel_size)
-					graspable[self.last_fail_primitive[0]-1] *= np.multiply(graspable[self.last_fail_primitive[0]-1], punish_mask)
+					graspable[self.last_fail_primitive[0]-1] = np.multiply(graspable[self.last_fail_primitive[0]-1], punish_mask)
+			# Prevent unsuccessful grasping with same primitive (From Appendix A. `Encouraging exploration upon repeat failure`)
+			if suck_fail==2: suck_weight = 0.5*self.suck_weight
+			elif suck_fail>=3: suck_weight = 0.25*self.suck_weight
+			if grasp_fail==2: grasp_weight = 0.5*self.grasp_weight
+			elif grasp_fail>=3: grasp_weight = 0.25*self.grasp_weight
+			rospy.loginfo("suck weight: {}\tgrasp weight: {}".format(suck_weight, grasp_weight))
+			# Multiply by primitive weight (From Appendix A. `Suction first, grasp later.`)
+			suckable *= suck_weight
+			graspable *= grasp_weight
 			suck_hm = utils.viz_affordance(suckable)
 			suck_combined = cv2.addWeighted(color_img, 0.8, suck_hm, 0.8, 0)
-			# Multiply by primitive weight
-			suckable *= self.suck_weight
-			graspable *= self.grasp_weight
 			cv2.imwrite(self.save_paths[4]+"suck_{:06}.png".format(iter_count), suck_combined) # mixed
 			grasps_combined = []
 			for i in range(self.grasp_angle):
@@ -189,7 +200,7 @@ class Process(object):
 				cv2.imwrite(self.save_paths[4]+"/grasp_{:06}_{}.png".format(iter_count, i), grasp_combined) # mixed
 				grasp_combined = utils.rotate_img(grasp_combined, -angle)
 				grasps_combined.append(grasp_combined)'''
-			# Get position
+			# Select action and get position
 			best_action = [np.max(suckable), np.max(graspable[0]), np.max(graspable[1]), np.max(graspable[2]), np.max(graspable[3])]
 			print "Action value: ", best_action
 			best_action_idx = np.where(best_action==np.max(best_action))[0][0]
@@ -202,6 +213,7 @@ class Process(object):
 				rospy.loginfo("Use \033[1;31msuction\033[0m")
 				suck_pixel = np.where(suckable==np.max(suckable))
 				suck_pixel = [suck_pixel[1][0], suck_pixel[0][0]] # x, y
+				primitive.append([best_action_idx, suck_pixel[1], suck_pixel[0]])
 				cam_z = (depth_img[suck_pixel[1], suck_pixel[0]]).astype(np.float32)/1000
 				cam_x = (suck_pixel[0]-self.camera_info.K[2])*cam_z/self.camera_info.K[0]
 				cam_y = (suck_pixel[1]-self.camera_info.K[5])*cam_z/self.camera_info.K[4]
@@ -221,9 +233,9 @@ class Process(object):
 				rotate_predict = utils.rotate_img(graspable[best_angle_idx], angle)
 				grasp_pixel = np.where(rotate_predict==np.max(rotate_predict))
 				grasp_pixel = [grasp_pixel[1][0], grasp_pixel[0][0]] # x, y
+				primitive.append([best_action_idx, grasp_pixel[1], grasp_pixel[0]])
 				u = grasp_pixel[0] - graspable[best_angle_idx].shape[0]/2
 				v = grasp_pixel[1] - graspable[best_angle_idx].shape[1]/2
-				print "u: {}, v: {}".format(u, v)
 				tempPt = np.zeros((3, 1))
 				# Position in fake link
 				tempPt[0] = binMiddleBottom[0] + u * self.voxel_size # X
@@ -242,6 +254,7 @@ class Process(object):
 				self.action_wrapper.get_pc(self.save_paths[5]+"{:06}_before.png".format(iter_count))
 				will_collide = self.action_wrapper.check_if_collide(targetPt, np.radians(gripper_angle))
 			print "Target position: [{}, {}, {}]".format(targetPt[0], targetPt[1], targetPt[2])
+			position.append(targetPt)
 			# Check if out of range
 			in_range = False
 			bin_range = np.loadtxt(self.file_path+"/bin_range.txt") # Range in `base_link` frame
@@ -256,6 +269,8 @@ class Process(object):
 				if will_collide: rospy.logwarn("Will collide, abort action") 
 				if not in_range: rospy.logwarn("Out of range, abort action") 
 				iter_count += 1
+				if best_action_idx==0: suction_fail+=1 
+				if best_action_idx!=0: grasp_fail+=1
 				continue
 			self.action_wrapper.take_action(tool_id, targetPt, np.radians(gripper_angle)) # execute action
 			valid_count += 1
@@ -265,12 +280,18 @@ class Process(object):
 				self.last_iter_fail = True
 				if best_action_idx==0: # suction fail
 					self.last_fail_primitive = [best_action_idx, suck_pixel[1], suck_pixel[0], camPt[2]] # suction, y, x (pixel), z (meter in camera coordinate)
+					suck_fail+=1
 				else: # gripper fail
-					self.last_fail_primitive = [best_action_idx, grasp_pixel[1], grasp_pixel[0]] # gripper, y, x (pixel)
+					self.last_fail_primitive = [best_action_idx, gripper_center[1], gripper_center[0]] # gripper, y, x (pixel)
+					grasp_fail+=1
 				rospy.loginfo("Action fail")
 				self.action_wrapper.reset()
+				rospy.sleep(1.0)
 			else: # success
 				grasped_count += 1
+				suck_fail = grasp_fail = 0
+				suck_weight = self.suck_weight
+				grasp_weight = self.grasp_weight
 				self.last_iter_fail = False
 				self.last_fail_primitive = []
 				rospy.loginfo("Action success")
@@ -289,6 +310,14 @@ class Process(object):
 		print("Grasped objects: {}".format(grasped_count))
 		print("Pass test: {}".format(empty))
 		print("================================================")
+		f = open(self.save_root+"/{}.txt".format(self.encode_index(self.episode, self.run)), 'w')
+		f.write("Number of iterations: {}\n".format(iter_count))
+		f.write("Valid iterations: {}\n".format(valid_count))
+		f.write("Grasped objects: {}\n".format(grasped_count))
+		f.write("Pass test: {}\n".format(empty))
+		f.close()
+		np.savetxt(self.save_root+"/position.csv", position, delimiter=",")
+		np.savetxt(self.save_root+"/action_target.csv", primitive, delimiter=",")
 		
 		return EmptyResponse()
 	# Reset `self.episode`, `self.run` and create new save root
@@ -301,7 +330,7 @@ class Process(object):
 		rospy.loginfo("run set from {} to {}".format(self.run, new_run))
 		self.episode = new_episode
 		self.run = new_run
-		self.save_root = self.file_path + "/exp_2/ep{}_run{}".format(self.episode, self.run)
+		self.save_root = self.file_path + "/exp_2/{}/ep{}_run{}".format(self.dir, self.episode, self.run)
 		self._create_directories()
 		self.last_iter_fail = None
 		self.last_fail_primitive = []
@@ -310,6 +339,7 @@ class Process(object):
 
 def main():
 	parser = argparse.ArgumentParser(prog="baseline", description="method from arc2017 MIT-Princeton method")
+	parser.add_argument("dir", type=str, help="|known|novel|hybrid")
 	parser.add_argument("episode", type=int, help="Which placing method is this test")
 	parser.add_argument("run", type=int, help="Which run is this test")
 	parser.add_argument("--n_classes", type=int, default=3, help="number of class for classification")

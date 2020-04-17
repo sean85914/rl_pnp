@@ -13,7 +13,7 @@ bool PointSetRegistration::parse_file(const std::string file){
   // Get number of data
   while(std::getline(f, line)) {
     if(!line.empty()) ++count; 
-    else printf("\033[1;33mGit empty line, ignore...\033[0m\n");
+    else printf("\033[1;33mGot empty line, ignore...\033[0m\n");
   }
   if(count<MIN_DATA){
     printf("\033[1;31mNot enough data points, at least four is required! Existing...\033[0m\n");
