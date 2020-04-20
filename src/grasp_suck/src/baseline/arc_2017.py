@@ -72,6 +72,7 @@ class Process(object):
 		rospy.loginfo("Load complete, time elasped: {}".format(time.time()-load_ts))
 		rospy.loginfo("current episode: \t{}".format(self.episode))
 		rospy.loginfo("current run: \t{}".format(self.run))
+		rospy.loginfo("current code: \t{}".format(self.encode_index(self.episode, self.run)))
 		rospy.loginfo("Service ready")
 	# encode recording index
 	def encode_index(self, episode, run):
@@ -269,8 +270,9 @@ class Process(object):
 				if will_collide: rospy.logwarn("Will collide, abort action") 
 				if not in_range: rospy.logwarn("Out of range, abort action") 
 				iter_count += 1
-				if best_action_idx==0: suction_fail+=1 
+				if best_action_idx==0: suck_fail+=1 
 				if best_action_idx!=0: grasp_fail+=1
+				self.action_wrapper.publish_data(iter_count, -1, False)
 				continue
 			self.action_wrapper.take_action(tool_id, targetPt, np.radians(gripper_angle)) # execute action
 			valid_count += 1
@@ -330,6 +332,7 @@ class Process(object):
 		rospy.loginfo("run set from {} to {}".format(self.run, new_run))
 		self.episode = new_episode
 		self.run = new_run
+		rospy.loginfo("current code: \t{}".format(self.encode_index(self.episode, self.run)))
 		self.save_root = self.file_path + "/exp_2/{}/ep{}_run{}".format(self.dir, self.episode, self.run)
 		self._create_directories()
 		self.last_iter_fail = None

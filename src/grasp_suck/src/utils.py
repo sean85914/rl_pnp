@@ -358,7 +358,9 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 
 # Choose action using greedy policy
 def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction, specific_tool=None):
-	print np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction[0]), np.max(grasp_prediction[1]), np.max(grasp_prediction[2]), np.max(grasp_prediction[3])
+	grasp_scale = 4./5
+	suck_2_scale = 6./5
+	print np.max(suck_1_prediction), np.max(suck_2_prediction)*suck_2_scale, np.max(grasp_prediction[0])*grasp_scale, np.max(grasp_prediction[1])*grasp_scale, np.max(grasp_prediction[2])*grasp_scale, np.max(grasp_prediction[3])*grasp_scale
 	action = 0
 	action_str = 'suck_1'
 	angle = 0
@@ -366,7 +368,7 @@ def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction, specif
 	if specific_tool is not None:
 		max_q_index = specific_tool
 	else:
-		primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction), np.max(grasp_prediction)/2]
+		primitives_max = [np.max(suck_1_prediction), np.max(suck_2_prediction)*suck_2_scale, np.max(grasp_prediction)*grasp_scale]
 		max_q_index = np.where(primitives_max==np.max(primitives_max))[0][0]
 	if max_q_index == 0: # suck_1
 		tmp = np.where(suck_1_prediction == np.max(suck_1_prediction))
