@@ -3,6 +3,7 @@
 #include <chrono>
 #include <queue>
 #include <thread>
+#include <utility>
 // Boost
 #include <boost/foreach.hpp>
 #include <boost/thread.hpp>
@@ -22,17 +23,45 @@
 
 bool read_complete = false;
 int width, height;
-double fps;
+double speed = 1.0, fps;
 std::string out_name;
 
+typedef std::pair<cv::Mat, std::string> data_pair;
 
-void write_video(std::queue<cv::Mat> &data_vec){
+void write_video(/*std::queue<cv::Mat>*/std::queue<data_pair> &data_vec){
   while(data_vec.empty()){} // Wait until data in the queue
   cv::VideoWriter video(out_name, CV_FOURCC('H', '2', '6', '4'), fps, cv::Size(width, height));
   while(true){
     if(read_complete and data_vec.empty()) break; // Stop
     if(data_vec.empty()) continue; // Consume too fast
-    video << data_vec.front();
+    /*video << data_vec.front().first;
+    data_vec.pop();
+    if(read_complete){
+      std::cout << "\r" << data_vec.size() << " images remaining...";
+    }*/
+    // Write time
+    cv::Mat raw_img = data_vec.front().first, img_with_time;
+    raw_img.copyTo(img_with_time);
+    std::string time_str = data_vec.front().second;
+    int baseline;
+    cv::Size size = cv::getTextSize(time_str, cv::FONT_HERSHEY_PLAIN, 1.0, 2, &baseline);
+    cv::putText(img_with_time, time_str, \
+                cv::Point(width-size.width, size.height), \
+                cv::FONT_HERSHEY_PLAIN, 1.0, \
+                cv::Scalar(255, 255, 255), 
+                2);
+    // Write speed
+    if(speed!=1.0){ // Only write if not 1X speed
+      std::string speed_str;
+      speed_str = std::to_string((int)speed) + "X";
+      cv::Size speed_size = cv::getTextSize(speed_str, cv::FONT_HERSHEY_PLAIN, 2.0, 2, &baseline);
+      cv::putText(img_with_time, speed_str, \
+                cv::Point(width-speed_size.width, size.height+speed_size.height+10),  // Poisition, 10 for Y-margin
+                cv::FONT_HERSHEY_PLAIN, 2.0,  // Font & size
+                cv::Scalar(255, 255, 255),  // Color
+                2); // Thickness
+    }
+    video << img_with_time;
     data_vec.pop();
     if(read_complete){
       std::cout << "\r" << data_vec.size() << " images remaining...";
@@ -40,11 +69,18 @@ void write_video(std::queue<cv::Mat> &data_vec){
   }
 }
 
+std::string unix_time2str(ros::Time time){
+  time_t ts = time.sec;
+  char buf[1024] = "";
+  struct tm* tms = localtime(&ts);
+  strftime(buf, 1024, "%Y/%m/%d %H:%M:%S", tms);
+  return std::string(buf);
+}
+
 int main(int argc, char** argv)
 {
   // Parse input argument
   bool has_data = false, is_compressed;
-  double speed = 1.0;
   std::string topic_name="";
   if(argc<3){
     std::cout << "\033[1;31mInsufficient input arguments\n\
@@ -77,7 +113,8 @@ Usage: ./bag_to_video bag_name output_video_name [speed]\n\033[0m";
   }
   rosbag::View view(bag);
   cv_bridge::CvImagePtr cv_bridge_ptr;
-  std::queue<cv::Mat> data_queue;
+  //std::queue<cv::Mat> data_queue;
+  std::queue<data_pair> data_queue;
   double bag_duration = (view.getEndTime() - view.getBeginTime()).toSec();
   std::cout << "Bag duration: " << bag_duration << " seconds\n";
   std::cout << "Converting...\n";
@@ -85,7 +122,7 @@ Usage: ./bag_to_video bag_name output_video_name [speed]\n\033[0m";
   std::thread writing_thread(write_video, std::ref(data_queue));
   // Start reading
   auto s_ts = std::chrono::high_resolution_clock::now();
-  // Counting number of images
+  // First pass: Counting number of images
   int img_cnt = 0;
   foreach(const rosbag::MessageInstance m, view){
     if(m.getDataType()=="sensor_msgs/Image" or \
@@ -155,7 +192,9 @@ Usage: ./bag_to_video bag_name output_video_name [speed]\n\033[0m";
         cv::cvtColor(cv_bridge_ptr->image, img, CV_RGB2BGR);
       }
       printf("\r[%05.1f%%]", read_ratio*100);
-      data_queue.push(img);
+      data_pair data = std::make_pair(img, unix_time2str(m.getTime()));
+      data_queue.push(data);
+      //data_queue.push(img);
     }
   }
   read_complete = true;
