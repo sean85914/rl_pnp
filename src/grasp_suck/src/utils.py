@@ -358,9 +358,10 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 
 # Choose action using greedy policy
 def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction, specific_tool=None):
-	grasp_scale = 4./5
-	suck_2_scale = 6./5
-	print np.max(suck_1_prediction), np.max(suck_2_prediction)*suck_2_scale, np.max(grasp_prediction[0])*grasp_scale, np.max(grasp_prediction[1])*grasp_scale, np.max(grasp_prediction[2])*grasp_scale, np.max(grasp_prediction[3])*grasp_scale
+	grasp_scale = 3./10
+	suck_1_scale = 11./10
+	suck_2_scale = 7./10
+	print np.max(suck_1_prediction)*suck_1_scale, np.max(suck_2_prediction)*suck_2_scale, np.max(grasp_prediction[0])*grasp_scale, np.max(grasp_prediction[1])*grasp_scale, np.max(grasp_prediction[2])*grasp_scale, np.max(grasp_prediction[3])*grasp_scale
 	action = 0
 	action_str = 'suck_1'
 	angle = 0

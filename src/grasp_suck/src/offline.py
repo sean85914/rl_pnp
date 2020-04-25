@@ -7,35 +7,38 @@ from trainer import Trainer
 from prioritized_memory import Memory
 import utils
 
-memory_capacity = 1500
+memory_capacity = [400, 200, 200]
 reward = 5.0
 discount_factor = 0.5
 mini_batch_size = 10
-copy_target_net = 100
-train_iter = 1000
-save_freq = 10
+copy_target_net = 6
+train_iter = 30
+save_freq = 5
+save_root = "models_with_novel_422_batch_{}".format(mini_batch_size)
+primitive_lr = 2.5e-4
+dexnet_lr = 5e-5
 
-suction_1_sampled = np.zeros(memory_capacity)
-suction_2_sampled = np.zeros(memory_capacity)
-gripper_sampled = np.zeros(memory_capacity)
+suction_1_sampled = np.zeros(memory_capacity[0])
+suction_2_sampled = np.zeros(memory_capacity[1])
+gripper_sampled = np.zeros(memory_capacity[2])
 #model_str  = "../training/logger_010/models/10_121.pth"
 model_str = "evaluate_model/600.pth"
 
-suction_1_memory = Memory(memory_capacity)
-suction_2_memory = Memory(memory_capacity)
-gripper_memory   = Memory(memory_capacity)
-suction_1_memory.load_memory("suction_1_augment.pkl")
-suction_2_memory.load_memory("suction_2_augment.pkl")
-gripper_memory.load_memory("gripper_augment.pkl")
-suction_1_memory.tree.reset_priority()
-suction_2_memory.tree.reset_priority()
-gripper_memory.tree.reset_priority()
+suction_1_memory = Memory(memory_capacity[0])
+suction_2_memory = Memory(memory_capacity[1])
+gripper_memory   = Memory(memory_capacity[2])
+suction_1_memory.load_memory("suction_1_mixed_400.pkl")
+suction_2_memory.load_memory("suction_2_mixed_200.pkl")
+gripper_memory.load_memory("gripper_mixed_200.pkl")
+#suction_1_memory.tree.reset_priority()
+#suction_2_memory.tree.reset_priority()
+#gripper_memory.tree.reset_priority()
 
 compare_color = "../training/logger_009/images/color_000005.jpg"
 compare_depth = "../training/logger_009/depth_data/depth_data_000005.npy"
 
 def create_path():
-	cwd = os.getcwd() + "/models"
+	cwd = os.getcwd() + "/" + save_root
 	if not os.path.exists(cwd):
 		os.makedirs(cwd)
 	primitives = ['suck_1/', 'suck_2/', 'grasp_0/', 'grasp_1/', 'grasp_2/', 'grasp_3/']
@@ -70,7 +73,7 @@ def load_and_predict(logger_idx, iter_idx):
 	print "Grasp 45 max: {} @({}, {})".format(np.max(grasp_prediction[3]), best[0][0], best[1][0])
 	
 feat_path, mixed_path = create_path()
-trainer = Trainer(reward, discount_factor, False, 5e-4, 1e-4)
+trainer = Trainer(reward, discount_factor, False, primitive_lr, dexnet_lr)
 #torch.save(trainer.behavior_net.state_dict(), "models/initial.pth") # From scratch
 trainer.behavior_net.load_state_dict(torch.load(model_str))
 trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
@@ -80,9 +83,9 @@ def train():
 		ts = time.time()
 		print "[{}%]".format(i/float(train_iter)*100)
 		mini_batch = []; idxs = []; is_weight = []; old_q = []
-		_mini_batch, _idxs, _is_weight = utils.sample_data(suction_1_memory, mini_batch_size); mini_batch += _mini_batch; idxs += _idxs; is_weight += list(_is_weight); tmp = [idx-memory_capacity-1 for idx in _idxs]; suction_1_sampled[tmp] += 1
-		_mini_batch, _idxs, _is_weight = utils.sample_data(suction_2_memory, mini_batch_size); mini_batch += _mini_batch; idxs += _idxs; is_weight += list(_is_weight); tmp = [idx-memory_capacity-1 for idx in _idxs]; suction_2_sampled[tmp] += 1
-		_mini_batch, _idxs, _is_weight = utils.sample_data(gripper_memory, mini_batch_size);   mini_batch += _mini_batch; idxs += _idxs; is_weight += list(_is_weight); tmp = [idx-memory_capacity-1 for idx in _idxs]; gripper_sampled[tmp] += 1
+		_mini_batch, _idxs, _is_weight = utils.sample_data(suction_1_memory, mini_batch_size); mini_batch += _mini_batch; idxs += _idxs; is_weight += list(_is_weight); tmp = [idx-memory_capacity[0]-1 for idx in _idxs]; suction_1_sampled[tmp] += 1
+		_mini_batch, _idxs, _is_weight = utils.sample_data(suction_2_memory, mini_batch_size); mini_batch += _mini_batch; idxs += _idxs; is_weight += list(_is_weight); tmp = [idx-memory_capacity[1]-1 for idx in _idxs]; suction_2_sampled[tmp] += 1
+		_mini_batch, _idxs, _is_weight = utils.sample_data(gripper_memory, mini_batch_size);   mini_batch += _mini_batch; idxs += _idxs; is_weight += list(_is_weight); tmp = [idx-memory_capacity[2]-1 for idx in _idxs]; gripper_sampled[tmp] += 1
 		for j in range(len(mini_batch)):
 			color = cv2.imread(mini_batch[j].color)
 			depth = np.load(mini_batch[j].depth)
@@ -111,14 +114,14 @@ def train():
 			#print "Q value: {} -> {}| TD target: {}".format(old_q[j], new_value, td_target)
 		if (i+1)%save_freq==0:
 			print "Save model"
-			torch.save(trainer.behavior_net.state_dict(), "models/{}.pth".format(i+1))
+			torch.save(trainer.behavior_net.state_dict(), save_root+"/{}.pth".format(i+1))
 			color = cv2.imread(compare_color)
 			depth = np.load(compare_depth)
 			suck_1_prediction, suck_2_prediction, grasp_prediction = trainer.forward(color, depth, is_volatile=True)
 			heatmaps, mixed_imgs = utils.save_heatmap_and_mixed(suck_1_prediction, suck_2_prediction, grasp_prediction, feat_path, mixed_path, color, i+1)
-			np.savetxt("models/suction_1_sampled.csv", suction_1_sampled, delimiter=",")
-			np.savetxt("models/suction_2_sampled.csv", suction_2_sampled, delimiter=",")
-			np.savetxt("models/gripper_sampled.csv", gripper_sampled, delimiter=",")
+			np.savetxt(save_root+"/suction_1_sampled.csv", suction_1_sampled, delimiter=",")
+			np.savetxt(save_root+"/suction_2_sampled.csv", suction_2_sampled, delimiter=",")
+			np.savetxt(save_root+"/gripper_sampled.csv", gripper_sampled, delimiter=",")
 		if (i+1)%copy_target_net==0:
 			trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
 		print "Took {} seconds".format(time.time()-ts)

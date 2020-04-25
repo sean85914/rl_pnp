@@ -537,6 +537,7 @@ bool AgentServer::placeCB(std_srvs::Empty::Request  &req,
     set_joints.request.position.assign(middle_joints.begin(), middle_joints.end());
     joint_6_coterminal(set_joints);
     set_joints_client.call(set_joints);
+    ros::Duration(0.5).sleep();
   }
   _home();
   // Speed to original one

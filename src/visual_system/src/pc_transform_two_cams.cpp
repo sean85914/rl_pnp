@@ -184,7 +184,46 @@ void callback(const sensor_msgs::PointCloud2::ConstPtr msg){
 
 bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::pc_is_empty::Response &res)
 {
-  
+  bool empty_request = false;
+  pcl::PointCloud<pcl::PointXYZRGB> pc;
+  if(req.pcd_file.empty() and req.input_pc.header.frame_id.empty()){ // Empty request
+    empty_request = true;
+    ROS_INFO("Dry test");
+    // TODO: simplify the code
+    pcl::PointCloud<pcl::PointXYZRGB> pc_cam1_vg, pc_cam2_vg;
+    if(down_sample){
+      vg.setInputCloud(pc_cam1.makeShared());
+      vg.filter(pc_cam1_vg);
+      if(use_two_cam){
+        vg.setInputCloud(pc_cam2.makeShared());
+        vg.filter(pc_cam2_vg);
+      }
+    }else{
+      pc_cam1_vg = pc_cam1;
+      pc_cam2_vg = pc_cam2;
+    }
+    std::thread thread_arr[thread_num*(use_two_cam?2:1)];
+    for(int i=0; i<thread_num; ++i){
+      std::vector<int> indices;
+      int size = pc_cam1_vg.points.size();
+      for(int j=size/thread_num*i; j<size/thread_num*(i+1); ++j){
+        indices.push_back(j);
+      }
+      pcl::PointCloud<pcl::PointXYZRGB> sub_pc(pc_cam1_vg, indices);
+      thread_arr[i] = std::thread(workers, i, sub_pc);
+      if(use_two_cam){
+        pcl::PointCloud<pcl::PointXYZRGB> sub_pc_2(pc_cam2_vg, indices);
+        thread_arr[thread_num+i] = std::thread(workers, thread_num+i, sub_pc);
+      }
+    }
+    pcl::PointCloud<pcl::PointXYZRGB> pc_in_range;
+    for(int i=0; i<thread_num*(use_two_cam?2:1); ++i){
+      thread_arr[i].join();
+      if(global_vec[i].size()>0)
+        pc_in_range += global_vec[i];
+    }
+    pc = pcl::PointCloud<pcl::PointXYZRGB>(pc_in_range);
+  } // end if(req.pcd_file.empty() and req.input_pc.header.frame_id.empty())
   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients ());
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices ());
   pcl::SACSegmentation<pcl::PointXYZRGB> seg;
@@ -192,10 +231,9 @@ bool callback_is_empty(visual_system::pc_is_empty::Request &req, visual_system::
   seg.setModelType(pcl::SACMODEL_PLANE);
   seg.setMethodType(pcl::SAC_RANSAC);
   seg.setDistanceThreshold(0.004f);
-  pcl::PointCloud<pcl::PointXYZRGB> pc;
-  if(req.pcd_file.empty()){
+  if(!empty_request and req.pcd_file.empty()){
     pcl::fromROSMsg(req.input_pc, pc);
-  }else{
+  }else if(!empty_request){
     if(pcl::io::loadPCDFile<pcl::PointXYZRGB>(req.pcd_file, pc)==-1){
       ROS_ERROR("Can't read given PCD file string, abort request");
       res.is_empty.data = false;
