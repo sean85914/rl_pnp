@@ -1,5 +1,5 @@
 {color_thres: 0.35, detect_x_lower: 0.8, detect_x_upper: 1.0, detect_y_lower: -0.42,
   detect_y_upper: -0.27, detect_z_lower: 0.14, detect_z_upper: 0.27, down_sample: false,
-  empty_thres: 0.95, factor: 0.75, resolution: 224, thres_point: 1500, use_two_cam: false,
+  empty_thres: 0.93, factor: 0.75, resolution: 224, thres_point: 1500, use_two_cam: false,
   verbose: true, x_lower: 0.72, x_upper: 1.02, y_lower: -0.54, y_upper: -0.24, z_lower: -0.1,
   z_upper: 0.2}

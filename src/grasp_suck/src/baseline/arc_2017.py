@@ -355,8 +355,8 @@ def main():
 	parser.add_argument("--grasp_model", type=str, default="graspnet.pth", help="grasp net model path")
 	parser.add_argument("--color_bg", type=str, default="color_background.jpg", help="color background path")
 	parser.add_argument("--depth_bg", type=str, default="depth_background.png", help="depth background path")
-	parser.add_argument("--color_topic", type=str, default="/camera1/color/image_raw")
-	parser.add_argument("--depth_topic", type=str, default="/camera1/aligned_depth_to_color/image_raw")
+	parser.add_argument("--color_topic", type=str, default="/camera1/color/image_raw", help="color topic name")
+	parser.add_argument("--depth_topic", type=str, default="/camera1/aligned_depth_to_color/image_raw", help="depth topic name")
 	args = parser.parse_args()
 	d = vars(args)
 	for key in d:
