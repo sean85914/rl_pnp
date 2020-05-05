@@ -62,4 +62,5 @@ add_dependencies(abb_node abb_node_gencpp)
 target_link_libraries(abb_node ${catkin_LIBRARIES} abb_comm matVec)                   
 
 add_executable(abb_logger src/abb_logger.cpp)
+add_dependencies(abb_logger abb_node_gencpp)
 target_link_libraries(abb_logger ${catkin_LIBRARIES}) 
