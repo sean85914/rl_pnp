@@ -1,0 +1,86 @@
+FROM nvidia/cudagl:9.0-devel-ubuntu16.04
+
+# Install ROS
+ENV ROS_DISTRO kinetic
+RUN apt-get update && apt-get install -y git sudo apt-utils vim udev lsb-release && echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list \
+&& apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654 \
+&& apt-get update \
+&& apt-get install -y ros-${ROS_DISTRO}-desktop-full \
+&& apt-get update \
+&& apt-get install -y python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential python-rosdep \
+&& rosdep init \
+&& rosdep update \
+&& rm -rf /var/lib/apt/lists/* \
+&& echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
+
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+ENV CMAKE_PREFIX_PATH /opt/ros/kinetic
+
+# Install librealsense2
+#&& cd /etc/udev/ && mkdir rules.d \
+RUN cd && git clone --branch v2.19.1 https://github.com/IntelRealSense/librealsense.git \
+&& cd librealsense \
+&& apt-get update && apt-get install -y git libssl-dev libusb-1.0.0-dev pkg-config libgtk-3-dev libglfw3-dev \ 
+&& cp config/99-realsense-libusb.rules /etc/udev/rules.d/ \
+#&& udevadm control --reload-rules && udevadm trigger \
+#&& ./scripts/patch-realsense-ubuntu-lts.sh \
+&& mkdir build && cd build \
+&& cmake ../ -DCMAKE_BUILD_TYPE=Release \
+&& make uninstall && make clean && make -j8 && make install
+
+# Install Serial
+RUN cd && git clone https://github.com/wjwwood/serial.git \
+&& apt-get install -y cmake python-catkin-pkg python-empy python-nose python-setuptools libgtest-dev build-essential ros-kinetic-catkin \
+&& cd serial && mkdir build && cd build && cmake ../ -DCMAKE_INSTALL_PREFIX=${CMAKE_PREFIX_PATH} && make && make install \
+&& rm -rf /var/lib/apt/lists/*
+
+# My workspace
+# Install needed packages and pip
+RUN apt-get update \ 
+&& apt-get install -y ros-kinetic-soem \
+ros-${ROS_DISTRO}-controller-manager \
+ros-${ROS_DISTRO}-socketcan-interface \
+ros-${ROS_DISTRO}-ur3-moveit-config \
+ros-${ROS_DISTRO}-ur5-moveit-config \
+ros-${ROS_DISTRO}-ur10-moveit-config \
+ros-${ROS_DISTRO}-moveit-planners-ompl \
+ros-${ROS_DISTRO}-ur-gazebo \
+ros-${ROS_DISTRO}-moveit-* \
+ros-${ROS_DISTRO}-ur3-e-moveit-config \
+ros-${ROS_DISTRO}-ur-e-gazebo \
+python-lxml \
+ros-${ROS_DISTRO}-create-description \
+libv4l-dev \
+ros-${ROS_DISTRO}-ur-* \
+ros-${ROS_DISTRO}-velocity-controllers \
+python-pymodbus \
+ros-${ROS_DISTRO}-ur10-e-moveit-config \
+ros-${ROS_DISTRO}-universal-robots \
+ros-${ROS_DISTRO}-joint-state-controller \
+ros-${ROS_DISTRO}-joint-trajectory-controller \
+ros-${ROS_DISTRO}-gazebo-ros-control \
+ros-${ROS_DISTRO}-ur-e-description \
+libopencv-dev \
+ros-${ROS_DISTRO}-kobuki-description \
+ros-${ROS_DISTRO}-force-torque-sensor-controller \
+ros-${ROS_DISTRO}-ddynamic-reconfigure \
+ros-${ROS_DISTRO}-industrial-msgs \
+ros-${ROS_DISTRO}-effort-controllers \
+ros-${ROS_DISTRO}-rgbd-launch \
+python-pip \
+&& pip install --upgrade pip==9.0.1 \
+&& rm -rf /var/lib/apt/lists/*
+
+RUN /bin/bash -c '. /opt/ros/kinetic/setup.bash && cd && git clone https://github.com/sean85914/rl_pnp.git && cd ~/rl_pnp && catkin_make' 
+
+RUN /bin/bash -c 'cd ~/rl_pnp && source devel/setup.bash'
+
+# Install pytorch
+# torch==1.0.1.post2
+# torchvision==0.2.2
+RUN apt-get update && apt-get install -y  \
+&& pip install torch==1.0.1.post2 && pip install torchvision==0.2.2
+
+WORKDIR /root/rl_pnp
+CMD ["/bin/bash"]
