@@ -72,15 +72,10 @@ python-pip \
 && pip install --upgrade pip==9.0.1 \
 && rm -rf /var/lib/apt/lists/*
 
-RUN /bin/bash -c '. /opt/ros/kinetic/setup.bash && cd && git clone https://github.com/sean85914/rl_pnp.git && cd ~/rl_pnp && catkin_make' 
-
-RUN /bin/bash -c 'cd ~/rl_pnp && source devel/setup.bash'
-
 # Install pytorch
 # torch==1.0.1.post2
 # torchvision==0.2.2
 RUN apt-get update && apt-get install -y  \
 && pip install torch==1.0.1.post2 && pip install torchvision==0.2.2
 
-WORKDIR /root/rl_pnp
 CMD ["/bin/bash"]
