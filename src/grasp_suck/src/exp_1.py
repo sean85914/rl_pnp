@@ -64,15 +64,16 @@ def prediction_process(args, action_queue, experience_queue, work, ready, can_pr
 			while experience_queue.empty() and not should_reset.value and work.value:
 				pass
 		if not experience_queue.empty():
-			print("[Prediction Thread] Got experience, updating network...")
 			transition = experience_queue.get()
-			color = cv2.imread(transition.color)
-			depth = np.load(transition.depth)
-			next_color = cv2.imread(transition.next_color)
-			next_depth = np.load(transition.next_depth)
-			pixel_index = transition.pixel_idx
-			td_target = trainer.get_label_value(transition.reward, next_color, next_depth, transition.is_empty, pixel_index[0])
-			trainer.backprop(color, depth, pixel_index, td_target, 1.0, 1, True, True)
+			if transition.reward!=reward: # on;y update if fail
+				print("[Prediction Thread] Got experience, updating network...")
+				color = cv2.imread(transition.color)
+				depth = np.load(transition.depth)
+				next_color = cv2.imread(transition.next_color)
+				next_depth = np.load(transition.next_depth)
+				pixel_index = transition.pixel_idx
+				td_target = trainer.get_label_value(transition.reward, next_color, next_depth, transition.is_empty, pixel_index[0])
+				trainer.backprop(color, depth, pixel_index, td_target, 1.0, 1, True, True)
 		if can_predict.value:
 			if first: first = False
 			print("[Prediction Thread] Start prediction")
@@ -125,7 +126,7 @@ def main():
 	parser.add_argument("run", type=int, help="Which number is this run")
 	parser.add_argument("episode", type=int, help="Which episode is this run")
 	parser.add_argument("specific_tool", type=int, help="only use specific tool? 0->small suction cup; 1->medium suction cup; 2->gripper; 3->all")
-	parser.add_argument("--obj_nums", type=int, default=8, help="Number of object, default is 6")
+	parser.add_argument("--obj_nums", type=int, default=8, help="Number of object, default is 8")
 	parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alram lamp, default is /dev/ttylight")
 	parser.add_argument("--densenet_lr", type=float, default=1e-5, help="Learning rate for feature extraction part, default is 1e-5")
 	parser.add_argument("--primitive_lr", type=float, default=5e-5, help="Learning rate for motion primitive subnetworks, default is 1e-4")
@@ -135,7 +136,10 @@ def main():
 	r = rospkg.RosPack()
 	package_path = r.get_path("grasp_suck")
 	root_path, image_path, depth_path, pc_path, vis_path, grasp_path, mixed_paths, feat_paths = create_directories(package_path, args.model_idx, args.episode, args.run, args.specific_tool)
-	arduino = serial.Serial(args.port, 115200)
+	connect_to_alarm = False
+	if args.port!="":
+		connect_to_alarm = True
+		arduino = serial.Serial(args.port, 115200)
 	reward = 5.0
 	discount_factor = 0.5
 	return_ = 0.0
@@ -181,7 +185,7 @@ def main():
 		record_bag_client(recorderRequest(encode_index(args.model_idx, args.episode, args.run, args.specific_tool))) # Start recording
 		while not is_empty and iteration.value<args.obj_nums*2:
 			print("\033[1;32m[{}] Iteration: {}\033[0m".format(time.time()-program_ts, iteration.value))
-			arduino.write("b 1000")
+			if connect_to_alarm: arduino.write("b 1000")
 			# Wait until there is action in the queue
 			while action_queue.empty():
 				pass
@@ -198,7 +202,7 @@ def main():
 				else:
 					print("[Main Thread] Will collide, abort request!")
 			else:
-				arduino.write("r 1000")
+				if connect_to_alarm: arduino.write("r 1000")
 				action_success = False
 			if is_valid:
 				if action_obj[0] < 2:
@@ -215,7 +219,8 @@ def main():
 			next_state_thread = mp.Process(target=get_next_state, args=(empty_state, iteration.value-1, (pick_item==args.obj_nums), pc_path, image_path, depth_path))
 			next_state_thread.start()
 			if action_success:
-				arduino.write("g 1000"); go_place(); fixed_home(); 
+				if connect_to_alarm: arduino.write("g 1000")
+				go_place(); fixed_home(); 
 			else:
 				fixed_home(); vacuum_pump_control(SetBoolRequest(False));
 			current_reward = utils.reward_judgement(reward, is_valid, action_success)

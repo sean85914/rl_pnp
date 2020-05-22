@@ -358,9 +358,9 @@ def epsilon_greedy_policy(epsilon, suck_1_prediction, suck_2_prediction, grasp_p
 
 # Choose action using greedy policy
 def greedy_policy(suck_1_prediction, suck_2_prediction, grasp_prediction, specific_tool=None):
-	grasp_scale = 3./10
-	suck_1_scale = 11./10
-	suck_2_scale = 7./10
+	grasp_scale = 0.9
+	suck_1_scale = 1.
+	suck_2_scale = 1.5
 	print np.max(suck_1_prediction)*suck_1_scale, np.max(suck_2_prediction)*suck_2_scale, np.max(grasp_prediction[0])*grasp_scale, np.max(grasp_prediction[1])*grasp_scale, np.max(grasp_prediction[2])*grasp_scale, np.max(grasp_prediction[3])*grasp_scale
 	action = 0
 	action_str = 'suck_1'
@@ -404,7 +404,6 @@ def create_argparser():
 	parser.add_argument("--is_testing", action="store_true", default=False, help="True if testing, default is false")
 	parser.add_argument("--force_cpu", action="store_true", default=False, help="True if using CPU, default is false")
 	parser.add_argument("--model", type=str, default="", help="If provided, continue training the model, or using this model for testing, 	default is empty srting")
-	parser.add_argument("--buffer_file", type=str, default="", help="If provided, will read the given file to construct the experience buffer, default is empty string")
 	parser.add_argument("--epsilon", type=float, default=0.5, help="Probability to choose random action, default is 0.5")
 	parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alram lamp, default is /dev/ttylight")
 	parser.add_argument("--buffer_size", type=int, default=1000, help="Experience buffer size, default is 500") # N
@@ -432,7 +431,6 @@ def parse_input(args):
 	testing = args.is_testing
 	use_cpu = args.force_cpu
 	model_str = args.model
-	buffer_str = args.buffer_file
 	run = args.run
 	epsilon = args.epsilon
 	run_episode = args.run_episode
@@ -448,7 +446,7 @@ def parse_input(args):
 	suction_1_memory = args.suction_1_memory
 	suction_2_memory = args.suction_2_memory
 	gripper_memory = args.gripper_memory
-	return testing, run, use_cpu, model_str, buffer_str, epsilon, port, \
+	return testing, run, use_cpu, model_str, epsilon, port, \
 	       buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr, specific_tool, suction_1_memory, suction_2_memory, gripper_memory
 
 def get_file_path(color_img_path_str):

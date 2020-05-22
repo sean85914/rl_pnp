@@ -4,7 +4,7 @@ from utils import Transition
 parser = utils.create_argparser()
 args = parser.parse_args()
 utils.show_args(args)
-testing, run, use_cpu, model_str, buffer_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr, specific_tool, suction_1_memory, suction_2_memory, gripper_memory = utils.parse_input(args)
+testing, run, use_cpu, model_str, epsilon, port, buffer_size, learning_freq, updating_freq, mini_batch_size, save_every, learning_rate, run_episode, densenet_lr, specific_tool, suction_1_memory, suction_2_memory, gripper_memory = utils.parse_input(args)
 
 import os
 import sys
