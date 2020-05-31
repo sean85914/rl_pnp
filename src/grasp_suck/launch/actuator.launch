@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+  <include file="$(find abb_node)/launch/abb_tf.launch"/>
+  <include file="$(find arm_operation)/launch/agent_action_server.launch"/>
+</launch>

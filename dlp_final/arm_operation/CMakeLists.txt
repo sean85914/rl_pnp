@@ -4,6 +4,13 @@ project(arm_operation)
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
 
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOMIC ON)
+
+SET (CMAKE_CXX_FLAGS "-fPIC")
+set (CMAKE_INCLUDE_CURRENT_DIR ON)
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -14,7 +21,6 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
   std_msgs
   sensor_msgs
   geometry_msgs
-  abb_node
   trajectory_msgs
   tf
   actionlib
@@ -22,6 +28,7 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
   message_generation
 )
 find_package(Eigen REQUIRED)
+find_package(Qt5 COMPONENTS Widgets Gui Core REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -59,16 +66,15 @@ find_package(Eigen REQUIRED)
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  execution.msg
+  joint_value.msg
 )
 
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
   target_pose.srv
-  change_tool.srv
-  agent_abb_action.srv
-  publish_info.srv
+  joint_pose.srv
+  getTCPPose.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -131,6 +137,8 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${Eigen_INCLUDE_DIRS}
+  ${Qt5Widgets_INCLUDE_DIRS}
+  ${Qt5Gui_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -213,10 +221,51 @@ install(DIRECTORY include/${PROJECT_NAME}/
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
-add_executable(change_tool_service src/change_tool_service.cpp)
-target_link_libraries(change_tool_service ${catkin_LIBRARIES})
-add_dependencies(change_tool_service ${catkin_EXPORTED_TARGETS})
+add_executable(ur5_control_server src/ur_control_server_node.cpp src/ur_control_server.cpp)
+add_dependencies(ur5_control_server ${catkin_EXPORTED_TARGETS} arm_operation_gencpp)
+target_link_libraries(ur5_control_server ${catkin_LIBRARIES} ur5_kin)
 
-add_executable(agent_server_node src/agent_server.cpp)
-target_link_libraries(agent_server_node ${catkin_LIBRARIES})
-add_dependencies(agent_server_node ${catkin_EXPORTED_TARGETS})
+add_executable(ur3_control_server src/ur_control_server_node.cpp src/ur_control_server.cpp)
+add_dependencies(ur3_control_server ${catkin_EXPORTED_TARGETS} arm_operation_gencpp)
+target_link_libraries(ur3_control_server ${catkin_LIBRARIES} ur3_kin)
+
+add_executable(get_current_pose src/get_current_pose.cpp)
+add_dependencies(get_current_pose ${catkin_EXPORTED_TARGETS} arm_operation_gencpp)
+target_link_libraries(get_current_pose ${catkin_LIBRARIES})
+
+add_executable(set_pose src/set_pose.cpp)
+add_dependencies(set_pose ${catkin_EXPORTED_TARGETS} arm_operation_gencpp)
+target_link_libraries(set_pose ${catkin_LIBRARIES})
+
+add_executable(ur3_ik_solver script/ur_ik_solver.cpp)
+target_link_libraries(ur3_ik_solver ${catkin_LIBRARIES} ur3_kin)
+
+add_executable(ur5_ik_solver script/ur_ik_solver.cpp)
+target_link_libraries(ur5_ik_solver ${catkin_LIBRARIES} ur5_kin)
+
+add_executable(tcp_transform_publisher src/tcp_transform_publisher.cpp)
+target_link_libraries(tcp_transform_publisher ${catkin_LIBRARIES})
+
+qt5_wrap_cpp(gui_SRC include/mainwindow.h)
+qt5_wrap_ui(gui_UI src/qt/mainwindow.ui)
+
+add_executable(ur5_ik_solver_ui
+  src/qt/mainwindow.cpp
+  src/qt/main.cpp
+  ${gui_SRC}
+  ${gui_UI}
+  src/ik_solver.hpp
+)
+qt5_use_modules(ur5_ik_solver_ui Widgets)
+target_link_libraries(ur5_ik_solver_ui ${catkin_LIBRARIES} ur5_kin)
+
+add_executable(ur3_ik_solver_ui
+  src/qt/mainwindow.cpp
+  src/qt/main.cpp
+  ${gui_SRC}
+  ${gui_UI}
+  src/ik_solver.hpp
+)
+qt5_use_modules(ur3_ik_solver_ui Widgets)
+target_link_libraries(ur3_ik_solver_ui ${catkin_LIBRARIES} ur3_kin)
+#target_link_libraries(ur5_ik_solver_ui ${Qt5Widgets_LIBRARIES} ${Qt5Gui_LIBRARIES})

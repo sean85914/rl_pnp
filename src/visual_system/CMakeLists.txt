@@ -23,13 +23,8 @@ find_package(OpenCV REQUIRED)
 
 add_service_files(
   FILES
-  target_pose.srv
-  barcode_detect.srv
-  get_xyz.srv
   get_pc.srv
   pc_is_empty.srv
-  check_valid.srv
-  get_surface_feature.srv
   check_grasp_success.srv
 )
 
@@ -56,29 +51,6 @@ install(DIRECTORY include/${PROJECT_NAME}/
   FILES_MATCHING PATTERN "*.h"
   PATTERN ".svn" EXCLUDE
 )
-
-add_library(helper src/helper.cpp)
-target_link_libraries(helper ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-
-add_executable(get_click_position src/get_click_position.cpp)
-target_link_libraries(get_click_position ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-
-add_executable(get_conveyor_plane src/get_conveyor_plane.cpp)
-target_link_libraries(get_conveyor_plane ${catkin_LIBRARIES})
-
-add_executable(get_target_pc src/get_target_pc.cpp)
-add_dependencies(get_target_pc visual_system_gencpp)
-target_link_libraries(get_target_pc ${catkin_LIBRARIES})
-
-add_executable(take_picture src/take_picture.cpp)
-target_link_libraries(take_picture ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-
-add_executable(save_all src/save_all.cpp)
-target_link_libraries(save_all ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-
-add_executable(pc_transform src/pc_transform.cpp)
-add_dependencies(pc_transform visual_system_gencpp)
-target_link_libraries(pc_transform ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} helper)
 
 add_executable(combine_pc_node src/pc_transform_two_cams.cpp)
 add_dependencies(combine_pc_node visual_system_gencpp)

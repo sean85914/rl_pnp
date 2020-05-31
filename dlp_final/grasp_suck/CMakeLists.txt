@@ -24,7 +24,8 @@ find_package(OpenCV REQUIRED)
 
 add_service_files(
   FILES
-  recorder.srv
+  get_pose.srv
+  get_result.srv
 )
 
 generate_messages(
@@ -47,10 +48,10 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}
 )
 
-add_executable(autonomous_recording src/autonomous_recording.cpp)
-add_dependencies(autonomous_recording grasp_suck_gencpp)
-target_link_libraries(autonomous_recording ${catkin_LIBRARIES})
+add_executable(helper_services src/helper_services.cpp)
+add_dependencies(helper_services ${catkin_EXPORTED_TARGETS} grasp_suck_gencpp arm_operation_gencpp)
+target_link_libraries(helper_services ${catkin_LIBRARIES})
 
-add_executable(bag_to_data src/bag_to_data.cpp)
-add_dependencies(bag_to_data grasp_suck_gencpp)
-target_link_libraries(bag_to_data ${catkin_LIBRARIES})
+add_executable(robotiq_gripper_control src/robotiq_gripper_control.cpp)
+add_dependencies(robotiq_gripper_control ${catkin_EXPORTED_TARGETS} robotiq_2f_gripper_control_gencpp)
+target_link_libraries(robotiq_gripper_control ${catkin_LIBRARIES})

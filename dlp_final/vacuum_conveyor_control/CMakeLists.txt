@@ -16,6 +16,11 @@ find_package(serial REQUIRED)
 set(rt_LIBRARIES rt)
 set(pthread_LIBRARIES pthread)
 
+add_service_files(
+  FILES
+  vacuum_control.srv
+)
+
 generate_messages(
   DEPENDENCIES
   std_msgs
@@ -30,6 +35,6 @@ catkin_package(
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-add_executable(vacuum_pump_control src/vacuum_pump_control.cpp)
-add_dependencies(vacuum_pump_control ${catkin_EXPORTED_TARGETS} vacuum_conveyor_control_gencpp)
-target_link_libraries(vacuum_pump_control ${catkin_LIBRARIES} ${serial_LIBRARIES} stdc++fs)
+add_executable(arduino_control src/vacuum_and_conveyor_control.cpp)
+add_dependencies(arduino_control ${catkin_EXPORTED_TARGETS} vacuum_conveyor_control_gencpp)
+target_link_libraries(arduino_control ${catkin_LIBRARIES} ${serial_LIBRARIES})

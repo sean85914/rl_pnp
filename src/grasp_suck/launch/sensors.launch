@@ -1,0 +1,37 @@
+<?xml version="1.0" ?>
+<launch>
+  <arg name="high_res_mode" default="true"/>
+  <arg name="serial_no"/>
+  <arg name="camera" default="camera1"/>
+  <arg name="tf_prefix" default="camera1"/>
+  <arg name="side_record" default="true"/>
+  <arg name="record_serial_no" default=""/>
+  <!-- Main camera -->
+  <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
+    <arg name="camera" value="$(arg camera)"/>
+    <arg name="tf_prefix" value="$(arg tf_prefix)"/>
+    <arg name="serial_no" value="$(arg serial_no)"/>
+    <arg name="depth_width" value="1280" if="$(arg high_res_mode)"/>
+    <arg name="depth_height" value="720" if="$(arg high_res_mode)"/>
+    <arg name="infra_width" value="1280" if="$(arg high_res_mode)"/>
+    <arg name="infra_height" value="720" if="$(arg high_res_mode)"/>
+    <arg name="color_width" value="1280" if="$(arg high_res_mode)"/>
+    <arg name="color_height" value="720" if="$(arg high_res_mode)"/>
+  </include>
+  <!-- Pointcloud conversion -->
+  <include file="$(find visual_system)/launch/combine_pc.launch"/>
+  <!-- Side-recording camera -->
+  <group if="$(arg side_record)">
+    <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+      <arg name="serial_no" value="$(arg record_serial_no)"/>
+      <arg name="camera" value="record"/>
+      <arg name="color_width" value="640"/>
+      <arg name="color_height" value="480"/>
+      <arg name="enable_depth" value="false"/>
+      <arg name="enable_infra1" value="false"/>
+      <arg name="enable_infra2" value="false"/>
+    </include>
+  </group>
+  <!-- Autonomous recording -->
+  <include file="$(find grasp_suck)/launch/autonomous_recording.launch"/>
+</launch>
