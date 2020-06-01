@@ -1,7 +1,7 @@
 # Abstract
 <p align="center">The increasing logistics work of E-commerce and cost for human labor come with a <b>great need for semi- to fully autonomous robotic picking task.</b> The Amazon Picking Challenge and the Amazon Robotics Challenge facilitate the developments of pick-and-place problems, commonly by the use of suction cup and parallel-jaw gripper. However, due to the diversity of object geometry, material, and weight, it is still challenging to successfully grasp all objects using single end effector. Existing affordance predictions were carried out by either human labelling or only learned for the geometry aspect of small unrealistic objects. This work mainly focus on <b>learning novel object bin-picking with proper tool selection for realistic objects with varieties of size, weight, geometry, and deformable objects.</b> A set of changeable pneumatic tool, including different types of suction cups and vacuum-based parallel-jaw gripper, is used for handling wide varieties of objects. The run-time tool selection is carried out by <b>model-free deep Q-learning that learns the mapping from a heightmap captured by a RGB-D camera to the action-value of each tool at each pixel.</b> The training data are collected with real robot system in a self-supervised fashion. We found the learnt policy trained from <b> 3,000 experiences collected in 18 hours</b> outperformed previous work by human labeled affordance. The grasping performance of novel objects were improved by a self-supervised finetune. All data are publicly available in RoboNet.
 <p align="center"><img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/motivation.png" width=830 height=250/>
-<p align="center"><img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/teaser.png" width=1185 height=435/>
+<p align="center"><img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/teaser.png"/>
 
 # Table of Contents
 1. [Hardware](#Hardware)
@@ -20,6 +20,7 @@
 | Tools from [XYZ Robotics](http://en.xyzrobotics.ai/)| <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/tools.png" width=299 height=159/> |
 
 ## How to Start <a name="Start"></a>
+### local
 ```
 $ cd && git clone https://github.com/sean85914/rl_pnp.git && cd rl_pnp && catkin_make
 $ source devel/setup.bash # do this every time you open a new terminal
@@ -28,6 +29,19 @@ $ source devel/setup.bash # do this every time you open a new terminal
 [Terminal 3] $ roslaunch grasp_suck sensors.launch serial_no:=[Camera Serial No.] side_record_no:=[Another Camera Serial No.]  
 [Terminal 4] $ roslaunch visualization viz.launch rviz:=true  
 [Terminal 5] $ roscd grasp_suck/src && python main.py [integer number]  
+```
+
+### docker
+For your convenience, we also provide docker image.  
+```
+$ cd && git clone https://github.com/sean85914/rl_pnp.git && cd rl_pnp
+$ bash docker_pull.sh
+$ bash docker_run.sh run && catkin_make && roscore
+$ bash docker_run.sh same # do this every time you open a new terminal
+[Terminal 1] $ roslaunch grasp_suck actuator.launch  
+[Terminal 2] $ roslaunch grasp_suck sensors.launch serial_no:=[Camera Serial No.] side_record_no:=[Another Camera Serial No.]  
+[Terminal 3] $ roslaunch visualization viz.launch rviz:=true  
+[Terminal 4] $ roscd grasp_suck/src && python main.py [integer number]  
 ```
 
 ## Launch <a name="Launch"></a>
@@ -39,13 +53,14 @@ $ source devel/setup.bash # do this every time you open a new terminal
 
 ## System Pipeline <a name="System"></a>
 <p align="center"> <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/system.png" width=730 height=413/> </p>
-The system consists three part:
+The system is consists of three part:
 
 1. <b>Environment Perception</b>: The agent retrieves pointcloud and convert to arm coordinate with calibrated extrinsic matrix. We then reproject the pointcloud in the pre-defined workspace to a top-down viewpoint heightmap, which includes both color and height information.
 2. <b>Network Prediction</b>: The heightmap then passes through a preprocessing procedure, feeds into a fully convolution neural network and get affordance prediction, which maps the heightmap to the Q-value of each tool.
 3. <b>Action Execution</b>: The agent selects the action among the predictions according to its policy (either <sub>&epsilon;-greedy</sub> or greedy policy) and executes the action and the envioronment will tell the agent whether it successfully grasp the object.
 
-
+Most of the behavior in this system are wrapped as ROS services and the main process can call them according to its need.  
+In following section we will introduce the function of each service.
 
 ## Services List <a name="Services"></a>
 
@@ -85,5 +100,8 @@ The system consists three part:
 
 ## Network <a name="Network"></a>
 * [Model Architecture](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/src/model_v2.py)
+![](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/network_architecture.png)
+<b> To get the affordance among different gripper yaw angle, we will rotate the image and feed into the network </b>
+![](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/gripper_orientation.png)
 * [Training](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/src/trainer.py)
 

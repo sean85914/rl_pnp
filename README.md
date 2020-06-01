@@ -1,10 +1,16 @@
 ## Hardwares
-
+| Hardware | Image |
+| :---: | :---: |
+| ABB IRB1660ID| <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/abb.jpg" width=222 height=296/>|
+| RealSense D435/415 <br> One required, one optinal | <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/d435.jpeg" width=237 height=105/> |
+| Vacuum Pumb <br> Should can be controlled by an Arduino and a valve| <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/vacuum_pump.png" width=244 height=186/> |
+| Tools from [XYZ Robotics](http://en.xyzrobotics.ai/)| <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/tools.png" width=299 height=159/> |
 
 ## Dependencies
 * [ROS kinetic](http://wiki.ros.org/kinetic/Installation/Ubuntu)
 * [librealsense2](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md)
 * [Serial](http://wjwwood.io/serial/)
+* Cuda with version either 9 or 10
 
 ## How to Start
 ```
