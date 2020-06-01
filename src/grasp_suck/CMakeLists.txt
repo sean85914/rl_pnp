@@ -49,7 +49,7 @@ include_directories(
 
 add_executable(autonomous_recording src/autonomous_recording.cpp)
 add_dependencies(autonomous_recording grasp_suck_gencpp)
-target_link_libraries(autonomous_recording ${catkin_LIBRARIES})
+target_link_libraries(autonomous_recording ${catkin_LIBRARIES} -lstdc++fs)
 
 add_executable(bag_to_data src/bag_to_data.cpp)
 add_dependencies(bag_to_data grasp_suck_gencpp)

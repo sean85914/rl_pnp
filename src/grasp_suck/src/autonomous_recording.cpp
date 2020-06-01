@@ -1,7 +1,11 @@
+// POSIX
+#include <pwd.h>
+#include <unistd.h>
 // STD
 #include <cstdio>
 #include <csignal>
 #include <thread>
+#include <experimental/filesystem>
 // ROS
 #include <ros/ros.h>
 #include <rosbag/bag.h>
@@ -20,6 +24,7 @@ std::string get_longest_common_substring(std::string str_1, std::string str_2){
   return res;
 }
 
+// Get relative path from `current_path` to `desired_path`
 std::string traverse_to_desired_dir(const std::string desired_path, const std::string current_path){
   std::string res="";
   std::string common = get_longest_common_substring(desired_path, current_path);
@@ -33,15 +38,29 @@ std::string traverse_to_desired_dir(const std::string desired_path, const std::s
   return res;
 }
 
+std::string getUserName(void){
+  struct passwd *pw;
+  uid_t uid;
+  uid = geteuid();
+  pw = getpwuid(uid);
+  if(pw){
+    return std::string(pw->pw_name);
+  } return std::string();
+}
+
 class Recording{
  public:
   Recording(pid_t pid, ros::NodeHandle nh, ros::NodeHandle pnh): 
     can_record(false), 
     run_episode(0), 
-    desired("/home/sean/Documents/exp_bag"),
+    //desired("/home/sean/Documents/exp_bag"),
     nh_(nh), 
     pnh_(pnh)
     {
+    desired = "/home/" + getUserName() + "/Documents/exp_bag";
+    if(!std::experimental::filesystem::exists(std::experimental::filesystem::path(desired))){
+      std::experimental::filesystem::create_directories(std::experimental::filesystem::path(desired));
+    }
     topics_to_record.push_back("/record/color/image_raw");
     topics_to_record.push_back("/agent_server_node/execution_info");
     bool compressed;
