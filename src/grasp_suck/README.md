@@ -11,6 +11,10 @@
 * Realsense D435/415 (One REQUIRED, One Optinal)
 * Vacuum Pump (Can be control by a valve)
 * Tools from XYZ Robotics
+| ABB IRB1660ID| ![](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/abb.jpg)|
+| RealSense D435/415 <br> One required, one optinal | ![](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/d435.jpg) |
+| Vacuum Pumb <br> Should can be controlled by an Arduino and a valve| ![](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/vacuum_pump.jpg) |
+| Tools from [XYZ Robotics](http://en.xyzrobotics.ai/)| ![](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/tools.jpg) |
 
 ## How to Start <a name="Start"></a>
 ```
