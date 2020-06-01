@@ -1,3 +1,8 @@
+# Abstract
+<p align="center">The increasing logistics work of E-commerce and cost for human labor come with a <b>great need for semi- to fully autonomous robotic picking task.</b> The Amazon Picking Challenge and the Amazon Robotics Challenge facilitate the developments of pick-and-place problems, commonly by the use of suction cup and parallel-jaw gripper. However, due to the diversity of object geometry, material, and weight, it is still challenging to successfully grasp all objects using single end effector. Existing affordance predictions were carried out by either human labelling or only learned for the geometry aspect of small unrealistic objects. This work mainly focus on <b>learning novel object bin-picking with proper tool selection for realistic objects with varieties of size, weight, geometry, and deformable objects.</b> A set of changeable pneumatic tool, including different types of suction cups and vacuum-based parallel-jaw gripper, is used for handling wide varieties of objects. The run-time tool selection is carried out by <b>model-free deep Q-learning that learns the mapping from a heightmap captured by a RGB-D camera to the action-value of each tool at each pixel.</b> The training data are collected with real robot system in a self-supervised fashion. We found the learnt policy trained from <b> 3,000 experiences collected in 18 hours</b> outperformed previous work by human labeled affordance. The grasping performance of novel objects were improved by a self-supervised finetune. All data are publicly available in RoboNet.
+<p align="center"><img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/motivation.jpg" width=830 height=250/>
+<p align="center"><img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/teaser.jpg" width=1185 height=435/>
+
 # Table of Contents
 1. [Hardware](#Hardware)
 2. [How to Start](#Start)
@@ -7,18 +12,16 @@
 6. [Network](#Network)
 
 ## Hardware <a name="Hardware"></a>
-* ABB IRB1660ID
-* Realsense D435/415 (One REQUIRED, One Optinal)
-* Vacuum Pump (Can be control by a valve)
-* Tools from XYZ Robotics
-| ABB IRB1660ID| ![](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/abb.jpg)|
-| RealSense D435/415 <br> One required, one optinal | ![](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/d435.jpg) |
-| Vacuum Pumb <br> Should can be controlled by an Arduino and a valve| ![](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/vacuum_pump.jpg) |
-| Tools from [XYZ Robotics](http://en.xyzrobotics.ai/)| ![](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/tools.jpg) |
+| Hardware | Image |
+| :---: | :---: |
+| ABB IRB1660ID| <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/abb.jpg" width=222 height=296/>|
+| RealSense D435/415 <br> One required, one optinal | <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/d435.jpeg" width=237 height=105/> |
+| Vacuum Pumb <br> Should can be controlled by an Arduino and a valve| <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/vacuum_pump.png" width=244 height=186/> |
+| Tools from [XYZ Robotics](http://en.xyzrobotics.ai/)| <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/tools.png" width=299 height=159/> |
 
 ## How to Start <a name="Start"></a>
 ```
-$ cd && gir clone https://github.com/sean85914/rl_pnp.git && cd rl_pnp && catkin_make
+$ cd && git clone https://github.com/sean85914/rl_pnp.git && cd rl_pnp && catkin_make
 $ source devel/setup.bash # do this every time you open a new terminal
 [Terminal 1] $ roscore  
 [Terminal 2] $ roslaunch grasp_suck actuator.launch  
@@ -35,10 +38,14 @@ $ source devel/setup.bash # do this every time you open a new terminal
 | visualization/viz.launch| rviz/rviz <br> visualization/show_lines <br> visualization/viz_boundary <br> visualization/viz_marker_node | Launch RViz <br> Show gripper detect range <br> Show worksapce range <br> Service to visualize the selected action |
 
 ## System Pipeline <a name="System"></a>
-The system consists three part:  
-1. The agent retrieves pointcloud and convert to arm coordinate with calibrated extrinsic matrix. We then reproject the pointcloud in the pre-defined workspace to a top-down viewpoint heightmap, which includes both color and height information.
-2. The heightmap then passes through a preprocessing procedure, feeds into a fully convolution neural network and get affordance prediction, which maps the heightmap to the Q-value of each tool.
-3. The agent selects the action among the predictions according to its policy (either <sub>&epsilon;-greedy</sub> or greedy policy) and executes the action and the envioronment will tell the agent whether it successfully grasp the object.
+<p align="center"> <img src="https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/img/system.png" width=730 height=413/> </p>
+The system consists three part:
+
+1. <b>Environment Perception</b>: The agent retrieves pointcloud and convert to arm coordinate with calibrated extrinsic matrix. We then reproject the pointcloud in the pre-defined workspace to a top-down viewpoint heightmap, which includes both color and height information.
+2. <b>Network Prediction</b>: The heightmap then passes through a preprocessing procedure, feeds into a fully convolution neural network and get affordance prediction, which maps the heightmap to the Q-value of each tool.
+3. <b>Action Execution</b>: The agent selects the action among the predictions according to its policy (either <sub>&epsilon;-greedy</sub> or greedy policy) and executes the action and the envioronment will tell the agent whether it successfully grasp the object.
+
+
 
 ## Services List <a name="Services"></a>
 
@@ -74,6 +81,9 @@ The system consists three part:
 | /autonomous_recording_node/start_recording | [grasp_suck/recorder](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/srv/recorder.srv) | Start recording with given index |
 | /autonomous_recording_node/stop_recording| [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Stop recording |
 
+
+
 ## Network <a name="Network"></a>
 * [Model Architecture](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/src/model_v2.py)
 * [Training](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/src/trainer.py)
+
