@@ -1,74 +1,75 @@
-<img src="img/system.png" height=640px>
-
 # Table of Contents
-1. [How to Start](#Start)
-2. [Launch](#Launch)
-3. [System Pipeline](#Pipeline)
-4. [Services](#Services)
-5. [Network](#Network)
+1. [Hardware](#Hardware)
+2. [How to Start](#Start)
+3. [Launch](#Launch)
+4. [System Pipeline](#System)
+5. [Services List](#Services)
+6. [Network](#Network)
 
-## How to start <a name="Start"></a>
-```
-$ cd && git clone https://github.com/sean85914/flip_object.git && cd flip_object && catkin_make
-$ source devel/setup.bash # DO THIS IN EACH NEW TERMINAL
-[Terminal 1] $ roslaunch arm_operation ur5_real.launch robot_ip:=192.168.50.11 tool_length:=0.0
-[Terminal 2] $ roslaunch realsense2_camera rs_rgbd.launch camera:=camera1
-[Terminal 3] $ roslaunch grasp_suck grasp_suck_system.launch
-[Terminal 4] $ rosrun rviz rviz -d src/visualization/config/system.rviz
-[Terminal 5] $ cd src/grasp_suck/src && python main.py [--force_cpu] [--model PATH_TO_YOUR_MODEL] [--epidode EPISODE] [--epsilon epsilon] [--num_of_items NUM_OF_ITEMS] [--update_target UPDATE_TARGET]
-```
-For testing, run
-```
-[Terminal 5] $ python main.py --is_testing [--force_cpu] [--grasp_only] [--episode EPISODE] [--model PATH_TO_YOUR_MODEL] [--num_of_items NUM_OF_ITEMS] [--update_target UPDATE_TARGET]
-```
-## System Pipeline <a name="Pipeline"></a>
-<img src="img/dqn_grasp_and_suck.png" height=640px align="center"/>
-The system is start with <code>item = N</code> and the process will stop after <code>item = 0</code>
+## Hardware <a name="Hardware"></a>
+* ABB IRB1660ID
+* Realsense D435/415 (One REQUIRED, One Optinal)
+* Vacuum Pump (Can be control by a valve)
+* Tools from XYZ Robotics
 
-## grasp_suck_system.launch <a name="Launch"></a>
+## How to Start <a name="Start"></a>
+```
+$ cd && gir clone https://github.com/sean85914/rl_pnp.git && cd rl_pnp && catkin_make
+$ source devel/setup.bash # do this every time you open a new terminal
+[Terminal 1] $ roscore  
+[Terminal 2] $ roslaunch grasp_suck actuator.launch  
+[Terminal 3] $ roslaunch grasp_suck sensors.launch serial_no:=[Camera Serial No.] side_record_no:=[Another Camera Serial No.]  
+[Terminal 4] $ roslaunch visualization viz.launch rviz:=true  
+[Terminal 5] $ roscd grasp_suck/src && python main.py [integer number]  
+```
 
-| Type   | Path    | Description |
-| :---:  | :---:   | :---:       |
-| launch | arm_operation/tcp_publisher.launch                    | Suction and 2-finger gripper transformation information |
-| node   | vacuum_conveyor_control/arduino_control               | Turn on vacuum control services |
-| node   | robotiq_2f_gripper_control/Robotiq2FGripperRtuNode.py | Turn on robotiq 2-finger gripper |
-| node   | grasp_suck/robotiq_gripper_control                    | Trun on robotiq gripper control services |
-| node   | visual_system/pc_transform                            | Transform point cloud from eye coord. to hand coord. <br> Check if workspace is empty </br> |
-| ~~node~~   | ~~grasp_suck/get_reward~~                                 | ~~Using consecutive depth images to judge if action succeed <br>TODO: use air pressure sensor to check if suck success</br>~~ |
-| launch | grasp_suck/helper_services.launch                     | High-level services, including homing, picking and placing | 
-| node | robotiq_ft_sensor/rq_sensor | Open force torch sensor, only do if use_ft set to true | 
-| node | visualization/viz_boundary.py | Visualize the limits of work space |
-| node | visualization/viz_marker.py | Service to visualize the primitive and text markers |
+## Launch <a name="Launch"></a>
+| Name | Nodes | Description |
+| :---: | :---: | :---: |
+| grasp_suck/actuator.launch | abb_node/abb_node <br> arm_operation/change_tool_service arm_operation/agent_server_node | Turn on robot arm logger and server <br> Services for changing tools <br> Services for agent behavior |
+| grasp_suck/sensors.launch | -- <br> visual_system/combine_pc_node  grasp_suck/autonomous_recording_node visual_system/two_cams_tf </br>| Turn on realsense camera(s) <br> Get pointcloud in workspace <br> Autonomous recording for ROS bag <br> Broadcast extrinsic transformation between the arm and the camera |
+| visualization/viz.launch| rviz/rviz <br> visualization/show_lines <br> visualization/viz_boundary <br> visualization/viz_marker_node | Launch RViz <br> Show gripper detect range <br> Show worksapce range <br> Service to visualize the selected action |
+
+## System Pipeline <a name="System"></a>
+The system consists three part:  
+1. The agent retrieves pointcloud and convert to arm coordinate with calibrated extrinsic matrix. We then reproject the pointcloud in the pre-defined workspace to a top-down viewpoint heightmap, which includes both color and height information.
+2. The heightmap then passes through a preprocessing procedure, feeds into a fully convolution neural network and get affordance prediction, which maps the heightmap to the Q-value of each tool.
+3. The agent selects the action among the predictions according to its policy (either <sub>&epsilon;-greedy</sub> or greedy policy) and executes the action and the envioronment will tell the agent whether it successfully grasp the object.
 
 ## Services List <a name="Services"></a>
 
-| Service name                              | Service type | Description |
-| :---:                                     | :---: | :---: |
-|<tr><td colspan=3><p align="center">**Gripper Related**</p></td></tr>|
-| /arduino_control/pheumatic_control | [std_srvs/SetBool](http://docs.ros.org/melodic/api/std_srvs/html/srv/SetBool.html) | Suction cup expansion and contraction |
-| /arduino_control/vacuum_control    | [vacuum_conveyor_control/vacuum_control](https://github.com/sean85914/flip_object/blob/master/src/vacuum_conveyor_control/srv/vacuum_control.srv) | Suction behavior control | 
-| /arduino_control/check_suck_success | [std_srvs/SetBool](http://docs.ros.org/melodic/api/std_srvs/html/srv/SetBool.html) | Check if suck success |
-| /robotiq_finger_control_node/intial_gripper | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Initialize gripper |
-| /robotiq_finger_control_node/close_gripper | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Close gripper |
-| /robotiq_finger_control_node/open_gripper  | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Open gripper | 
-| /robotiq_finger_control_node/get_grasp_state | [std_srvs/SetBool](http://docs.ros.org/melodic/api/std_srvs/html/srv/SetBool.html) | Get if grasp success |
-|<tr><td colspan=3><p align="center">**Robot Arm Related**</p></td></tr>|
-| /ur5_control_server/ur_control/goto_joint_pose | [arm_operation/joint_pose](https://github.com/sean85914/flip_object/blob/master/src/arm_operation/srv/joint_pose.srv) | Go to user given joint pose |
-| /ur5_control_server/ur_control/goto_pose | [arm_operation/target_pose](https://github.com/sean85914/flip_object/blob/master/src/arm_operation/srv/target_pose.srv) | Go to user given cartesian pose | 
-|<tr><td colspan=3><p align="center">**Visual Related**</p></td></tr>|
-| ~~/get_reward/get_result~~ | ~~[grasp_suck/get_result](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/srv/get_result.srv)~~ | ~~Use consecutive depth heightmaps to determine if suck success~~ |
-| /pc_transform/get_pc | [visual_system/get_pc](https://github.com/sean85914/flip_object/blob/master/src/visual_system/srv/get_pc.srv) | Get pointcloud inside the workspace with coordinate of robot arm |
-| /pc_transform/empty_state | [visual_system/pc_is_empty](https://github.com/sean85914/flip_object/blob/master/src/visual_system/srv/pc_is_empty.srv) | Get if workspace is empty |
-|<tr><td colspan=3><p align="center">**High-level Services**</p></td></tr>|
-| /helper_services_node/goto_target | [grasp_suck/get_pose](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/srv/get_pose.srv) | Make arm contact with request point with specific motion primitive and angle
-| /helper_services_node/robot_go_home | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Return arm to home and set posterior |
-| /helper_services_node/robot_go_place | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Place the object with predifined pose |
-|<tr><td colspan=3><p align="center">**Visualization**</p></td></tr>|
-| /viz_marker_node/viz_marker | [visualization/viz_marker](https://github.com/sean85914/flip_object/blob/master/src/visualization/srv/viz_marker.srv) | Visualize primitive and text markers |
+| Service Name| Service Type | Description |
+| :---: | :---: | :---: |
+|<tr><td colspan=3><p align="center">**Arm Related**</p></td></tr>|
+| /abb/GetCartesian | [abb_node/robot_GetCartesian](https://github.com/sean85914/rl_pnp/blob/master/src/open_abb/abb_node/srv/robot_GetCartesian.srv) | Get robot end-effector pose w.r.t. the base |
+| /abb/GetJoints | [abb_node/robot_GetJoints](https://github.com/sean85914/rl_pnp/blob/master/src/open_abb/abb_node/srv/robot_GetJoints.srv) | Get robot six joints angle |
+| /abb/SetCartesian | [abb_node/robot_SetCartesian](https://github.com/sean85914/rl_pnp/blob/master/src/open_abb/abb_node/srv/robot_SetCartesian.srv) | Set robot end-effector to assigned pose |
+| /abb/SetJoints | [abb_node/robot_SetJoints](https://github.com/sean85914/rl_pnp/blob/master/src/open_abb/abb_node/srv/robot_SetJoints.srv) | Set robot six joints to assigned angle |
+| /abb/SetSpeed | [abb_node/robot_SetSpeed](https://github.com/sean85914/rl_pnp/blob/master/src/open_abb/abb_node/srv/robot_SetSpeed.srv) | Set robot end-effector tranlation and rotation speed |
+| /abb/SetZone | [abb_node/robot_SetCartesian](https://github.com/sean85914/rl_pnp/blob/master/src/open_abb/abb_node/srv/robot_SetZone.srv)| Set accuracy of the end-effector when moving to the designated pose |
+|<tr><td colspan=3><p align="center">**Vacuum Related**</p></td></tr>|
+| /vacuum_pump_control_node/vacuum_control | [std_srvs/SetBool](http://docs.ros.org/melodic/api/std_srvs/html/srv/SetBool.html) | Turn on the pneumatic tool |
+| /vacuum_pump_control_node/check_suck_success | [std_srvs/SetBool](http://docs.ros.org/melodic/api/std_srvs/html/srv/SetBool.html) | Check if current suction cup is grasping object |
+|<tr><td colspan=3><p align="center">**Visaul Related**</p></td></tr>|
+| /combine_pc_node/get_pc | [visual_system/get_pc](https://github.com/sean85914/rl_pnp/blob/master/src/visual_system/srv/get_pc.srv)| Get pointcloud in the workspace |
+| /combine_pc_node/grasp_state | [visual_system/check_grasp_success](https://github.com/sean85914/rl_pnp/blob/master/src/visual_system/srv/check_grasp_success.srv)| Check if current parallel-jaw gripper is grasping object |
+| /combine_pc_node/empty_state | [visual_system/pc_is_empty](https://github.com/sean85914/rl_pnp/blob/master/src/visual_system/srv/pc_is_empty.srv)| Check if current workspace is empty, <br> i.e., contains no other object |
+|<tr><td colspan=3><p align="center">**Agent Related**</p></td></tr>|
+| /change_tool_service/change_tool_service| [arm_operation/change_tool](https://github.com/sean85914/rl_pnp/blob/master/src/arm_operation/srv/change_tool.srv)| Change mounted tool to designated one |
+| /change_tool_service/calibrate_gripper | [std_srvs/SetBool](http://docs.ros.org/melodic/api/std_srvs/html/srv/SetBool.html) | Calibrate parallel-jaw gripper to zero-degree |
+| /agent_server_node/go_home | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Make robot arm return to predefined joint angles |
+| /agent_server_node/go_home_fix_orientation | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Make robot arm return to predefined position with current orientation |
+| /agent_server_node/go_place | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Transport grasped object to another bin then return |
+| /agent_server_node/agent_take_action | [arm_operation/agent_abb_action](https://github.com/sean85914/rl_pnp/blob/master/src/arm_operation/srv/agent_abb_action.srv) | Execute the action with selected tool and position |
+| /agent_server_node/light_vibrate | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Shake gently from the end-effector to prevent bad grasping |
+| /agent_server_node/fast_vibrate | [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Quickly vibrate up and down to avoid object gets stuck in the gripper |
+| /agent_server_node/check_if_collide | [arm_operation/agent_abb_action](https://github.com/sean85914/rl_pnp/blob/master/src/arm_operation/srv/agent_abb_action.srv) | Check if the gripper will collide with the bin and camera |
+| /agent_server_node/publish_data | [arm_operation/publish_info](https://github.com/sean85914/rl_pnp/blob/master/src/arm_operation/srv/publish_info.srv) | Log execution data for future usage |
+|<tr><td colspan=3><p align="center">**Visualization Related**</p></td></tr>|
+| /viz_marker_node/viz_marker | [visualization/viz_marker](https://github.com/sean85914/rl_pnp/blob/master/src/visualization/srv/viz_marker.srv)| Visualize the selected action in RViz |
+| /autonomous_recording_node/start_recording | [grasp_suck/recorder](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/srv/recorder.srv) | Start recording with given index |
+| /autonomous_recording_node/stop_recording| [std_srvs/Empty](http://docs.ros.org/melodic/api/std_srvs/html/srv/Empty.html) | Stop recording |
 
 ## Network <a name="Network"></a>
-**Network Flowchart**
-<img src="img/size_flow.png">
-### TODO： add description
-1. [models.py](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/src/models.py)
-2. [trainer.py](https://github.com/sean85914/flip_object/blob/master/src/grasp_suck/src/trainer.py)  
+* [Model Architecture](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/src/model_v2.py)
+* [Training](https://github.com/sean85914/rl_pnp/blob/master/src/grasp_suck/src/trainer.py)

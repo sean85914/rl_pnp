@@ -405,7 +405,7 @@ def create_argparser():
 	parser.add_argument("--force_cpu", action="store_true", default=False, help="True if using CPU, default is false")
 	parser.add_argument("--model", type=str, default="", help="If provided, continue training the model, or using this model for testing, 	default is empty srting")
 	parser.add_argument("--epsilon", type=float, default=0.5, help="Probability to choose random action, default is 0.5")
-	parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alram lamp, default is /dev/ttylight")
+	parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alarm lamp, default is /dev/ttylight")
 	parser.add_argument("--buffer_size", type=int, default=1000, help="Experience buffer size, default is 500") # N
 	parser.add_argument("--learning_freq", type=int, default=5, help="Frequency for updating behavior network, default is 5") # M
 	parser.add_argument("--updating_freq", type=int, default=10, help="Frequency for updating target network, default is 10") # C
