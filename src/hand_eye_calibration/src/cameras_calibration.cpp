@@ -47,13 +47,24 @@ CamerasCalibration::CamerasCalibration(ros::NodeHandle nh, ros::NodeHandle pnh):
   if(!pnh_.getParam("master_cam_name", master_cam_name)) master_cam_name = "camera1";
   if(!pnh_.getParam("slave_cam_name", slave_cam_name)) slave_cam_name = "camera2";
   if(!pnh_.getParam("file_name", file_name)) file_name = "cameras_calibration";
+  if(file_name.empty()){
+    ROS_WARN("Empty filename, set to default");
+    file_name = "cameras_calibration";
+  }
   printParams();
   master_cam_link = master_cam_name+"_link";
   slave_cam_link  = slave_cam_name +"_link";
   package_path = ros::package::getPath("hand_eye_calibration");
   boost::filesystem::path p(package_path+"/data");
   if(!boost::filesystem::exists(p)) boost::filesystem::create_directory(p);
-  file_path = package_path + "/data/" + file_name + ".txt";
+  // If have file extension, make sure it is `txt`
+  if(file_name.length()>4&&file_name[file_name.length()-4]=='.'){
+    if(file_name.substr(file_name.length()-3, 3).compare("txt")==0)
+      file_path = package_path + "/data/" + file_name;
+    else // none `txt`
+      file_path = package_path + "/data/" + file_name.substr(0, file_name.length()-5) + ".txt";
+  }else // Without extension
+    file_path = package_path + "/data/" + file_name + ".txt";
   fs.open(file_path, std::fstream::out | std::fstream::app); // Write file at the end
   ROS_INFO("[%s] Node ready", ros::this_node::getName().c_str());
 }
