@@ -24,7 +24,7 @@ $ roslaunch visualization viz.launch rviz:=true
 $ roscd grasp_suck/src && python main.py [integer number]
 ```
 
-## [DLP 2019 Final Project](https://github.com/sean85914/rl_pnp/tree/master/dlp_final/grasp_suck/README.md)
+## [DLP 2019 Final Project](https://github.com/sean85914/rl_pnp/tree/master/dlp_final/grasp_suck)
 ![](https://github.com/sean85914/flip_object/blob/master/img/dlp_system.png)
 In this project, we try to use reinforcement learning to do pick and place with custom made gripper. The gripper is composed of Robotiq 2F-85 and a retractable suction cup. The method is inspired by "Learning Synergies between Pushing and Grasping with Self-supervised Deep Reinforcement Learning", from Andy Zeng.
 ```
@@ -38,6 +38,6 @@ In this project, we try to use reinforcement learning to do pick and place with 
 }
 ```
 
-## [Master Thesis](https://github.com/sean85914/rl_pnp/tree/master/src/grasp_suck/README.md)
+## [Master Thesis](https://github.com/sean85914/rl_pnp/tree/master/src/grasp_suck)
 Extend from the project above, we try to use three different tools to do bin picking job with ABB IRB1660ID. Specially thanks to XYZ Robotics for sponsoring the robot arm and the tooling system.
 ![](https://github.com/sean85914/flip_object/blob/master/img/master_thesis_system.png)
