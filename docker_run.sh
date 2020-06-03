@@ -56,6 +56,6 @@ then
   --device=/dev/ttyUSB* \
   --device=/dev/ttyACM* \
   -v /dev/bus/usb:/dev/bus/usb \
-  -w /home/$USER/rl_pnp \
+  -w ${pwd} \
   sean85914/ddqn_bin_picking:cuda9.0 bash
 fi
