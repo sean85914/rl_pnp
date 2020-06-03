@@ -22,7 +22,7 @@ then
   CUDA_TAG="cuda9.0"
 elif [ `echo $LD_LIBRARY_PATH | grep -c "cuda-10.*" ` -gt 0 ]
 then
-  echo "\033[1;35mFind Cuda version 10.0\033[0m"
+  echo -e "\033[1;35mFind Cuda version 10.0\033[0m"
   CUDA_TAG="cuda10.0"
 fi
 
@@ -42,7 +42,7 @@ then
   -v /etc/localtime:/etc/localtime:ro \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v /tmp/.X11-unix/:/tmp/.X11-unix \
-  -v /home/$USER/rl_pnp:/home/$USER/rl_pnp \
+  -v ${pwd}:${pwd} \
   --env "XAUTHORITY=$XAUTH" \
   -v "XAUTHORITY=$XAUTH" \
   --runtime=nvidia \

@@ -12,7 +12,7 @@ fi
 # Check if $CUDA_TAG set
 if [ -z "$CUDA_TAG" ]
 then
-  echo "\033[1;31mInvalid Cuda version (we only provided with version 9.* and 10.*) or no Cuda Installed\033[0m"
+  echo -e "\033[1;31mInvalid Cuda version (we only provided with version 9.* and 10.*) or no Cuda Installed\033[0m"
   return
 fi
 
