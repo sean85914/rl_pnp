@@ -68,6 +68,8 @@ ros-${ROS_DISTRO}-ddynamic-reconfigure \
 ros-${ROS_DISTRO}-industrial-msgs \
 ros-${ROS_DISTRO}-effort-controllers \
 ros-${ROS_DISTRO}-rgbd-launch \
+ros-${ROS_DISTRO}-geographic-msgs \
+ros-${ROS_DISTRO}-geodesy \
 python-pip \
 && pip install --upgrade pip==9.0.1 \
 && rm -rf /var/lib/apt/lists/*
