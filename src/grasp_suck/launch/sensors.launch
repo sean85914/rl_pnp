@@ -4,7 +4,6 @@
   <arg name="serial_no"/>
   <arg name="camera" default="camera1"/>
   <arg name="tf_prefix" default="camera1"/>
-  <arg name="side_record" default="true"/>
   <arg name="record_serial_no" default=""/>
   <!-- Main camera -->
   <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
@@ -21,7 +20,7 @@
   <!-- Pointcloud conversion -->
   <include file="$(find visual_system)/launch/combine_pc.launch"/>
   <!-- Side-recording camera -->
-  <group if="$(arg side_record)">
+  <group unless="$(eval record_serial_no == '')">
     <include file="$(find realsense2_camera)/launch/rs_camera.launch">
       <arg name="serial_no" value="$(arg record_serial_no)"/>
       <arg name="camera" value="record"/>

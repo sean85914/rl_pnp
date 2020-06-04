@@ -18,18 +18,18 @@ fi
 # Check if valid cuda version
 if [ `echo $LD_LIBRARY_PATH | grep -c "cuda-9.*" ` -gt 0 ]
 then
-  echo -e "\033[1;35mFind Cuda version 9.0\033[0m"
+  echo -e "\033[1;35mFind Cuda version 9\033[0m"
   CUDA_TAG="cuda9.0"
 elif [ `echo $LD_LIBRARY_PATH | grep -c "cuda-10.*" ` -gt 0 ]
 then
-  echo -e "\033[1;35mFind Cuda version 10.0\033[0m"
+  echo -e "\033[1;35mFind Cuda version 10\033[0m"
   CUDA_TAG="cuda10.0"
 fi
 
 # Check if $CUDA_TAG set
 if [ -z "$CUDA_TAG" ]
 then
-  echo "\033[1;31mInvalid Cuda version (we only provided with version 9.* and 10.*) or no Cuda Installed\033[0m"
+  echo -e "\033[1;31mInvalid Cuda version (we only provided with version 9.* and 10.*) or no Cuda Installed\033[0m"
   return
 fi
 
@@ -42,7 +42,7 @@ then
   -v /etc/localtime:/etc/localtime:ro \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v /tmp/.X11-unix/:/tmp/.X11-unix \
-  -v ${pwd}:${pwd} \
+  -v $PWD/:/home/$USER/rl_pnp \
   --env "XAUTHORITY=$XAUTH" \
   -v "XAUTHORITY=$XAUTH" \
   --runtime=nvidia \
@@ -56,6 +56,6 @@ then
   --device=/dev/ttyUSB* \
   --device=/dev/ttyACM* \
   -v /dev/bus/usb:/dev/bus/usb \
-  -w ${pwd} \
-  sean85914/ddqn_bin_picking:cuda9.0 bash
+  -w /home/$USER/rl_pnp \
+  sean85914/ddqn_bin_picking:${CUDA_TAG} bash
 fi
