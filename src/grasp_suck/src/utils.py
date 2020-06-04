@@ -5,6 +5,7 @@ import yaml
 import cv2
 import struct
 import ctypes
+import rospkg
 import argparse
 import multiprocessing as mp
 from scipy import ndimage
@@ -21,8 +22,9 @@ from prioritized_memory import Memory
 # Define transition tuple
 Transition = namedtuple('Transition', ['color', 'depth', 'pixel_idx', 'reward', 'next_color', 'next_depth', 'is_empty'])
 
-yaml_path = "/home/sean/Documents/flip_obj/src/visual_system/config/param_config.yaml"
-background_data = "/home/sean/Documents/flip_obj/src/grasp_suck/data/background.txt"
+rospack = rospkg.RosPack()
+yaml_path = rospack.get_path("visual_system")+"/config/param_config.yaml"
+background_data = rospack.get_path("grasp_suck")+"/data/background.txt"
 
 with open(yaml_path, "r") as stream:
 	data = yaml.load(stream)
@@ -405,7 +407,7 @@ def create_argparser():
 	parser.add_argument("--force_cpu", action="store_true", default=False, help="True if using CPU, default is false")
 	parser.add_argument("--model", type=str, default="", help="If provided, continue training the model, or using this model for testing, 	default is empty srting")
 	parser.add_argument("--epsilon", type=float, default=0.5, help="Probability to choose random action, default is 0.5")
-	parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alarm lamp, default is /dev/ttylight")
+	parser.add_argument("--port", type=str, default="/dev/ttylight", help="Port for arduino, which controls the alram lamp, default is /dev/ttylight")
 	parser.add_argument("--buffer_size", type=int, default=1000, help="Experience buffer size, default is 500") # N
 	parser.add_argument("--learning_freq", type=int, default=5, help="Frequency for updating behavior network, default is 5") # M
 	parser.add_argument("--updating_freq", type=int, default=10, help="Frequency for updating target network, default is 10") # C

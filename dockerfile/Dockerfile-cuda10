@@ -77,7 +77,7 @@ python-pip \
 # torch==1.0.1.post2
 # torchvision==0.2.2
 RUN apt-get update && apt-get install -y  \
-&& pip install torch==1.0.1.post2 && pip install torchvision==0.2.2
+&& pip install torch==1.0.1.post2 && pip install torchvision==0.2.2 && pip install scipy
 
 RUN echo "source /home/*/rl_pnp/devel/setup.bash" >> ~/.bashrc
 CMD ["/bin/bash"]

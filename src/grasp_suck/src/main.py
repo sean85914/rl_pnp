@@ -39,7 +39,10 @@ sufficient_exp = 0
 gripper_memory_buffer   = Memory(buffer_size)
 suction_1_memory_buffer = Memory(buffer_size)
 suction_2_memory_buffer = Memory(buffer_size)
-arduino = serial.Serial(port, 115200)
+if port!='':
+	arduino = serial.Serial(port, 115200)
+else:
+	arduino = None
 
 if model_str == "" and testing: # TEST SHOULD PROVIDE MODEL
 	print "\033[0;31mNo model provided, exit!\033[0m"
@@ -164,7 +167,7 @@ loss_t = 0
 try:
 	while True:
 		if iteration is not 0: 
-			arduino.write("gb 1000") # Green + buzzer for alarming resetting
+			if arduino: arduino.write("gb 1000") # Green + buzzer for alarming resetting
 			print "Return: {} | Mean Training Loss: {}".format(return_, np.mean(loss_list[loss_t:len(loss_list)])) # For recording data
 			loss_t = len(loss_list)
 			return_list.append(return_); 
@@ -228,7 +231,8 @@ try:
 					else:
 						print "Will collide, abort request!"
 				else: # invalid
-					action_list.append(-1); arduino.write("r 1000") # Red
+					action_list.append(-1); 
+					if arduino: arduino.write("r 1000") # Red
 					action_success = False
 				if is_valid:
 					if action < 2: # suction cup
@@ -241,11 +245,13 @@ try:
 				result_list.append(action_success)
 				if action_success: arduino.write("g 1000"); go_place(); fixed_home(); # Green
 				else: 
-					if is_valid: arduino.write("o 1000") # Orange
+					if is_valid: 
+						if arduino: arduino.write("o 1000") # Orange
 					fixed_home(); vacuum_pump_control(SetBoolRequest(False))
 				info = publish_infoRequest(); info.execution = utils.wrap_execution_info(iteration, is_valid, pixel_index[0], action_success)
 				publish_data_client(info)
-				time.sleep(1.0); arduino.write("go 1000") # Remind takeing input
+				time.sleep(1.0); 
+				if arduino: arduino.write("go 1000") # Remind takeing input
 				# Get next images, and check if workspace is empty
 				next_pc = _get_pc(iteration, False)
 				next_color, next_depth, next_points = utils.get_heightmap(next_pc.pc, image_path + "next_", depth_path + "next_", iteration)
@@ -271,7 +277,8 @@ try:
 				   gripper_memory_buffer.length   > mini_batch_size:
 					sufficient_exp+=1
 					if (sufficient_exp-1)%learning_freq==0:
-						back_ts = time.time(); arduino.write("b 1000"); learned_times += 1
+						back_ts = time.time(); 
+						if arduino: arduino.write("b 1000"); learned_times += 1
 						mini_batch = []; idxs = []; is_weight = []; old_q = []; td_target_list = [];
 						if specific_tool is not None:
 							if specific_tool == 0:
@@ -313,7 +320,7 @@ try:
 							elif i/mini_batch_size==1 or specific_tool == 1: suction_2_memory_buffer.update(idxs[i], td_target-old_value)
 							else: gripper_memory_buffer.update(idxs[i], td_target-old_value)
 						back_t = time.time()-back_ts
-						arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/(3*mini_batch_size))
+						if arduino: arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/(3*mini_batch_size))
 						if learned_times % updating_freq == 0:
 							print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
 							trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())
