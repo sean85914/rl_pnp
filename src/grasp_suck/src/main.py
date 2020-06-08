@@ -243,7 +243,9 @@ try:
 						else:
 							action_success = False
 				result_list.append(action_success)
-				if action_success: arduino.write("g 1000"); go_place(); fixed_home(); # Green
+				if action_success: 
+					if arduino: arduino.write("g 1000")
+					go_place(); fixed_home(); # Green
 				else: 
 					if is_valid: 
 						if arduino: arduino.write("o 1000") # Orange
@@ -278,7 +280,8 @@ try:
 					sufficient_exp+=1
 					if (sufficient_exp-1)%learning_freq==0:
 						back_ts = time.time(); 
-						if arduino: arduino.write("b 1000"); learned_times += 1
+						if arduino: arduino.write("b 1000")
+						learned_times += 1
 						mini_batch = []; idxs = []; is_weight = []; old_q = []; td_target_list = [];
 						if specific_tool is not None:
 							if specific_tool == 0:
@@ -320,7 +323,8 @@ try:
 							elif i/mini_batch_size==1 or specific_tool == 1: suction_2_memory_buffer.update(idxs[i], td_target-old_value)
 							else: gripper_memory_buffer.update(idxs[i], td_target-old_value)
 						back_t = time.time()-back_ts
-						if arduino: arduino.write("b 1000"); print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/(3*mini_batch_size))
+						if arduino: arduino.write("b 1000");
+						print "Backpropagation& Updating: {} seconds \t|\t Avg. {} seconds".format(back_t, back_t/(3*mini_batch_size))
 						if learned_times % updating_freq == 0:
 							print "[%f] Replace target network to behavior network" %(program_time+time.time()-program_ts)
 							trainer.target_net.load_state_dict(trainer.behavior_net.state_dict())

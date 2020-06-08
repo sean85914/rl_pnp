@@ -13,6 +13,7 @@ xhost +local:docker
 if [ "$1" == "same" ]
 then
   docker exec -it --privileged ${CONTAINER_NAME} bash
+  exit
 fi
 
 # Check if valid cuda version
