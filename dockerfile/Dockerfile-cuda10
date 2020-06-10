@@ -76,8 +76,12 @@ python-pip \
 # Install pytorch
 # torch==1.0.1.post2
 # torchvision==0.2.2
-RUN apt-get update && apt-get install -y  \
+RUN apt-get update \
 && pip install torch==1.0.1.post2 && pip install torchvision==0.2.2 && pip install scipy
+
+RUN apt-get update && apt-get install -y  wget \
+&& mkdir -p /root/.torch/models && cd /root/.torch/models \
+&& wget https://download.pytorch.org/models/densenet121-a639ec97.pth
 
 RUN echo "source /home/*/rl_pnp/devel/setup.bash" >> ~/.bashrc
 CMD ["/bin/bash"]

@@ -65,3 +65,6 @@ target_link_libraries(charuco_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 add_executable(charuco src/charuco.cpp)
 target_link_libraries(charuco ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} charuco_detector)
+
+add_executable(pointcloud_to_image src/pointcloud_to_image.cpp)
+target_link_libraries(pointcloud_to_image ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
