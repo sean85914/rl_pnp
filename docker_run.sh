@@ -44,7 +44,9 @@ then
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v /tmp/.X11-unix/:/tmp/.X11-unix \
   -v $PWD/:/home/$USER/rl_pnp \
+  -v /home/$USER/Documents/:/home/$USER/Documents \
   --env "XAUTHORITY=$XAUTH" \
+  --env USER=$USER \
   -v "XAUTHORITY=$XAUTH" \
   --runtime=nvidia \
   --device=/dev/dri:/dev/dri \

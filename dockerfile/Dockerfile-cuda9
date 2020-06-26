@@ -84,4 +84,5 @@ RUN apt-get update && apt-get install -y  wget \
 && wget https://download.pytorch.org/models/densenet121-a639ec97.pth
 
 RUN echo "source /home/*/rl_pnp/devel/setup.bash" >> ~/.bashrc
+RUN echo "source /home/*/rl_pnp/catkin_ws/devel/setup.bash" >> ~/.bashrc
 CMD ["/bin/bash"]

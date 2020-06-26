@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1280</width>
+    <height>640</height>
+   </rect>
+  </property>
+  <property name="font">
+   <font>
+    <pointsize>21</pointsize>
+   </font>
+  </property>
+  <property name="windowTitle">
+   <string>random_grasp</string>
+  </property>
+  <property name="windowIcon">
+   <iconset theme="arm">
+    <normaloff>.</normaloff>.</iconset>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <widget class="QLabel" name="image_view">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>10</y>
+      <width>960</width>
+      <height>540</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>TextLabel</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="object">
+    <property name="geometry">
+     <rect>
+      <x>990</x>
+      <y>20</y>
+      <width>91</width>
+      <height>51</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>21</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Object</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="get_mask_button">
+    <property name="geometry">
+     <rect>
+      <x>990</x>
+      <y>90</y>
+      <width>271</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Get Mask</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="execute_button">
+    <property name="geometry">
+     <rect>
+      <x>990</x>
+      <y>220</y>
+      <width>271</width>
+      <height>51</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Execute</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="success_button">
+    <property name="geometry">
+     <rect>
+      <x>990</x>
+      <y>300</y>
+      <width>120</width>
+      <height>80</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Success</string>
+    </property>
+    <property name="checkable">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="fail_button">
+    <property name="geometry">
+     <rect>
+      <x>1140</x>
+      <y>300</y>
+      <width>120</width>
+      <height>80</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Fail</string>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="status_browser">
+    <property name="geometry">
+     <rect>
+      <x>990</x>
+      <y>410</y>
+      <width>270</width>
+      <height>140</height>
+     </rect>
+    </property>
+    <property name="font">
+      <font>
+        <pointsize>9</pointsize>
+      </font>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="object_list">
+    <property name="geometry">
+     <rect>
+      <x>1090</x>
+      <y>30</y>
+      <width>171</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <item>
+     <property name="text">
+      <string>kotex</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>kellogg's</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>cheez-it</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>domino</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>kleenex</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>pocky</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>milo</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>swissmiss</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>raisins</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>mm</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>crayola</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>ziploc</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>dobie</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>spam</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>andes</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>macadamia</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>vanish</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>viva</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>stax</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>3m_white</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>pringles</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>shin_cup</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>heineken</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>maxwell_house</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>hunts</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>sea_salt_grinder</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>grill_mates</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>nivea</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>uhu_stic</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>lemon_c</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>folgers</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>3m_black</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>starkist</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>sdi</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>salted_potato_sticks</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>beanfields</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>scotch_brite</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>turtle_news</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>milano</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>sunlus</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>kleenex_soft</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>marshmallows</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>mango</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>nexcare</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>anytime</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>lemon_candy</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>extra</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>kisses</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>classic_marbles</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>bath_sponge</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>towel</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>cloth</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>usb_wire</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>mosi_out</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>dove</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>windex</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>french's</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>soft_scrub</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>mini_soccer_ball</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>cola</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>kinder</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>nutella</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>vaseline</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>pokemon</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>libava</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>3m_hook</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>chupa_chups</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>toblerone</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>piske</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>wrench</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>toilet_brush</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>teaspoon</string>
+     </property>
+    </item>
+   </widget>
+   <widget class="QComboBox" name="tool_list">
+    <property name="geometry">
+     <rect>
+      <x>1060</x>
+      <y>160</y>
+      <width>201</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <item>
+     <property name="text">
+      <string>I</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>II</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>III</string>
+     </property>
+    </item>
+   </widget>
+   <widget class="QLabel" name="tool">
+    <property name="geometry">
+     <rect>
+      <x>990</x>
+      <y>150</y>
+      <width>91</width>
+      <height>51</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>21</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Tool</string>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1280</width>
+     <height>39</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QToolBar" name="mainToolBar">
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+  </widget>
+  <widget class="QStatusBar" name="statusBar"/>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>

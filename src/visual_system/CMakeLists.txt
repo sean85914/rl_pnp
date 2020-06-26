@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 2.8.3)
 project(visual_system)
 add_compile_options(-std=c++11)
 
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOMIC ON)
+
+SET(CMAKE_CXX_FLAGS "-fPIC")
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
 find_package(catkin REQUIRED COMPONENTS cmake_modules
   roscpp
   rospy
@@ -21,6 +28,7 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
 find_package(Boost REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(PythonLibs 2.7 REQUIRED)
+find_package(Qt5 COMPONENTS Widgets Gui REQUIRED)
 
 add_service_files(
   FILES
@@ -45,6 +53,8 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
+  ${Qt5Widgets_INCLUDE_DIRS}
+  ${Qt5Gui_INCLUDE_DIRS}
 )
 
 install(DIRECTORY include/${PROJECT_NAME}/
@@ -73,3 +83,15 @@ target_link_libraries(pointcloud_to_image ${catkin_LIBRARIES} ${OpenCV_LIBRARIES
 add_library(conversion src/decode_vector.cpp)
 target_link_libraries(conversion boost_python python2.7 ${catkin_LIBRARIES})
 target_include_directories(conversion PRIVATE ${PYTHON_INCLUDE_DIRS})
+
+qt5_wrap_cpp(gui_SRC include/visual_system/mainwindow.h)
+qt5_wrap_ui(gui_UI src/random_grasping/mainwindow.ui)
+
+add_executable(random_grasping
+  src/random_grasping/mainwindow.cpp
+  src/random_grasping/main.cpp
+  ${gui_SRC}
+  ${gui_UI}
+)
+qt5_use_modules(random_grasping Widgets)
+target_link_libraries(random_grasping ${catkin_LIBRARIES})
