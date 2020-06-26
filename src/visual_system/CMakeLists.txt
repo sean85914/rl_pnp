@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS cmake_modules
 
 find_package(Boost REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(PythonLibs 2.7 REQUIRED)
 
 add_service_files(
   FILES
@@ -68,3 +69,7 @@ target_link_libraries(charuco ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} charuco_de
 
 add_executable(pointcloud_to_image src/pointcloud_to_image.cpp)
 target_link_libraries(pointcloud_to_image ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_library(conversion src/decode_vector.cpp)
+target_link_libraries(conversion boost_python python2.7 ${catkin_LIBRARIES})
+target_include_directories(conversion PRIVATE ${PYTHON_INCLUDE_DIRS})
