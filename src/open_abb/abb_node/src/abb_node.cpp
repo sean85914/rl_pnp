@@ -10,11 +10,39 @@
 
 #include "abb_node.h"
 
+void JointT::getSpeeds(const JointT j, sensor_msgs::JointState& js)
+{
+  for(int i=0; i<6; ++i)
+    js.velocity[i] = (joints[i]-j.joints[i])/(time-j.time);
+}
+
+void JointT::setJoints(const sensor_msgs::JointState js)
+{
+  for(int i=0; i<6; ++i)
+    joints[i] = js.position[i];
+}
+
+bool JointT::setTime(const char* hms)
+{
+  // Format: HH:MM:SS
+  int hh = 0, mm = 0, ss = 0;
+  if(hms[2]!=':'||hms[5]!=':'){
+    ROS_ERROR("Invalid time string");
+    return false;
+  }
+  std::string time_str(hms);
+  hh = std::stoi(time_str.substr(0, 2));
+  mm = std::stoi(time_str.substr(3, 2));
+  ss = std::stoi(time_str.substr(6, 2));
+  time = hh*3600+mm*60+ss;
+  return true;
+}
+
 /////////////////////////////////
 // BEGIN RobotController Class //
 /////////////////////////////////
 
-RobotController::RobotController(ros::NodeHandle *n) 
+RobotController::RobotController(ros::NodeHandle *n): first(true)
 {
   node = n;
 }
@@ -1427,6 +1455,7 @@ void RobotController::logCallback(const ros::TimerEvent&)
 
   //Joints has 6 positions, as the robot is 6 DOF
   msgJoints.position.resize(6);
+  msgJoints.velocity.resize(6);
   msgJoints.name.resize(6);
   msgJoints.name[0] = "joint1";
   msgJoints.name[1] = "joint2";
@@ -1502,6 +1531,17 @@ void RobotController::logCallback(const ros::TimerEvent&)
 		  msgJoints.position[i] *= 0.017453292;
 		}
               jointsModif = true;
+              if(first){ // First data
+                lastJoints.setJoints(msgJoints);
+                lastJoints.setTime(time);
+                first = false;
+              }else{
+                JointT currJoints;
+                currJoints.setJoints(msgJoints);
+                currJoints.setTime(time);
+                currJoints.getSpeeds(lastJoints, msgJoints);
+                lastJoints = JointT(currJoints);
+              }
             }
             break;
           }

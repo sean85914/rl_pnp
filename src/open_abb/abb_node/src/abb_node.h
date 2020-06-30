@@ -113,6 +113,30 @@ pthread_mutex_t wobjUpdateMutex;
 pthread_mutex_t forceUpdateMutex;
 pthread_mutex_t sendRecvMutex;
 
+class JointT{
+ public:
+  JointT(){
+    for(int i=0; i<6; ++i)
+      joints[i] = 0.0;
+    time = 0.0;
+  }
+  JointT(const JointT& t){
+    time = t.time;
+    for(int i=0; i<6; ++i)
+      joints[i] = t.joints[i];
+  }
+  /*
+    Get joint speed using difference
+    lhs: new data, rhs: last data
+  */
+  void getSpeeds(const JointT j, sensor_msgs::JointState& js);
+  void setJoints(const sensor_msgs::JointState js);
+  bool setTime(const char* hms);
+ private:
+  double joints[6];
+  double time;
+};
+
 class RobotController
 {
  public:
@@ -298,4 +322,8 @@ class RobotController
   Quaternion curQ;
   double curJ[NUM_JOINTS];
   double curForce[NUM_FORCES];
+  
+  // Difference to get joint speed
+  bool first;
+  JointT lastJoints;
 };
