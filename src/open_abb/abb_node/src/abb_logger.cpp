@@ -55,7 +55,10 @@ class TCPSocket{
 
 class ROSWrapper{
  private:
+  bool first;
   double x, y, z, q0, qx, qy, qz;
+  double last_joint[6];
+  ros::Time last_time;
   ros::NodeHandle nh_, pnh_;
   sensor_msgs::JointState js_msg;
   ros::Publisher pub_joints, pub_pose, pub_js;
@@ -74,8 +77,8 @@ class ROSWrapper{
     return true;
   }
  public:
-  ROSWrapper(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh_){
-    js_msg.name.resize(6); js_msg.position.resize(6);
+  ROSWrapper(ros::NodeHandle nh, ros::NodeHandle pnh): nh_(nh), pnh_(pnh_), first(true){
+    js_msg.name.resize(6); js_msg.position.resize(6); js_msg.velocity.resize(6);
     for(int i=1; i<=6; ++i){
       js_msg.name[i-1] = "joint" + std::to_string(i);
     }
@@ -118,6 +121,14 @@ class ROSWrapper{
           js_msg.position[i] *= M_PI/180.0;
         }
         js_msg.header.stamp = ros::Time::now();
+        if(first)
+          first = true;
+        else{
+          for(int i=0; i<6; ++i)
+            js_msg.velocity[i] = (js_msg.position[i]-js[i])/(js_msg.header.stamp-last_time).toSec();
+        }
+        last_time = js_msg.header.stamp;
+        std::copy(js, js+6, last_joint);
         pub_js.publish(js_msg);
         pub_joints.publish(joints);
         break;
