@@ -131,7 +131,7 @@ class JointT{
   */
   void getSpeeds(const JointT j, sensor_msgs::JointState& js);
   void setJoints(const sensor_msgs::JointState js);
-  bool setTime(const char* hms);
+  void setTime(void);
  private:
   double joints[6];
   double time;

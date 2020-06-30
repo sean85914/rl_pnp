@@ -122,13 +122,14 @@ class ROSWrapper{
         }
         js_msg.header.stamp = ros::Time::now();
         if(first)
-          first = true;
+          first = false;
         else{
+          double time_diff = (js_msg.header.stamp-last_time).toSec();
           for(int i=0; i<6; ++i)
-            js_msg.velocity[i] = (js_msg.position[i]-js[i])/(js_msg.header.stamp-last_time).toSec();
+            js_msg.velocity[i] = (js_msg.position[i]-last_joint[i])/time_diff;
         }
         last_time = js_msg.header.stamp;
-        std::copy(js, js+6, last_joint);
+        std::copy(js_msg.position.begin(), js_msg.position.begin()+6, last_joint);
         pub_js.publish(js_msg);
         pub_joints.publish(joints);
         break;

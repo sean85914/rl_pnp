@@ -22,20 +22,9 @@ void JointT::setJoints(const sensor_msgs::JointState js)
     joints[i] = js.position[i];
 }
 
-bool JointT::setTime(const char* hms)
+void JointT::setTime(void)
 {
-  // Format: HH:MM:SS
-  int hh = 0, mm = 0, ss = 0;
-  if(hms[2]!=':'||hms[5]!=':'){
-    ROS_ERROR("Invalid time string");
-    return false;
-  }
-  std::string time_str(hms);
-  hh = std::stoi(time_str.substr(0, 2));
-  mm = std::stoi(time_str.substr(3, 2));
-  ss = std::stoi(time_str.substr(6, 2));
-  time = hh*3600+mm*60+ss;
-  return true;
+  time = ros::Time::now().toSec();
 }
 
 /////////////////////////////////
@@ -157,8 +146,10 @@ bool RobotController::defaultRobotConfiguration()
   node->getParam("robot/workobjectQX",defWOqx);
   node->getParam("robot/workobjectQY",defWOqy);
   node->getParam("robot/workobjectQZ",defWOqz);
-  if (!setWorkObject(defWOx,defWOy,defWOz,defWOq0,defWOqx,defWOqy,defWOqz))
+  if (!setWorkObject(defWOx,defWOy,defWOz,defWOq0,defWOqx,defWOqy,defWOqz)){
+    ROS_ERROR("Can't set workspace");
     return false;
+  }
 
   //Tool
   node->getParam("robot/toolX",defTx);
@@ -168,24 +159,33 @@ bool RobotController::defaultRobotConfiguration()
   node->getParam("robot/toolQX",defTqx);
   node->getParam("robot/toolQY",defTqy);
   node->getParam("robot/toolQZ",defTqz);
-  if (!setTool(defTx,defTy,defTz,defTq0,defTqx,defTqy,defTqz))
+  if (!setTool(defTx,defTy,defTz,defTq0,defTqx,defTqy,defTqz)){
+    ROS_ERROR("Can't set tool");
     return false;
+  }
 
   //Zone
   node->getParam("robot/zone",zone);
-  if (!setZone(zone))
+  if (!setZone(zone)){
+    ROS_ERROR("Can't set zone");
     return false;
+  }
 
   //Speed
   node->getParam("robot/speedTCP",speedTCP);
   node->getParam("robot/speedORI",speedORI);
-  if (!setSpeed(speedTCP, speedORI))
+  if (!setSpeed(speedTCP, speedORI)){
+    ROS_ERROR("Can't set speed");
     return false;
+  }
 
   //Vacuum
-  node->getParam("robot/vacuum",vacuumMode);
-  if (!setVacuum(vacuumMode))
+  // Not sure what's wrong
+  /*node->getParam("robot/vacuum",vacuumMode);
+  if (!setVacuum(vacuumMode)){
+    ROS_ERROR("Can't set vacuum");
     return false;
+  }*/
 
   // If everything is set, our default configuration has been set up correctly
   return true;
@@ -1533,12 +1533,12 @@ void RobotController::logCallback(const ros::TimerEvent&)
               jointsModif = true;
               if(first){ // First data
                 lastJoints.setJoints(msgJoints);
-                lastJoints.setTime(time);
+                lastJoints.setTime();
                 first = false;
               }else{
                 JointT currJoints;
                 currJoints.setJoints(msgJoints);
-                currJoints.setTime(time);
+                currJoints.setTime();
                 currJoints.getSpeeds(lastJoints, msgJoints);
                 lastJoints = JointT(currJoints);
               }
